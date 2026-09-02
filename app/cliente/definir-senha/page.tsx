@@ -1,0 +1,10 @@
+import { KeyRound } from 'lucide-react';
+import Image from 'next/image';
+import { requireUser } from '@/lib/app-auth';
+
+export const dynamic = 'force-dynamic';
+export default async function DefinePasswordPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+  const user = await requireUser();
+  const { status } = await searchParams;
+  return <main className="flex min-h-screen items-center justify-center bg-[#0a0a0a] px-5 py-12 text-white"><section className="w-full max-w-xl border border-white/12 bg-[#171716] p-7 sm:p-10"><Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={232} height={84} className="h-12 w-auto brightness-0 invert" /><div className="mt-9 flex size-13 items-center justify-center bg-[#f2ad19] text-black"><KeyRound className="size-6" /></div><span className="eyebrow mt-7 block text-[#f2ad19]">Primeiro acesso</span><h1 className="mt-3 text-4xl font-black uppercase leading-none tracking-[-.05em]">Crie sua nova senha</h1><p className="mt-5 text-sm leading-relaxed text-white/58">Olá, {user.name}. Para proteger sua conta, substitua a senha temporária antes de continuar.</p>{status ? <p role="alert" className="mt-5 border-l-4 border-[#f2ad19] bg-white/8 p-4 text-sm">Use ao menos 10 caracteres e repita a mesma senha nos dois campos.</p> : null}<form action="/api/auth/change-password" method="post" className="mt-7 space-y-4"><input name="password" type="password" minLength={10} required autoComplete="new-password" placeholder="Nova senha" className="h-14 w-full border border-white/15 bg-black/40 px-4 text-sm outline-none focus:border-[#f2ad19]" /><input name="passwordConfirmation" type="password" minLength={10} required autoComplete="new-password" placeholder="Repita a nova senha" className="h-14 w-full border border-white/15 bg-black/40 px-4 text-sm outline-none focus:border-[#f2ad19]" /><button type="submit" className="h-14 w-full bg-[#f2ad19] text-xs font-extrabold uppercase tracking-[.13em] text-black hover:bg-[#ff9900]">Salvar e acessar</button></form></section></main>;
+}

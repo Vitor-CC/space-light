@@ -614,6 +614,8 @@ export default function Home() {
               <a href="#metodo" className="hover:text-[#f2ad19]">Como fazemos</a>
               <a href="#contato" className="hover:text-[#f2ad19]">Contato</a>
               <a href="/cliente/login" className="hover:text-[#f2ad19]">Área do Cliente</a>
+              <a href="/instrutor/login" className="hover:text-[#f2ad19]">Área do Instrutor</a>
+              <a href="/empresa" className="hover:text-[#f2ad19]">Área da Empresa</a>
             </nav>
             <div className="flex gap-2">
               <a

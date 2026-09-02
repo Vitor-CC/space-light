@@ -22,17 +22,10 @@ import {
   UserRound,
 } from 'lucide-react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import {
-  CLIENT_SESSION_KEY,
-  ClientCertificate,
-  ClientDocument,
-  ClientTraining,
-  clientPortalData,
-} from '@/lib/client-portal-data';
+import type { ClientCertificate, ClientDocument, ClientPortalData, ClientTraining } from '@/lib/client-portal-data';
 
 type PortalSection =
   | 'dashboard'
@@ -92,13 +85,13 @@ function slugify(value: string) {
     .replace(/(^-|-$)/g, '');
 }
 
-function demoFileHref(title: string, type: string) {
+function demoFileHref(title: string, type: string, legalName: string) {
   const body = [
     'SPACE LIGHT ENGENHARIA',
     type.toUpperCase(),
     '',
     title,
-    `Cliente: ${clientPortalData.organization.legalName}`,
+    `Cliente: ${legalName}`,
     '',
     'Arquivo demonstrativo do protótipo da Área do Cliente.',
     'Os arquivos oficiais serão disponibilizados pela equipe Space Light após a integração do backend.',
@@ -183,8 +176,7 @@ function TrainingCard({ training }: { training: ClientTraining }) {
   );
 }
 
-function Dashboard({ onNavigate }: { onNavigate: (section: PortalSection) => void }) {
-  const data = clientPortalData;
+function Dashboard({ data, userName, onNavigate }: { data: ClientPortalData; userName: string; onNavigate: (section: PortalSection) => void }) {
   const lastTraining = data.trainings[0];
   const totals = {
     trainings: data.trainings.length,
@@ -199,7 +191,7 @@ function Dashboard({ onNavigate }: { onNavigate: (section: PortalSection) => voi
         <div className="hero-grid absolute inset-0 opacity-25" />
         <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
-            <span className="eyebrow text-[#f2ad19]">Bem-vinda, Mariana</span>
+            <span className="eyebrow text-[#f2ad19]">Olá, {userName}</span>
             <h2 className="mt-4 max-w-3xl text-3xl font-black uppercase leading-[0.94] tracking-[-0.055em] md:text-5xl">
               Seus treinamentos estão organizados e disponíveis.
             </h2>
@@ -255,7 +247,7 @@ function Dashboard({ onNavigate }: { onNavigate: (section: PortalSection) => voi
             Ver todos
           </button>
         </div>
-        <TrainingCard training={lastTraining} />
+        {lastTraining ? <TrainingCard training={lastTraining} /> : <EmptyState text="Nenhum treinamento foi publicado para esta empresa ainda." />}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -286,20 +278,24 @@ function Dashboard({ onNavigate }: { onNavigate: (section: PortalSection) => voi
   );
 }
 
-function Trainings() {
-  return <div className="space-y-4">{clientPortalData.trainings.map((training) => <TrainingCard key={training.id} training={training} />)}</div>;
+function EmptyState({ text }: { text: string }) {
+  return <div className="border border-dashed border-black/20 bg-white p-10 text-center text-sm text-[#666]">{text}</div>;
 }
 
-function Photos() {
-  const trainingById = new Map(clientPortalData.trainings.map((training) => [training.id, training]));
+function Trainings({ data }: { data: ClientPortalData }) {
+  return data.trainings.length ? <div className="space-y-4">{data.trainings.map((training) => <TrainingCard key={training.id} training={training} />)}</div> : <EmptyState text="Nenhum treinamento disponível no momento." />;
+}
+
+function Photos({ data }: { data: ClientPortalData }) {
+  const trainingById = new Map(data.trainings.map((training) => [training.id, training]));
   return (
     <div>
       <div className="mb-6 flex items-start gap-3 border-l-4 border-[#f2ad19] bg-white p-4 text-sm text-[#666]">
         <ImageIcon className="mt-0.5 size-5 shrink-0 text-[#8a6107]" />
-        <p>Esta galeria mostra uma seleção demonstrativa. Na integração futura, a equipe Space Light poderá liberar lotes completos de fotos por cliente e treinamento.</p>
+        <p>As fotos liberadas pela equipe Space Light aparecem aqui, separadas por treinamento.</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {clientPortalData.photos.map((photo) => {
+        {data.photos.map((photo) => {
           const training = trainingById.get(photo.trainingId);
           return (
             <a key={photo.id} href={photo.src} target="_blank" rel="noreferrer" className="group relative min-h-[300px] overflow-hidden bg-black">
@@ -314,12 +310,13 @@ function Photos() {
           );
         })}
       </div>
+      {!data.photos.length ? <EmptyState text="Nenhuma foto foi publicada para esta empresa ainda." /> : null}
     </div>
   );
 }
 
-function DocumentRow({ document }: { document: ClientDocument }) {
-  const training = clientPortalData.trainings.find((item) => item.id === document.trainingId);
+function DocumentRow({ document, data }: { document: ClientDocument; data: ClientPortalData }) {
+  const training = data.trainings.find((item) => item.id === document.trainingId);
   return (
     <article className="grid gap-5 border border-black/10 bg-white p-5 md:grid-cols-[auto_1fr_auto] md:items-center md:p-6">
       <span className="flex size-12 items-center justify-center bg-black text-[#f2ad19]"><FileText className="size-5" /></span>
@@ -329,22 +326,22 @@ function DocumentRow({ document }: { document: ClientDocument }) {
         <p className="mt-2 text-xs text-[#777]">{training ? `${training.nr} · ${training.dateLabel}` : 'Documento geral da empresa'} · {document.format} · {document.size} · Atualizado em {document.updatedAt}</p>
       </div>
       <a
-        href={demoFileHref(document.title, 'Documento demonstrativo')}
-        download={`${slugify(document.title)}-demonstrativo.txt`}
+        href={demoFileHref(document.title, 'Documento', data.organization.legalName)}
+        download={`${slugify(document.title)}.txt`}
         className="inline-flex h-11 items-center justify-center gap-2 border border-black/16 px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] transition hover:border-black hover:bg-black hover:text-white"
       >
-        <Download className="size-4" /> Baixar demonstrativo
+        <Download className="size-4" /> Baixar arquivo
       </a>
     </article>
   );
 }
 
-function Documents() {
-  return <div className="space-y-3">{clientPortalData.documents.map((document) => <DocumentRow key={document.id} document={document} />)}</div>;
+function Documents({ data }: { data: ClientPortalData }) {
+  return data.documents.length ? <div className="space-y-3">{data.documents.map((document) => <DocumentRow key={document.id} document={document} data={data} />)}</div> : <EmptyState text="Nenhum documento foi publicado para esta empresa ainda." />;
 }
 
-function CertificateCard({ certificate }: { certificate: ClientCertificate }) {
-  const training = clientPortalData.trainings.find((item) => item.id === certificate.trainingId);
+function CertificateCard({ certificate, data }: { certificate: ClientCertificate; data: ClientPortalData }) {
+  const training = data.trainings.find((item) => item.id === certificate.trainingId);
   return (
     <article className="relative overflow-hidden border border-black/10 bg-white p-6 md:p-7">
       <div className="absolute right-0 top-0 h-1 w-24 bg-[#f2ad19]" />
@@ -360,30 +357,30 @@ function CertificateCard({ certificate }: { certificate: ClientCertificate }) {
         <div className="flex justify-between gap-4"><dt className="text-[#777]">Quantidade</dt><dd className="font-bold text-right">{certificate.quantity}</dd></div>
       </dl>
       <a
-        href={demoFileHref(certificate.title, 'Certificado demonstrativo')}
-        download={`${slugify(certificate.title)}-demonstrativo.txt`}
+        href={demoFileHref(certificate.title, 'Certificado', data.organization.legalName)}
+        download={`${slugify(certificate.title)}.txt`}
         className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 bg-black px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white transition hover:bg-[#f2ad19] hover:text-black"
       >
-        <Download className="size-4" /> Baixar lote demonstrativo
+        <Download className="size-4" /> Baixar lote
       </a>
     </article>
   );
 }
 
-function Certificates() {
+function Certificates({ data }: { data: ClientPortalData }) {
   return (
     <div>
       <div className="mb-6 border-l-4 border-[#f2ad19] bg-white p-5">
         <strong className="text-sm uppercase">Acesso corporativo</strong>
         <p className="mt-2 text-sm leading-relaxed text-[#666]">Os certificados são organizados em lotes para a empresa contratante. Participantes não possuem conta nem acesso individual ao portal.</p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{clientPortalData.certificates.map((certificate) => <CertificateCard key={certificate.id} certificate={certificate} />)}</div>
+      {data.certificates.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.certificates.map((certificate) => <CertificateCard key={certificate.id} certificate={certificate} data={data} />)}</div> : <EmptyState text="Nenhum lote de certificados foi publicado ainda." />}
     </div>
   );
 }
 
-function Profile() {
-  const organization = clientPortalData.organization;
+function Profile({ data }: { data: ClientPortalData }) {
+  const organization = data.organization;
   const fields = [
     ['Razão social', organization.legalName],
     ['CNPJ', organization.document],
@@ -424,40 +421,19 @@ function Profile() {
   );
 }
 
-export function ClientPortal() {
-  const router = useRouter();
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+export function ClientPortal({ data, user }: { data: ClientPortalData; user: { name: string; email: string } }) {
   const [section, setSection] = useState<PortalSection>('dashboard');
-
-  useEffect(() => {
-    const hasSession = Boolean(window.sessionStorage.getItem(CLIENT_SESSION_KEY));
-    setAuthenticated(hasSession);
-    if (!hasSession) router.replace('/cliente/login');
-  }, [router]);
 
   const content = useMemo(() => {
     switch (section) {
-      case 'dashboard': return <Dashboard onNavigate={setSection} />;
-      case 'trainings': return <Trainings />;
-      case 'photos': return <Photos />;
-      case 'documents': return <Documents />;
-      case 'certificates': return <Certificates />;
-      case 'profile': return <Profile />;
+      case 'dashboard': return <Dashboard data={data} userName={user.name} onNavigate={setSection} />;
+      case 'trainings': return <Trainings data={data} />;
+      case 'photos': return <Photos data={data} />;
+      case 'documents': return <Documents data={data} />;
+      case 'certificates': return <Certificates data={data} />;
+      case 'profile': return <Profile data={data} />;
     }
-  }, [section]);
-
-  function signOut() {
-    window.sessionStorage.removeItem(CLIENT_SESSION_KEY);
-    router.replace('/cliente/login');
-  }
-
-  if (authenticated !== true) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-black text-white">
-        <div className="text-center"><span className="mx-auto block size-3 animate-pulse bg-[#f2ad19]" /><p className="eyebrow mt-5 text-white/55">Verificando acesso</p></div>
-      </main>
-    );
-  }
+  }, [data, section, user.name]);
 
   return (
     <main className="min-h-screen bg-[#efefeb] text-[#0b0b0b]">
@@ -466,11 +442,11 @@ export function ClientPortal() {
           <div className="flex min-w-0 items-center gap-5">
             <a href="/" aria-label="Space Light Engenharia — início" className="shrink-0"><Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={232} height={84} className="h-11 w-auto brightness-0 invert" /></a>
             <span className="hidden h-8 w-px bg-white/15 sm:block" />
-            <div className="hidden min-w-0 sm:block"><span className="block truncate text-xs font-bold">{clientPortalData.organization.displayName}</span><span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.12em] text-white/42">Acesso corporativo</span></div>
+            <div className="hidden min-w-0 sm:block"><span className="block truncate text-xs font-bold">{data.organization.displayName}</span><span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.12em] text-white/42">Acesso corporativo</span></div>
           </div>
           <div className="flex items-center gap-2">
             <a href="/" className="hidden h-10 items-center gap-2 border border-white/15 px-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white/70 transition hover:border-[#f2ad19] hover:text-white sm:inline-flex"><Home className="size-4" /> Site</a>
-            <Button type="button" onClick={signOut} variant="outline" className="h-10 rounded-none border-white/15 bg-white/5 px-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white hover:bg-white hover:text-black"><LogOut className="size-4" /> <span className="hidden sm:inline">Sair</span></Button>
+            <form action="/api/auth/logout" method="post"><Button type="submit" variant="outline" className="h-10 rounded-none border-white/15 bg-white/5 px-3 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white hover:bg-white hover:text-black"><LogOut className="size-4" /> <span className="hidden sm:inline">Sair</span></Button></form>
           </div>
         </div>
       </header>
@@ -485,7 +461,7 @@ export function ClientPortal() {
                 return <button key={id} type="button" onClick={() => setSection(id)} className={`flex h-12 w-full items-center gap-3 px-3 text-left text-[11px] font-extrabold uppercase tracking-[0.1em] transition ${active ? 'bg-[#f2ad19] text-black' : 'text-white/62 hover:bg-white/8 hover:text-white'}`}><Icon className="size-4" />{label}<ChevronRight className={`ml-auto size-4 ${active ? 'opacity-100' : 'opacity-20'}`} /></button>;
               })}
             </nav>
-            <div className="mt-7 border border-white/10 p-4"><div className="flex items-center gap-3"><UserRound className="size-5 text-[#f2ad19]" /><div><strong className="block text-xs">Mariana Costa</strong><span className="mt-1 block text-[9px] uppercase tracking-[0.1em] text-white/40">Responsável da empresa</span></div></div></div>
+            <div className="mt-7 border border-white/10 p-4"><div className="flex items-center gap-3"><UserRound className="size-5 text-[#f2ad19]" /><div className="min-w-0"><strong className="block truncate text-xs">{user.name}</strong><span className="mt-1 block truncate text-[9px] uppercase tracking-[0.1em] text-white/40">{user.email}</span></div></div></div>
           </div>
         </aside>
 
