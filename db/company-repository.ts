@@ -270,7 +270,11 @@ export function ensurePortalSchema(): Promise<void> {
         'CREATE INDEX IF NOT EXISTS idx_instructor_availability_status_date ON instructor_availability(status, available_date)',
       ),
     ]);
-    await d1.prepare('PRAGMA optimize').run();
+    // PRAGMA optimize não é permitido no Turso (ele gerencia isso sozinho);
+    // executa apenas no SQLite local.
+    if (!process.env.TURSO_DATABASE_URL) {
+      await d1.prepare('PRAGMA optimize').run();
+    }
   })().catch((error) => {
       schemaPromise = null;
       throw error;
