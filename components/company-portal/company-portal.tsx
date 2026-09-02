@@ -1,23 +1,25 @@
 'use client';
 
-import { Award, Building2, ChevronRight, FileUp, GraduationCap, LayoutDashboard, LogOut, QrCode, RefreshCw, UserRound } from 'lucide-react';
+import { Activity, Award, Building2, ChevronRight, FileUp, GraduationCap, LayoutDashboard, LogOut, QrCode, RefreshCw, Users, UserRound } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { CompanyAudit } from '@/components/company-portal/company-audit';
 import { CompanyCertificates } from '@/components/company-portal/company-certificates';
 import { CompanyClients } from '@/components/company-portal/company-clients';
 import { CompanyDashboard } from '@/components/company-portal/company-dashboard';
 import { CompanyFiles } from '@/components/company-portal/company-files';
 import { CompanyInstructors } from '@/components/company-portal/company-instructors';
 import { CompanyParticipants } from '@/components/company-portal/company-participants';
+import { CompanyTeam } from '@/components/company-portal/company-team';
 import { CompanyTrainings } from '@/components/company-portal/company-trainings';
 import { SectionHeading } from '@/components/company-portal/company-ui';
 import type { CompanySection } from '@/components/company-portal/company-ui';
 import type { CompanyDashboardData } from '@/lib/company-types';
 import { readMockCompanyDatabase } from '@/lib/mock-company-database';
 
-const navigation = [
+const baseNavigation = [
   { id: 'dashboard' as const, label: 'Visão geral', shortLabel: 'Início', icon: LayoutDashboard },
   { id: 'clients' as const, label: 'Clientes', shortLabel: 'Clientes', icon: Building2 },
   { id: 'instructors' as const, label: 'Instrutores', shortLabel: 'Instrut.', icon: UserRound },
@@ -25,6 +27,11 @@ const navigation = [
   { id: 'files' as const, label: 'Arquivos', shortLabel: 'Arquivos', icon: FileUp },
   { id: 'participants' as const, label: 'QR e participantes', shortLabel: 'QR', icon: QrCode },
   { id: 'certificates' as const, label: 'Certificados', shortLabel: 'Certif.', icon: Award },
+];
+
+const ownerNavigation = [
+  { id: 'team' as const, label: 'Funcionários', shortLabel: 'Equipe', icon: Users },
+  { id: 'audit' as const, label: 'Atividade', shortLabel: 'Log', icon: Activity },
 ];
 
 export function CompanyPortal({ initialData }: { initialData: CompanyDashboardData }) {
@@ -35,6 +42,9 @@ export function CompanyPortal({ initialData }: { initialData: CompanyDashboardDa
   const reload = useCallback(async () => setData(await readMockCompanyDatabase()), []);
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 6000); return () => window.clearTimeout(timer); }, [notice]);
 
+  const isOwner = data?.currentUser.isOwner ?? false;
+  const navigation = useMemo(() => (isOwner ? [...baseNavigation, ...ownerNavigation] : baseNavigation), [isOwner]);
+
   const content = useMemo(() => {
     if (!data) return null;
     if (section === 'dashboard') return <CompanyDashboard data={data} navigate={setSection} />;
@@ -43,8 +53,11 @@ export function CompanyPortal({ initialData }: { initialData: CompanyDashboardDa
     if (section === 'trainings') return <CompanyTrainings data={data} reload={reload} notify={setNotice} />;
     if (section === 'files') return <CompanyFiles data={data} reload={reload} notify={setNotice} />;
     if (section === 'participants') return <CompanyParticipants data={data} reload={reload} />;
-    return <CompanyCertificates data={data} />;
-  }, [data, reload, section]);
+    if (section === 'certificates') return <CompanyCertificates data={data} />;
+    if (section === 'team') return isOwner ? <CompanyTeam notify={setNotice} /> : null;
+    if (section === 'audit') return isOwner ? <CompanyAudit notify={setNotice} /> : null;
+    return null;
+  }, [data, reload, section, isOwner]);
 
   return <main className="min-h-screen bg-[#efefeb] text-[#0b0b0b]">
     {notice ? <output className="fixed right-4 top-24 z-[60] max-w-sm border-l-4 border-[#f2ad19] bg-black p-4 text-sm text-white shadow-xl">{notice}</output> : null}

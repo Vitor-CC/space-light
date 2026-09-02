@@ -7,8 +7,10 @@ import type {
   ClientTraining,
 } from '@/lib/client-portal-data';
 import type {
+  AuditEntry,
   CompanyClient,
   CompanyDashboardData,
+  CompanyEmployee,
   CompanyFile,
   CompanyInstructor,
   CompanyInstructorAvailability,
@@ -32,6 +34,7 @@ export type StoredUser = {
   password_salt: string;
   active: number;
   must_reset: number;
+  is_owner: number;
 };
 
 let schemaPromise: Promise<void> | null = null;
@@ -101,6 +104,7 @@ export function ensurePortalSchema(): Promise<void> {
         password_hash TEXT NOT NULL,
         password_salt TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'client',
+        is_owner INTEGER NOT NULL DEFAULT 0,
         active INTEGER NOT NULL DEFAULT 1,
         must_reset INTEGER NOT NULL DEFAULT 0,
         last_login_at TEXT,
@@ -255,6 +259,15 @@ export function ensurePortalSchema(): Promise<void> {
       'ALTER TABLE users ADD COLUMN instructor_id TEXT');
     await ensureColumn(d1, 'trainings', 'instructor_id',
       'ALTER TABLE trainings ADD COLUMN instructor_id TEXT');
+    await ensureColumn(d1, 'users', 'is_owner',
+      'ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0');
+    const ownerEmail = (process.env.SPACE_ADMIN_EMAIL ?? '').trim().toLowerCase();
+    if (ownerEmail) {
+      await d1
+        .prepare(`UPDATE users SET is_owner = 1 WHERE lower(email) = ? AND role = 'admin'`)
+        .bind(ownerEmail)
+        .run();
+    }
 
     await d1.batch([
       d1.prepare(
@@ -300,7 +313,7 @@ export async function findUserByEmail(
   await ensurePortalSchema();
   return getD1()
     .prepare(`SELECT id, client_id, instructor_id, name, email, password_hash, password_salt,
-      role, active, must_reset
+      role, is_owner, active, must_reset
       FROM users WHERE lower(email) = ? LIMIT 1`)
     .bind(normalizeEmail(email))
     .first<StoredUser>();
@@ -312,7 +325,7 @@ export async function findUserById(
   await ensurePortalSchema();
   return getD1()
     .prepare(`SELECT id, client_id, instructor_id, name, email, password_hash, password_salt,
-      role, active, must_reset
+      role, is_owner, active, must_reset
       FROM users WHERE id = ? LIMIT 1`)
     .bind(userId)
     .first<StoredUser>();
@@ -328,8 +341,8 @@ export async function bootstrapAdmin(input: {
   await getD1()
     .prepare(`INSERT INTO users (
       id, client_id, name, email, password_hash, password_salt, role,
-      active, must_reset, last_login_at
-    ) VALUES (?, NULL, 'Equipe Space Light', ?, ?, ?, 'admin', 1, 1, datetime('now'))`)
+      is_owner, active, must_reset, last_login_at
+    ) VALUES (?, NULL, 'Equipe Space Light', ?, ?, ?, 'admin', 1, 1, 1, datetime('now'))`)
     .bind(
       id,
       normalizeEmail(input.email),
@@ -841,8 +854,92 @@ export async function listInstructorTrainingParticipants(input: {
   return rows(result);
 }
 
+// ---------------------------------------------------------------------------
+// Equipe Space Light (funcionários) e auditoria
+// ---------------------------------------------------------------------------
+
+export function isOwnerByEmailOrFlag(email: string, isOwnerFlag?: number): boolean {
+  if (isOwnerFlag === 1) return true;
+  const ownerEmail = (process.env.SPACE_ADMIN_EMAIL ?? '').trim().toLowerCase();
+  return Boolean(ownerEmail) && email.trim().toLowerCase() === ownerEmail;
+}
+
+export async function listEmployees(): Promise<CompanyEmployee[]> {
+  await ensurePortalSchema();
+  const result = await getD1()
+    .prepare(`SELECT id, name, email, is_owner, active, must_reset,
+      last_login_at, created_at
+      FROM users WHERE role = 'admin'
+      ORDER BY is_owner DESC, created_at ASC`)
+    .all<CompanyEmployee>();
+  return rows(result);
+}
+
+export async function createEmployeeByOwner(input: {
+  name: string;
+  email: string;
+  passwordHash: string;
+  passwordSalt: string;
+  createdByUserId: string;
+}) {
+  await ensurePortalSchema();
+  const email = normalizeEmail(input.email);
+  const existing = await findUserByEmail(email);
+  if (existing) throw new Error('Já existe uma conta com este e-mail.');
+  const id = makeId('user');
+  await getD1()
+    .prepare(`INSERT INTO users (
+      id, client_id, instructor_id, name, email, password_hash, password_salt,
+      role, is_owner, active, must_reset
+    ) VALUES (?, NULL, NULL, ?, ?, ?, ?, 'admin', 0, 1, 1)`)
+    .bind(id, input.name.trim(), email, input.passwordHash, input.passwordSalt)
+    .run();
+  await writeAudit(input.createdByUserId, 'employee.created', 'user', id, { email });
+  return { userId: id, email };
+}
+
+export async function setEmployeeActive(input: {
+  userId: string;
+  active: boolean;
+  byUserId: string;
+}) {
+  await ensurePortalSchema();
+  const target = await findUserById(input.userId);
+  if (!target || target.role !== 'admin') {
+    throw new Error('Funcionário não encontrado.');
+  }
+  if (isOwnerByEmailOrFlag(target.email, target.is_owner)) {
+    throw new Error('A conta do dono não pode ser desativada.');
+  }
+  await getD1()
+    .prepare(`UPDATE users SET active = ? WHERE id = ? AND role = 'admin'`)
+    .bind(input.active ? 1 : 0, input.userId)
+    .run();
+  await writeAudit(
+    input.byUserId,
+    input.active ? 'employee.activated' : 'employee.deactivated',
+    'user',
+    input.userId,
+    {},
+  );
+}
+
+export async function listAuditLogs(limit = 60): Promise<AuditEntry[]> {
+  await ensurePortalSchema();
+  const safeLimit = Math.min(Math.max(Math.trunc(limit) || 60, 1), 200);
+  const result = await getD1()
+    .prepare(`SELECT a.id, a.action, a.entity_type, a.entity_id, a.metadata,
+      a.created_at, u.name AS actor_name, u.email AS actor_email
+      FROM audit_logs a
+      LEFT JOIN users u ON u.id = a.user_id
+      ORDER BY a.created_at DESC, a.id DESC
+      LIMIT ${safeLimit}`)
+    .all<AuditEntry>();
+  return rows(result);
+}
+
 export async function getCompanyDashboardData(
-  currentUser: { id: string; email: string },
+  currentUser: { id: string; email: string; is_owner?: number },
 ): Promise<CompanyDashboardData> {
   await ensurePortalSchema();
   const d1 = getD1();
@@ -918,7 +1015,11 @@ export async function getCompanyDashboardData(
     trainings: rows(trainingsResult),
     files: rows(filesResult),
     participants: rows(participantsResult),
-    currentUser: { id: currentUser.id, email: currentUser.email },
+    currentUser: {
+      id: currentUser.id,
+      email: currentUser.email,
+      isOwner: isOwnerByEmailOrFlag(currentUser.email, currentUser.is_owner),
+    },
   };
 }
 

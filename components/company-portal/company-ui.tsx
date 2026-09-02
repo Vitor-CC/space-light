@@ -4,7 +4,7 @@ import { CalendarDays, CheckCircle2, MapPin } from 'lucide-react';
 
 import type { CompanyTraining } from '@/lib/company-types';
 
-export type CompanySection = 'dashboard' | 'clients' | 'instructors' | 'trainings' | 'files' | 'participants' | 'certificates';
+export type CompanySection = 'dashboard' | 'clients' | 'instructors' | 'trainings' | 'files' | 'participants' | 'certificates' | 'team' | 'audit';
 
 export const fieldClass = 'h-12 rounded-none border-black/16 bg-white px-3 text-sm focus-visible:ring-[#f2ad19]/40';
 export const inputClass = 'h-12 w-full rounded-none border border-black/16 bg-white px-3 text-sm outline-none focus:border-[#f2ad19] focus:ring-2 focus:ring-[#f2ad19]/30';
@@ -18,6 +18,8 @@ export const sectionCopy: Record<CompanySection, { title: string; description: s
   files: { title: 'Arquivos', description: 'Envie fotos e documentos em lote para o cliente e treinamento corretos.' },
   participants: { title: 'QR e participantes', description: 'Compartilhe o formulário e acompanhe as inscrições.' },
   certificates: { title: 'Certificados', description: 'Acompanhe os lotes desde a presença até a liberação ao cliente.' },
+  team: { title: 'Funcionários', description: 'Crie e gerencie os acessos da equipe Space Light. Exclusivo do dono da conta.' },
+  audit: { title: 'Atividade', description: 'Histórico de ações da equipe: quem fez o quê e quando.' },
 };
 
 export function formatDate(value: string) {

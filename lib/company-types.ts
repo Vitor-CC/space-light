@@ -99,6 +99,28 @@ export type CompanyParticipant = {
   created_at: string;
 };
 
+export type CompanyEmployee = {
+  id: string;
+  name: string;
+  email: string;
+  is_owner: number;
+  active: number;
+  must_reset: number;
+  last_login_at: string | null;
+  created_at: string;
+};
+
+export type AuditEntry = {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  metadata: string;
+  created_at: string;
+  actor_name: string | null;
+  actor_email: string | null;
+};
+
 export type CompanyDashboardData = {
   clients: CompanyClient[];
   instructors: CompanyInstructor[];
@@ -106,5 +128,5 @@ export type CompanyDashboardData = {
   trainings: CompanyTraining[];
   files: CompanyFile[];
   participants: CompanyParticipant[];
-  currentUser: { id: string; email: string };
+  currentUser: { id: string; email: string; isOwner: boolean };
 };

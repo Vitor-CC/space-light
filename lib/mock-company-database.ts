@@ -1,4 +1,4 @@
-import type { CompanyDashboardData, CompanyTraining } from '@/lib/company-types';
+import type { AuditEntry, CompanyDashboardData, CompanyEmployee, CompanyTraining } from '@/lib/company-types';
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -44,4 +44,22 @@ export function findMockTrainingByToken(token: string) {
 
 export function registerMockParticipant(token: string, input: { fullName: string; documentId: string; email: string; phone: string; jobTitle: string }) {
   return requestJson<{ id: string; training: CompanyTraining }>(`/api/public/trainings/${encodeURIComponent(token)}`, { method: 'POST', body: JSON.stringify(input) });
+}
+
+// --- Equipe Space Light (funcionários) e auditoria ---
+
+export function readEmployees() {
+  return requestJson<{ employees: CompanyEmployee[] }>('/api/company/employees', { cache: 'no-store' }).then((result) => result.employees);
+}
+
+export function createEmployee(input: { name: string; email: string }) {
+  return requestJson<{ userId: string; email: string; temporaryPassword: string }>('/api/company/employees', { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function setEmployeeActive(userId: string, active: boolean) {
+  return requestJson<{ ok: true }>(`/api/company/employees/${encodeURIComponent(userId)}/status`, { method: 'POST', body: JSON.stringify({ active }) });
+}
+
+export function readAuditLogs() {
+  return requestJson<{ entries: AuditEntry[] }>('/api/company/audit', { cache: 'no-store' }).then((result) => result.entries);
 }
