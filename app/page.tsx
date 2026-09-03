@@ -14,6 +14,7 @@ import {
 import Image from 'next/image';
 
 import { buttonVariants } from '@/components/ui/button';
+import { MobileNav } from '@/components/site/mobile-nav';
 import { cn } from '@/lib/utils';
 
 const trainings = [
@@ -163,11 +164,13 @@ export default function Home() {
             href="#contato"
             className={cn(
               buttonVariants({ size: 'lg' }),
-              'h-11 rounded-none bg-[#f2ad19] px-5 text-xs font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]',
+              'h-11 max-lg:hidden rounded-none bg-[#f2ad19] px-5 text-xs font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]',
             )}
           >
             Solicitar proposta <ArrowUpRight className="size-4" />
           </a>
+
+          <MobileNav />
         </div>
       </header>
 
