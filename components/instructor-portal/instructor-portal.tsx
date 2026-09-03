@@ -6,12 +6,14 @@ import {
   Check,
   Clock3,
   Copy,
+  Download,
   GraduationCap,
   LayoutDashboard,
   Loader2,
   LogOut,
   MapPin,
   Play,
+  Plus,
   QrCode,
   RefreshCw,
   Trash2,
@@ -130,6 +132,10 @@ function TrainingRoom({ data, selectedId, selectTraining, reload, notify }: { da
   const [participants, setParticipants] = useState<CompanyParticipant[]>(training ? data.participants.filter((item) => item.training_id === training.id) : []);
   const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [showManual, setShowManual] = useState(false);
+  const [manual, setManual] = useState({ fullName: '', documentId: '', jobTitle: '', email: '', phone: '' });
+  const [savingManual, setSavingManual] = useState(false);
 
   useEffect(() => {
     if (!training || training.status !== 'in_progress') { setImage(''); setUrl(''); return; }
@@ -152,6 +158,8 @@ function TrainingRoom({ data, selectedId, selectTraining, reload, notify }: { da
     return () => { active = false; window.clearInterval(timer); };
   }, [training?.id, training?.status]);
 
+  useEffect(() => { void refreshParticipants(); }, [training?.id]);
+
   async function start() {
     if (!training) return;
     setStarting(true);
@@ -163,9 +171,60 @@ function TrainingRoom({ data, selectedId, selectTraining, reload, notify }: { da
     finally { setStarting(false); }
   }
   async function copyUrl() { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }
+  async function refreshParticipants() {
+    if (!training) return;
+    try {
+      const result = await requestJson<{ participants: CompanyParticipant[] }>(`/api/instructor/trainings/${encodeURIComponent(training.id)}/participants`);
+      setParticipants(result.participants);
+    } catch { /* silencioso */ }
+  }
+  async function complete() {
+    if (!training) return;
+    setEnding(true);
+    try {
+      await requestJson(`/api/instructor/trainings/${encodeURIComponent(training.id)}/complete`, { method: 'POST' });
+      notify('Treinamento encerrado. A lista de presença foi congelada.');
+      await reload();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao encerrar o treinamento.'); }
+    finally { setEnding(false); }
+  }
+  async function addManual(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!training) return;
+    setSavingManual(true);
+    try {
+      await requestJson(`/api/instructor/trainings/${encodeURIComponent(training.id)}/participants`, { method: 'POST', body: JSON.stringify(manual) });
+      setManual({ fullName: '', documentId: '', jobTitle: '', email: '', phone: '' });
+      setShowManual(false);
+      notify('Participante adicionado à lista.');
+      await refreshParticipants();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao adicionar participante.'); }
+    finally { setSavingManual(false); }
+  }
+  async function removeParticipant(participantId: string) {
+    if (!training) return;
+    try {
+      await requestJson(`/api/instructor/trainings/${encodeURIComponent(training.id)}/participants`, { method: 'DELETE', body: JSON.stringify({ participantId }) });
+      notify('Participante removido.');
+      await refreshParticipants();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao remover participante.'); }
+  }
+  function exportCsv() {
+    if (!training) return;
+    const header = ['Nome', 'Identificador', 'Função', 'E-mail', 'Telefone', 'Entrada'];
+    const body = participants.map((p) => [p.full_name, p.document_id, p.job_title, p.email, p.phone, new Date(p.created_at).toLocaleString('pt-BR')]
+      .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(';'));
+    const csv = '﻿' + [header.join(';'), ...body].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `lista-presenca-${training.nr.replace(/\s+/g, '')}-${training.code}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
 
   if (!training) return <Empty icon={QrCode} title="Nenhum treinamento atribuído" text="A sala será liberada quando a gestão atribuir uma turma ao seu cadastro." />;
-  return <div className="space-y-6"><label className="block max-w-2xl"><span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[.1em]">Treinamento</span><select value={training.id} onChange={(event) => selectTraining(event.target.value)} className="h-12 w-full border border-black/15 bg-white px-3 text-sm outline-none focus:border-[#f2ad19]">{data.trainings.map((item) => <option key={item.id} value={item.id}>{item.client_name} · {item.nr} · {formatDate(item.training_date)}</option>)}</select></label>{training.status !== 'in_progress' ? <section className="border-t-4 border-[#f2ad19] bg-white p-7 md:p-10"><span className="eyebrow text-[#8a6107]">Pronto para começar</span><h2 className="mt-3 text-3xl font-black uppercase tracking-[-.05em]">{training.nr} · {training.title}</h2><p className="mt-4 max-w-2xl text-sm leading-relaxed text-[#666]">Ao iniciar, o QR Code de presença será exibido e o formulário ficará disponível para os participantes.</p><button type="button" onClick={() => void start()} disabled={starting || training.status === 'completed'} className="mt-7 inline-flex h-14 items-center gap-3 bg-[#f2ad19] px-7 text-[10px] font-extrabold uppercase tracking-[.12em] text-black disabled:opacity-50">{starting ? <Loader2 className="size-5 animate-spin" /> : <Play className="size-5" />}Iniciar treinamento</button></section> : <><section className="grid gap-6 border border-black/10 bg-white p-6 lg:grid-cols-[380px_1fr] lg:p-8"><div className="flex min-h-[340px] items-center justify-center bg-[#f7f7f4] p-4">{image ? <Image src={image} alt={`QR Code do treinamento ${training.nr}`} width={360} height={360} unoptimized className="h-auto w-full max-w-[360px]" /> : <Loader2 className="size-8 animate-spin text-[#8a6107]" />}</div><div className="flex flex-col justify-between"><div><span className="eyebrow text-[#8a6107]">Turma em andamento</span><h2 className="mt-3 text-3xl font-black uppercase tracking-[-.05em]">{training.nr} · {training.title}</h2><p className="mt-2 text-sm font-bold text-[#8a6107]">{training.client_name}</p><p className="mt-6 break-all border-l-4 border-[#f2ad19] bg-[#fff8e8] p-4 font-mono text-[10px]">{url}</p></div><button type="button" onClick={() => void copyUrl()} className="mt-5 inline-flex h-11 items-center justify-center gap-2 border border-black/15 text-[9px] font-extrabold uppercase hover:bg-black hover:text-white">{copied ? <Check className="size-4" /> : <Copy className="size-4" />}{copied ? 'Copiado' : 'Copiar link'}</button></div></section><section><div className="mb-4 flex items-end justify-between"><div><span className="eyebrow text-[#8a6107]">Atualização automática</span><h2 className="mt-2 text-2xl font-extrabold uppercase">Quem já preencheu</h2></div><span className="inline-flex items-center gap-2 text-xs font-bold text-[#777]"><RefreshCw className="size-3.5" />{participants.length} de {training.participant_limit || '—'}</span></div>{participants.length ? <div className="overflow-x-auto border border-black/10 bg-white"><table className="w-full min-w-[720px] text-left text-xs"><thead className="bg-black text-[9px] font-extrabold uppercase tracking-[.1em] text-white"><tr><th className="p-4">Participante</th><th className="p-4">Identificador</th><th className="p-4">Função</th><th className="p-4">Contato</th><th className="p-4">Entrada</th></tr></thead><tbody className="divide-y divide-black/8">{participants.map((participant) => <tr key={participant.id}><td className="p-4 font-bold">{participant.full_name}</td><td className="p-4 text-[#666]">{participant.document_id}</td><td className="p-4 text-[#666]">{participant.job_title || '—'}</td><td className="p-4 text-[#666]">{participant.email || participant.phone || '—'}</td><td className="p-4 text-[#666]">{new Date(participant.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</td></tr>)}</tbody></table></div> : <Empty icon={UsersRound} title="Aguardando participantes" text="Esta lista será atualizada automaticamente conforme o QR Code for preenchido." />}</section></>}</div>;
+  return <div className="space-y-6"><label className="block max-w-2xl"><span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[.1em]">Treinamento</span><select value={training.id} onChange={(event) => selectTraining(event.target.value)} className="h-12 w-full border border-black/15 bg-white px-3 text-sm outline-none focus:border-[#f2ad19]">{data.trainings.map((item) => <option key={item.id} value={item.id}>{item.client_name} · {item.nr} · {formatDate(item.training_date)}</option>)}</select></label>{training.status !== 'in_progress' ? <section className="border-t-4 border-[#f2ad19] bg-white p-7 md:p-10"><span className="eyebrow text-[#8a6107]">{training.status === 'completed' ? 'Treinamento concluído' : 'Pronto para começar'}</span><h2 className="mt-3 text-3xl font-black uppercase tracking-[-.05em]">{training.nr} · {training.title}</h2><p className="mt-4 max-w-2xl text-sm leading-relaxed text-[#666]">{training.status === 'completed' ? 'Este treinamento foi encerrado. A lista de presença está congelada e pode ser exportada abaixo.' : 'Ao iniciar, o QR Code de presença será exibido e o formulário ficará disponível para os participantes.'}</p>{training.status === 'completed' ? <div className="mt-7 flex flex-wrap items-center gap-3"><span className="inline-flex items-center gap-2 bg-[#daf2df] px-4 py-2 text-[10px] font-extrabold uppercase text-[#17642d]"><Check className="size-4" />Concluído · {participants.length} presença(s)</span><button type="button" onClick={exportCsv} disabled={participants.length === 0} className="inline-flex h-11 items-center gap-2 border border-black/15 px-4 text-[9px] font-extrabold uppercase hover:bg-black hover:text-white disabled:opacity-40"><Download className="size-4" />Exportar CSV</button></div> : <button type="button" onClick={() => void start()} disabled={starting} className="mt-7 inline-flex h-14 items-center gap-3 bg-[#f2ad19] px-7 text-[10px] font-extrabold uppercase tracking-[.12em] text-black disabled:opacity-50">{starting ? <Loader2 className="size-5 animate-spin" /> : <Play className="size-5" />}Iniciar treinamento</button>}</section> : <><section className="grid gap-6 border border-black/10 bg-white p-6 lg:grid-cols-[380px_1fr] lg:p-8"><div className="flex min-h-[340px] items-center justify-center bg-[#f7f7f4] p-4">{image ? <Image src={image} alt={`QR Code do treinamento ${training.nr}`} width={360} height={360} unoptimized className="h-auto w-full max-w-[360px]" /> : <Loader2 className="size-8 animate-spin text-[#8a6107]" />}</div><div className="flex flex-col justify-between"><div><span className="eyebrow text-[#8a6107]">Turma em andamento</span><h2 className="mt-3 text-3xl font-black uppercase tracking-[-.05em]">{training.nr} · {training.title}</h2><p className="mt-2 text-sm font-bold text-[#8a6107]">{training.client_name}</p><p className="mt-6 break-all border-l-4 border-[#f2ad19] bg-[#fff8e8] p-4 font-mono text-[10px]">{url}</p></div><div className="mt-5 flex flex-col gap-2 sm:flex-row"><button type="button" onClick={() => void copyUrl()} className="inline-flex h-11 flex-1 items-center justify-center gap-2 border border-black/15 text-[9px] font-extrabold uppercase hover:bg-black hover:text-white">{copied ? <Check className="size-4" /> : <Copy className="size-4" />}{copied ? 'Copiado' : 'Copiar link'}</button><button type="button" onClick={() => void complete()} disabled={ending} className="inline-flex h-11 flex-1 items-center justify-center gap-2 bg-black px-4 text-[9px] font-extrabold uppercase text-white hover:bg-[#b62525] disabled:opacity-50">{ending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Encerrar treinamento</button></div></div></section><section><div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><span className="eyebrow text-[#8a6107]">Atualização automática</span><h2 className="mt-2 text-2xl font-extrabold uppercase">Quem já preencheu</h2></div><div className="flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-2 text-xs font-bold text-[#777]"><RefreshCw className="size-3.5" />{participants.length} de {training.participant_limit || '—'}</span><button type="button" onClick={exportCsv} disabled={participants.length === 0} className="inline-flex h-10 items-center gap-2 border border-black/15 px-3 text-[9px] font-extrabold uppercase hover:bg-black hover:text-white disabled:opacity-40"><Download className="size-4" />CSV</button><button type="button" onClick={() => setShowManual((value) => !value)} className="inline-flex h-10 items-center gap-2 bg-[#f2ad19] px-3 text-[9px] font-extrabold uppercase text-black hover:bg-[#ff9900]"><Plus className="size-4" />Adicionar</button></div></div>{showManual ? <form onSubmit={addManual} className="mb-4 grid gap-3 border border-black/10 bg-white p-4 sm:grid-cols-2 xl:grid-cols-3"><input required value={manual.fullName} onChange={(e) => setManual({ ...manual, fullName: e.target.value })} placeholder="Nome completo *" className="h-11 border border-black/15 bg-white px-3 text-sm outline-none focus:border-[#f2ad19]" /><input required value={manual.documentId} onChange={(e) => setManual({ ...manual, documentId: e.target.value })} placeholder="Matrícula/CPF *" className="h-11 border border-black/15 bg-white px-3 text-sm outline-none focus:border-[#f2ad19]" /><input value={manual.jobTitle} onChange={(e) => setManual({ ...manual, jobTitle: e.target.value })} placeholder="Função" className="h-11 border border-black/15 bg-white px-3 text-sm outline-none focus:border-[#f2ad19]" /><input value={manual.email} onChange={(e) => setManual({ ...manual, email: e.target.value })} placeholder="E-mail" className="h-11 border border-black/15 bg-white px-3 text-sm outline-none focus:border-[#f2ad19]" /><input value={manual.phone} onChange={(e) => setManual({ ...manual, phone: e.target.value })} placeholder="Telefone" className="h-11 border border-black/15 bg-white px-3 text-sm outline-none focus:border-[#f2ad19]" /><button type="submit" disabled={savingManual} className="inline-flex h-11 items-center justify-center gap-2 bg-black text-[9px] font-extrabold uppercase text-white hover:bg-[#f2ad19] hover:text-black disabled:opacity-50">{savingManual ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Adicionar à lista</button></form> : null}{participants.length ? <div className="overflow-x-auto border border-black/10 bg-white"><table className="w-full min-w-[760px] text-left text-xs"><thead className="bg-black text-[9px] font-extrabold uppercase tracking-[.1em] text-white"><tr><th className="p-4">Participante</th><th className="p-4">Identificador</th><th className="p-4">Função</th><th className="p-4">Contato</th><th className="p-4">Entrada</th><th className="p-4 text-right">Ações</th></tr></thead><tbody className="divide-y divide-black/8">{participants.map((participant) => <tr key={participant.id}><td className="p-4 font-bold">{participant.full_name}</td><td className="p-4 text-[#666]">{participant.document_id}</td><td className="p-4 text-[#666]">{participant.job_title || '—'}</td><td className="p-4 text-[#666]">{participant.email || participant.phone || '—'}</td><td className="p-4 text-[#666]">{new Date(participant.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</td><td className="p-4 text-right"><button type="button" onClick={() => void removeParticipant(participant.id)} aria-label={`Remover ${participant.full_name}`} className="inline-flex size-8 items-center justify-center border border-black/10 text-[#999] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-3.5" /></button></td></tr>)}</tbody></table></div> : <Empty icon={UsersRound} title="Aguardando participantes" text="Adicione manualmente ou aguarde o preenchimento pelo QR Code." />}</section></>}</div>;
 }
 
 function Profile({ data }: { data: InstructorDashboardData }) {

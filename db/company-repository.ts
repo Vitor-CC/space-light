@@ -854,6 +854,94 @@ export async function listInstructorTrainingParticipants(input: {
   return rows(result);
 }
 
+export async function completeInstructorTraining(input: {
+  instructorId: string;
+  trainingId: string;
+  userId: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const training = await d1
+    .prepare(`SELECT id, status FROM trainings
+      WHERE id = ? AND instructor_id = ? LIMIT 1`)
+    .bind(input.trainingId, input.instructorId)
+    .first<{ id: string; status: string }>();
+  if (!training) throw new Error('Treinamento não encontrado para este instrutor.');
+  if (training.status !== 'in_progress') {
+    throw new Error('Só é possível encerrar um treinamento em andamento.');
+  }
+  await d1
+    .prepare(`UPDATE trainings SET status = 'completed'
+      WHERE id = ? AND instructor_id = ?`)
+    .bind(input.trainingId, input.instructorId)
+    .run();
+  await writeAudit(input.userId, 'training.completed', 'training', input.trainingId, {});
+  return { status: 'completed' as const };
+}
+
+export async function addParticipantByInstructor(input: {
+  instructorId: string;
+  trainingId: string;
+  userId: string;
+  participant: { fullName: string; documentId: string; email: string; phone: string; jobTitle: string };
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const training = await d1
+    .prepare(`SELECT id, participant_limit,
+      (SELECT count(*) FROM participants p WHERE p.training_id = trainings.id) AS participant_count
+      FROM trainings WHERE id = ? AND instructor_id = ? LIMIT 1`)
+    .bind(input.trainingId, input.instructorId)
+    .first<{ id: string; participant_limit: number; participant_count: number }>();
+  if (!training) throw new Error('Treinamento não encontrado para este instrutor.');
+  if (!input.participant.fullName.trim() || !input.participant.documentId.trim()) {
+    throw new Error('Informe ao menos o nome e o identificador do participante.');
+  }
+  if (training.participant_limit > 0 && training.participant_count >= training.participant_limit) {
+    throw new Error('O limite de participantes deste treinamento foi atingido.');
+  }
+  const id = makeId('participant');
+  try {
+    await d1
+      .prepare(`INSERT INTO participants (
+        id, training_id, full_name, document_id, email, phone, job_title, consent
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`)
+      .bind(
+        id,
+        training.id,
+        input.participant.fullName.trim(),
+        input.participant.documentId.trim(),
+        normalizeEmail(input.participant.email),
+        input.participant.phone.trim(),
+        input.participant.jobTitle.trim(),
+      )
+      .run();
+  } catch {
+    throw new Error('Já existe um participante com este identificador nesta turma.');
+  }
+  await writeAudit(input.userId, 'participant.added_manually', 'participant', id, { trainingId: training.id });
+  return { id };
+}
+
+export async function removeParticipantByInstructor(input: {
+  instructorId: string;
+  trainingId: string;
+  participantId: string;
+  userId: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const participant = await d1
+    .prepare(`SELECT p.id FROM participants p
+      JOIN trainings t ON t.id = p.training_id
+      WHERE p.id = ? AND t.id = ? AND t.instructor_id = ? LIMIT 1`)
+    .bind(input.participantId, input.trainingId, input.instructorId)
+    .first<{ id: string }>();
+  if (!participant) throw new Error('Participante não encontrado.');
+  await d1.prepare(`DELETE FROM participants WHERE id = ?`).bind(input.participantId).run();
+  await writeAudit(input.userId, 'participant.removed', 'participant', input.participantId, { trainingId: input.trainingId });
+}
+
 // ---------------------------------------------------------------------------
 // Equipe Space Light (funcionários) e auditoria
 // ---------------------------------------------------------------------------
