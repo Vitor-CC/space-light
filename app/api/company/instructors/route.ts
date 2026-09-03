@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { createInstructorByAdmin } from '@/db/company-repository';
+import { createInstructorByAdmin, deleteInstructorByAdmin } from '@/db/company-repository';
 import { getCurrentUser } from '@/lib/app-auth';
 import { generateTemporaryPassword, hashPassword } from '@/lib/password-auth';
 
@@ -38,5 +38,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ ...result, temporaryPassword }, { status: 201 });
   } catch {
     return NextResponse.json({ error: 'Já existe um instrutor com este CPF ou e-mail.' }, { status: 409 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'admin' || user.must_reset) {
+    return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
+  }
+  const { instructorId } = (await request.json()) as { instructorId?: string };
+  if (!instructorId) return NextResponse.json({ error: 'Instrutor não informado.' }, { status: 400 });
+  try {
+    await deleteInstructorByAdmin({ instructorId, byUserId: user.id });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Erro ao excluir instrutor.' }, { status: 400 });
   }
 }

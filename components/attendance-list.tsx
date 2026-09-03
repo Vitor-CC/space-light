@@ -49,13 +49,13 @@ export function AttendanceList({ data }: { data: AttendanceListData }) {
         <button type="button" onClick={() => window.print()} className="inline-flex h-11 items-center gap-2 bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]"><Printer className="size-4" />Imprimir / Salvar PDF</button>
       </div>
 
-      <div className="al-sheet mx-auto max-w-[820px] bg-white p-4 shadow-sm print:max-w-none print:p-0 print:shadow-none">
+      <div className="al-sheet mx-auto w-full max-w-[794px] min-h-[1123px] bg-white p-6 shadow-sm print:min-h-0 print:max-w-none print:p-0 print:shadow-none">
         {/* Cabeçalho */}
         <table className="al-table">
           <tbody>
             <tr>
-              <td rowSpan={6} style={{ width: 190, textAlign: 'center' }}>
-                <Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={232} height={84} className="mx-auto h-14 w-auto" />
+              <td rowSpan={6} style={{ width: 200, textAlign: 'center', padding: 10 }}>
+                <Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={320} height={320} className="mx-auto h-auto w-full max-w-[150px] object-contain" />
               </td>
               <td style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 15 }}>LISTA DE PRESENÇA</td>
             </tr>

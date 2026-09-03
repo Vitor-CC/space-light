@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import {
   createEmployeeByOwner,
+  deleteEmployeeByOwner,
   isOwnerByEmailOrFlag,
   listEmployees,
 } from '@/db/company-repository';
@@ -53,5 +54,20 @@ export async function POST(request: Request) {
       { error: error instanceof Error ? error.message : 'Erro ao criar o funcionário.' },
       { status: 400 },
     );
+  }
+}
+
+export async function DELETE(request: Request) {
+  const owner = await requireOwner();
+  if (!owner) {
+    return NextResponse.json({ error: 'Acesso restrito ao dono da conta.' }, { status: 403 });
+  }
+  const { userId } = (await request.json()) as { userId?: string };
+  if (!userId) return NextResponse.json({ error: 'Funcionário não informado.' }, { status: 400 });
+  try {
+    await deleteEmployeeByOwner({ userId, byUserId: owner.id });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Erro ao excluir funcionário.' }, { status: 400 });
   }
 }

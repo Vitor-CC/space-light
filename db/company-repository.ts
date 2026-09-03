@@ -1010,6 +1010,46 @@ export async function getAttendanceListData(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Exclusões
+// ---------------------------------------------------------------------------
+
+export async function deleteTrainingByAdmin(input: { trainingId: string; byUserId: string }) {
+  await ensurePortalSchema();
+  await getD1().prepare('DELETE FROM trainings WHERE id = ?').bind(input.trainingId).run();
+  await writeAudit(input.byUserId, 'training.deleted', 'training', input.trainingId, {});
+}
+
+export async function deleteClientByAdmin(input: { clientId: string; byUserId: string }) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  await d1.batch([
+    d1.prepare("DELETE FROM users WHERE client_id = ? AND role = 'client'").bind(input.clientId),
+    d1.prepare('DELETE FROM clients WHERE id = ?').bind(input.clientId),
+  ]);
+  await writeAudit(input.byUserId, 'client.deleted', 'client', input.clientId, {});
+}
+
+export async function deleteInstructorByAdmin(input: { instructorId: string; byUserId: string }) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  await d1.batch([
+    d1.prepare("DELETE FROM users WHERE instructor_id = ? AND role = 'instructor'").bind(input.instructorId),
+    d1.prepare('DELETE FROM instructors WHERE id = ?').bind(input.instructorId),
+  ]);
+  await writeAudit(input.byUserId, 'instructor.deleted', 'instructor', input.instructorId, {});
+}
+
+export async function deleteEmployeeByOwner(input: { userId: string; byUserId: string }) {
+  await ensurePortalSchema();
+  const target = await findUserById(input.userId);
+  if (!target || target.role !== 'admin') throw new Error('Funcionário não encontrado.');
+  if (isOwnerByEmailOrFlag(target.email, target.is_owner)) throw new Error('A conta do dono não pode ser excluída.');
+  if (target.id === input.byUserId) throw new Error('Você não pode excluir a própria conta.');
+  await getD1().prepare("DELETE FROM users WHERE id = ? AND role = 'admin'").bind(input.userId).run();
+  await writeAudit(input.byUserId, 'employee.deleted', 'user', input.userId, {});
+}
+
+// ---------------------------------------------------------------------------
 // Equipe Space Light (funcionários) e auditoria
 // ---------------------------------------------------------------------------
 

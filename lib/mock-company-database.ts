@@ -63,3 +63,21 @@ export function setEmployeeActive(userId: string, active: boolean) {
 export function readAuditLogs() {
   return requestJson<{ entries: AuditEntry[] }>('/api/company/audit', { cache: 'no-store' }).then((result) => result.entries);
 }
+
+// --- Exclusões ---
+
+export function deleteClient(clientId: string) {
+  return requestJson<{ ok: true }>('/api/company/clients', { method: 'DELETE', body: JSON.stringify({ clientId }) });
+}
+
+export function deleteInstructor(instructorId: string) {
+  return requestJson<{ ok: true }>('/api/company/instructors', { method: 'DELETE', body: JSON.stringify({ instructorId }) });
+}
+
+export function deleteTraining(trainingId: string) {
+  return requestJson<{ ok: true }>('/api/company/trainings', { method: 'DELETE', body: JSON.stringify({ trainingId }) });
+}
+
+export function deleteEmployee(userId: string) {
+  return requestJson<{ ok: true }>('/api/company/employees', { method: 'DELETE', body: JSON.stringify({ userId }) });
+}

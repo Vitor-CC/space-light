@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClientByAdmin } from '@/db/company-repository';
+import { createClientByAdmin, deleteClientByAdmin } from '@/db/company-repository';
 import { getCurrentUser } from '@/lib/app-auth';
 import { generateTemporaryPassword, hashPassword } from '@/lib/password-auth';
 
@@ -15,5 +15,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ...result, temporaryPassword }, { status: 201 });
   } catch {
     return NextResponse.json({ error: 'Já existe um cliente com este CNPJ ou e-mail.' }, { status: 409 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'admin' || user.must_reset) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
+  const { clientId } = (await request.json()) as { clientId?: string };
+  if (!clientId) return NextResponse.json({ error: 'Cliente não informado.' }, { status: 400 });
+  try {
+    await deleteClientByAdmin({ clientId, byUserId: user.id });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Erro ao excluir cliente.' }, { status: 400 });
   }
 }
