@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import type { AttendanceListData } from '@/lib/company-types';
+import { nrInfo } from '@/lib/nr-catalog';
 
 function formatDate(iso: string) {
   if (!iso) return '';
@@ -22,6 +23,10 @@ function formatDates(dates: string[]) {
 export function AttendanceList({ data }: { data: AttendanceListData }) {
   const { training, participants } = data;
   const dates = training.dates.length ? training.dates : [''];
+  const info = nrInfo(training.nr);
+  const bandTitle = info?.title || training.title;
+  const content = training.content_program?.trim() || info?.content || '';
+  const signatureWidth = dates.length >= 3 ? 80 : dates.length === 2 ? 120 : 150;
   const blankRows = 4;
   const rows: (AttendanceListData['participants'][number] | null)[] = [
     ...participants,
@@ -31,12 +36,12 @@ export function AttendanceList({ data }: { data: AttendanceListData }) {
   return (
     <div className="al-root">
       <style>{`
-        @page { size: A4 landscape; margin: 8mm; }
+        @page { size: A4 portrait; margin: 10mm; }
         @media print { .no-print { display: none !important; } .al-root { background: #fff !important; padding: 0 !important; } }
         .al-sheet { color: #000; font-family: Arial, Helvetica, sans-serif; }
-        .al-table { width: 100%; border-collapse: collapse; }
-        .al-table td, .al-table th { border: 1px solid #000; padding: 3px 6px; font-size: 11px; vertical-align: middle; }
-        .al-head th { background: #f0f0f0; text-align: center; font-size: 10px; text-transform: uppercase; }
+        .al-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .al-table td, .al-table th { border: 1px solid #000; padding: 3px 5px; font-size: 10px; vertical-align: middle; word-wrap: break-word; }
+        .al-head th { background: #f0f0f0; text-align: center; font-size: 9px; text-transform: uppercase; }
       `}</style>
 
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -44,7 +49,7 @@ export function AttendanceList({ data }: { data: AttendanceListData }) {
         <button type="button" onClick={() => window.print()} className="inline-flex h-11 items-center gap-2 bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]"><Printer className="size-4" />Imprimir / Salvar PDF</button>
       </div>
 
-      <div className="al-sheet mx-auto max-w-[1040px] bg-white p-4 shadow-sm print:max-w-none print:p-0 print:shadow-none">
+      <div className="al-sheet mx-auto max-w-[820px] bg-white p-4 shadow-sm print:max-w-none print:p-0 print:shadow-none">
         {/* Cabeçalho */}
         <table className="al-table">
           <tbody>
@@ -64,11 +69,11 @@ export function AttendanceList({ data }: { data: AttendanceListData }) {
 
         {/* Faixa do NR + conteúdo programático */}
         <div style={{ border: '1px solid #000', borderTop: 'none', background: '#fdf5a6', textAlign: 'center', fontWeight: 'bold', fontSize: 11, padding: '4px 6px' }}>
-          {training.nr}{training.title ? ` - ${training.title}` : ''} — CONTEÚDO PROGRAMÁTICO.
+          {training.nr}{bandTitle ? ` - ${bandTitle}` : ''} — CONTEÚDO PROGRAMÁTICO.
         </div>
-        {training.content_program ? (
-          <div style={{ border: '1px solid #000', borderTop: 'none', fontSize: 10, lineHeight: 1.35, padding: '5px 6px' }}>
-            {training.content_program}
+        {content ? (
+          <div style={{ border: '1px solid #000', borderTop: 'none', fontSize: 10, lineHeight: 1.35, padding: '5px 6px', textAlign: 'justify' }}>
+            {content}
           </div>
         ) : null}
 
@@ -76,13 +81,13 @@ export function AttendanceList({ data }: { data: AttendanceListData }) {
         <table className="al-table" style={{ marginTop: 10 }}>
           <thead className="al-head">
             <tr>
-              <th style={{ width: 28 }}>Nº</th>
+              <th style={{ width: 26 }}>Nº</th>
               <th style={{ textAlign: 'left' }}>Nome</th>
-              <th style={{ width: 90 }}>RG</th>
-              <th style={{ width: 110 }}>CPF</th>
-              <th style={{ width: 80 }}>Data de nasc.</th>
+              <th style={{ width: 78 }}>RG</th>
+              <th style={{ width: 100 }}>CPF</th>
+              <th style={{ width: 68 }}>Data de nasc.</th>
               {dates.map((date, index) => (
-                <th key={index} style={{ width: 130 }}>Assinatura{date ? ` ${formatDate(date)}` : ''}</th>
+                <th key={index} style={{ width: signatureWidth }}>Assinatura{date ? ` ${formatDate(date)}` : ''}</th>
               ))}
             </tr>
           </thead>
@@ -101,7 +106,7 @@ export function AttendanceList({ data }: { data: AttendanceListData }) {
         </table>
 
         <p style={{ marginTop: 8, fontSize: 9, color: '#555' }} className="no-print">
-          Dica: em &quot;Imprimir&quot;, escolha &quot;Salvar como PDF&quot; e orientação Paisagem.
+          Dica: em &quot;Imprimir&quot;, escolha &quot;Salvar como PDF&quot;, papel A4, orientação Retrato e margens padrão.
         </p>
       </div>
     </div>
