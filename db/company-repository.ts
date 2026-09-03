@@ -1009,6 +1009,36 @@ export async function getAttendanceListData(input: {
   };
 }
 
+export async function updateInstructorProfile(input: {
+  instructorId: string;
+  userId: string;
+  name: string;
+  phone: string;
+  professionalRegistry: string;
+  specialties: string;
+  baseCity: string;
+}) {
+  await ensurePortalSchema();
+  if (!input.name.trim()) throw new Error('Informe o nome.');
+  const d1 = getD1();
+  await d1.batch([
+    d1
+      .prepare(`UPDATE instructors SET name = ?, phone = ?, professional_registry = ?,
+        specialties = ?, base_city = ?, updated_at = datetime('now')
+        WHERE id = ?`)
+      .bind(
+        input.name.trim(),
+        input.phone.trim(),
+        input.professionalRegistry.trim(),
+        input.specialties.trim(),
+        input.baseCity.trim(),
+        input.instructorId,
+      ),
+    d1.prepare('UPDATE users SET name = ? WHERE id = ?').bind(input.name.trim(), input.userId),
+  ]);
+  await writeAudit(input.userId, 'instructor.profile_updated', 'instructor', input.instructorId, {});
+}
+
 // ---------------------------------------------------------------------------
 // Exclusões
 // ---------------------------------------------------------------------------
