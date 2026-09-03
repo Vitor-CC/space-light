@@ -30,7 +30,7 @@ export function approveInstructor(instructorId: string) {
   return requestJson<{ ok: true }>(`/api/company/instructors/${encodeURIComponent(instructorId)}/approve`, { method: 'POST' });
 }
 
-export function createMockTraining(input: { clientId: string; instructorId: string; nr: string; title: string; trainingDate: string; duration: string; location: string; participantLimit: number }) {
+export function createMockTraining(input: { clientId: string; instructorId: string; nr: string; title: string; dates: string[]; contentProgram: string; duration: string; location: string; participantLimit: number }) {
   return requestJson<{ id: string; code: string; qrToken: string }>('/api/company/trainings', { method: 'POST', body: JSON.stringify(input) });
 }
 
@@ -42,7 +42,7 @@ export function findMockTrainingByToken(token: string) {
   return requestJson<{ training: CompanyTraining | null }>(`/api/public/trainings/${encodeURIComponent(token)}`, { cache: 'no-store' }).then((result) => result.training);
 }
 
-export function registerMockParticipant(token: string, input: { fullName: string; documentId: string; email: string; phone: string; jobTitle: string }) {
+export function registerMockParticipant(token: string, input: { fullName: string; documentId: string; rg: string; birthDate: string; email: string; phone: string; jobTitle: string }) {
   return requestJson<{ id: string; training: CompanyTraining }>(`/api/public/trainings/${encodeURIComponent(token)}`, { method: 'POST', body: JSON.stringify(input) });
 }
 

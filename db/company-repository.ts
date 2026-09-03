@@ -7,6 +7,7 @@ import type {
   ClientTraining,
 } from '@/lib/client-portal-data';
 import type {
+  AttendanceListData,
   AuditEntry,
   CompanyClient,
   CompanyDashboardData,
@@ -118,6 +119,8 @@ export function ensurePortalSchema(): Promise<void> {
         nr TEXT NOT NULL,
         title TEXT NOT NULL,
         training_date TEXT NOT NULL,
+        training_dates TEXT NOT NULL DEFAULT '',
+        content_program TEXT NOT NULL DEFAULT '',
         duration TEXT NOT NULL,
         location TEXT NOT NULL,
         instructor TEXT NOT NULL,
@@ -152,6 +155,8 @@ export function ensurePortalSchema(): Promise<void> {
         training_id TEXT NOT NULL REFERENCES trainings(id) ON DELETE CASCADE,
         full_name TEXT NOT NULL,
         document_id TEXT NOT NULL,
+        rg TEXT NOT NULL DEFAULT '',
+        birth_date TEXT NOT NULL DEFAULT '',
         email TEXT NOT NULL DEFAULT '',
         phone TEXT NOT NULL DEFAULT '',
         job_title TEXT NOT NULL DEFAULT '',
@@ -268,6 +273,14 @@ export function ensurePortalSchema(): Promise<void> {
         .bind(ownerEmail)
         .run();
     }
+    await ensureColumn(d1, 'participants', 'rg',
+      "ALTER TABLE participants ADD COLUMN rg TEXT NOT NULL DEFAULT ''");
+    await ensureColumn(d1, 'participants', 'birth_date',
+      "ALTER TABLE participants ADD COLUMN birth_date TEXT NOT NULL DEFAULT ''");
+    await ensureColumn(d1, 'trainings', 'training_dates',
+      "ALTER TABLE trainings ADD COLUMN training_dates TEXT NOT NULL DEFAULT ''");
+    await ensureColumn(d1, 'trainings', 'content_program',
+      "ALTER TABLE trainings ADD COLUMN content_program TEXT NOT NULL DEFAULT ''");
 
     await d1.batch([
       d1.prepare(
@@ -724,7 +737,7 @@ export async function getInstructorDashboardData(
       d1
         .prepare(`SELECT p.id, p.training_id, t.title AS training_title,
           t.nr AS training_nr, c.name AS client_name, p.full_name,
-          p.document_id, p.email, p.phone, p.job_title, p.created_at
+          p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.created_at
           FROM participants p
           JOIN trainings t ON t.id = p.training_id
           JOIN clients c ON c.id = t.client_id
@@ -843,7 +856,7 @@ export async function listInstructorTrainingParticipants(input: {
   const result = await getD1()
     .prepare(`SELECT p.id, p.training_id, t.title AS training_title,
       t.nr AS training_nr, c.name AS client_name, p.full_name,
-      p.document_id, p.email, p.phone, p.job_title, p.created_at
+      p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.created_at
       FROM participants p
       JOIN trainings t ON t.id = p.training_id
       JOIN clients c ON c.id = t.client_id
@@ -883,7 +896,7 @@ export async function addParticipantByInstructor(input: {
   instructorId: string;
   trainingId: string;
   userId: string;
-  participant: { fullName: string; documentId: string; email: string; phone: string; jobTitle: string };
+  participant: { fullName: string; documentId: string; rg?: string; birthDate?: string; email: string; phone: string; jobTitle: string };
 }) {
   await ensurePortalSchema();
   const d1 = getD1();
@@ -904,13 +917,15 @@ export async function addParticipantByInstructor(input: {
   try {
     await d1
       .prepare(`INSERT INTO participants (
-        id, training_id, full_name, document_id, email, phone, job_title, consent
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`)
+        id, training_id, full_name, document_id, rg, birth_date, email, phone, job_title, consent
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
       .bind(
         id,
         training.id,
         input.participant.fullName.trim(),
         input.participant.documentId.trim(),
+        (input.participant.rg ?? '').trim(),
+        (input.participant.birthDate ?? '').trim(),
         normalizeEmail(input.participant.email),
         input.participant.phone.trim(),
         input.participant.jobTitle.trim(),
@@ -940,6 +955,58 @@ export async function removeParticipantByInstructor(input: {
   if (!participant) throw new Error('Participante não encontrado.');
   await d1.prepare(`DELETE FROM participants WHERE id = ?`).bind(input.participantId).run();
   await writeAudit(input.userId, 'participant.removed', 'participant', input.participantId, { trainingId: input.trainingId });
+}
+
+export async function getAttendanceListData(input: {
+  trainingId: string;
+  user: { id: string; role: string; instructor_id: string | null };
+}): Promise<AttendanceListData | null> {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const isAdmin = input.user.role === 'admin';
+  const training = await d1
+    .prepare(`SELECT t.id, c.name AS client_name, t.location, t.duration,
+      COALESCE(i.name, t.instructor) AS instructor, t.nr, t.title,
+      t.training_date, t.training_dates, t.content_program, t.instructor_id
+      FROM trainings t
+      JOIN clients c ON c.id = t.client_id
+      LEFT JOIN instructors i ON i.id = t.instructor_id
+      WHERE t.id = ? LIMIT 1`)
+    .bind(input.trainingId)
+    .first<{
+      id: string; client_name: string; location: string; duration: string;
+      instructor: string; nr: string; title: string; training_date: string;
+      training_dates: string; content_program: string; instructor_id: string | null;
+    }>();
+  if (!training) return null;
+  if (!isAdmin && (!input.user.instructor_id || training.instructor_id !== input.user.instructor_id)) {
+    return null;
+  }
+  let dates: string[] = [];
+  try {
+    dates = training.training_dates ? (JSON.parse(training.training_dates) as string[]) : [];
+  } catch { dates = []; }
+  if (!Array.isArray(dates) || dates.length === 0) dates = [training.training_date];
+  const participantsResult = await d1
+    .prepare(`SELECT full_name, document_id, rg, birth_date
+      FROM participants WHERE training_id = ?
+      ORDER BY full_name COLLATE NOCASE ASC`)
+    .bind(input.trainingId)
+    .all<{ full_name: string; document_id: string; rg: string; birth_date: string }>();
+  return {
+    training: {
+      id: training.id,
+      client_name: training.client_name,
+      location: training.location,
+      duration: training.duration,
+      instructor: training.instructor,
+      nr: training.nr,
+      title: training.title,
+      dates,
+      content_program: training.content_program,
+    },
+    participants: rows(participantsResult),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1087,7 +1154,7 @@ export async function getCompanyDashboardData(
         .prepare(
           `SELECT p.id, p.training_id, t.title AS training_title,
            t.nr AS training_nr, c.name AS client_name, p.full_name,
-           p.document_id, p.email, p.phone, p.job_title, p.created_at
+           p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.created_at
            FROM participants p
            JOIN trainings t ON t.id = p.training_id
            JOIN clients c ON c.id = t.client_id
@@ -1116,7 +1183,8 @@ export async function createTraining(input: {
   instructorId: string;
   nr: string;
   title: string;
-  trainingDate: string;
+  dates: string[];
+  contentProgram: string;
   duration: string;
   location: string;
   participantLimit: number;
@@ -1135,16 +1203,19 @@ export async function createTraining(input: {
     .bind(input.instructorId)
     .first<{ id: string; name: string }>();
   if (!instructor) throw new Error('Selecione um instrutor aprovado.');
+  const dates = input.dates.map((value) => value.trim()).filter(Boolean).slice(0, 3);
+  if (dates.length === 0) throw new Error('Informe ao menos uma data para o treinamento.');
+  const primaryDate = dates[0];
   const id = makeId('training');
   const digits = input.nr.replace(/\D/g, '').padStart(2, '0');
   const suffix = crypto.randomUUID().slice(0, 6).toUpperCase();
-  const code = `SL-${input.trainingDate.slice(0, 4)}-${digits}-${suffix}`;
+  const code = `SL-${primaryDate.slice(0, 4)}-${digits}-${suffix}`;
   const qrToken = `${code}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
   await d1
     .prepare(`INSERT INTO trainings (
-      id, client_id, instructor_id, code, nr, title, training_date, duration,
-      location, instructor, status, participant_limit, qr_token, qr_enabled
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, 1)`)
+      id, client_id, instructor_id, code, nr, title, training_date, training_dates,
+      content_program, duration, location, instructor, status, participant_limit, qr_token, qr_enabled
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, 1)`)
     .bind(
       id,
       input.clientId,
@@ -1152,7 +1223,9 @@ export async function createTraining(input: {
       code,
       input.nr.trim(),
       input.title.trim(),
-      input.trainingDate,
+      primaryDate,
+      JSON.stringify(dates),
+      (input.contentProgram ?? '').trim(),
       input.duration.trim(),
       input.location.trim(),
       instructor.name,
@@ -1237,6 +1310,8 @@ export async function registerParticipant(
   input: {
     fullName: string;
     documentId: string;
+    rg?: string;
+    birthDate?: string;
     email: string;
     phone: string;
     jobTitle: string;
@@ -1253,13 +1328,15 @@ export async function registerParticipant(
   const id = makeId('participant');
   await getD1()
     .prepare(`INSERT INTO participants (
-      id, training_id, full_name, document_id, email, phone, job_title, consent
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`)
+      id, training_id, full_name, document_id, rg, birth_date, email, phone, job_title, consent
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
     .bind(
       id,
       training.id,
       input.fullName.trim(),
       input.documentId.trim(),
+      (input.rg ?? '').trim(),
+      (input.birthDate ?? '').trim(),
       normalizeEmail(input.email),
       input.phone.trim(),
       input.jobTitle.trim(),

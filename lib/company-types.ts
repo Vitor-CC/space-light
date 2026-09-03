@@ -93,10 +93,32 @@ export type CompanyParticipant = {
   client_name: string;
   full_name: string;
   document_id: string;
+  rg: string;
+  birth_date: string;
   email: string;
   phone: string;
   job_title: string;
   created_at: string;
+};
+
+export type AttendanceListData = {
+  training: {
+    id: string;
+    client_name: string;
+    location: string;
+    duration: string;
+    instructor: string;
+    nr: string;
+    title: string;
+    dates: string[];
+    content_program: string;
+  };
+  participants: {
+    full_name: string;
+    document_id: string;
+    rg: string;
+    birth_date: string;
+  }[];
 };
 
 export type CompanyEmployee = {
