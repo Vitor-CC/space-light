@@ -93,8 +93,8 @@ function demoFileHref(title: string, type: string, legalName: string) {
     title,
     `Cliente: ${legalName}`,
     '',
-    'Arquivo demonstrativo do protótipo da Área do Cliente.',
-    'Os arquivos oficiais serão disponibilizados pela equipe Space Light após a integração do backend.',
+    'Documento gerado pela Área do Cliente da Space Light Engenharia.',
+    'O arquivo oficial será disponibilizado pela equipe Space Light.',
   ].join('\n');
 
   return `data:text/plain;charset=utf-8,${encodeURIComponent(body)}`;
