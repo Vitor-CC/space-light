@@ -958,7 +958,51 @@ export async function completeInstructorTraining(input: {
     .bind(input.trainingId, input.instructorId)
     .run();
   await writeAudit(input.userId, 'training.completed', 'training', input.trainingId, {});
-  return { status: 'completed' as const };
+
+  // Encerrar a turma já emite o lote de certificados: quem estava na lista de
+  // presença é exatamente quem recebe.
+  const emitidos = await issueCertificateBatch({
+    trainingId: input.trainingId,
+    byUserId: input.userId,
+  });
+  return { status: 'completed' as const, certificates: emitidos };
+}
+
+/**
+ * Congela o lote: a quantidade sai da lista de presença no momento do
+ * encerramento. Reencerrar não duplica — o lote é atualizado.
+ */
+export async function issueCertificateBatch(input: { trainingId: string; byUserId: string }) {
+  const d1 = getD1();
+  const total = await d1
+    .prepare('SELECT count(*) AS total FROM participants WHERE training_id = ?')
+    .bind(input.trainingId)
+    .first<{ total: number }>();
+  const quantidade = total?.total ?? 0;
+
+  const existente = await d1
+    .prepare('SELECT id FROM certificate_batches WHERE training_id = ? LIMIT 1')
+    .bind(input.trainingId)
+    .first<{ id: string }>();
+
+  if (existente) {
+    await d1
+      .prepare(`UPDATE certificate_batches
+        SET participant_count = ?, status = 'generated', generated_at = datetime('now')
+        WHERE id = ?`)
+      .bind(quantidade, existente.id)
+      .run();
+  } else {
+    await d1
+      .prepare(`INSERT INTO certificate_batches (id, training_id, status, participant_count, generated_at)
+        VALUES (?, ?, 'generated', ?, datetime('now'))`)
+      .bind(makeId('batch'), input.trainingId, quantidade)
+      .run();
+  }
+  await writeAudit(input.byUserId, 'certificates.issued', 'training', input.trainingId, {
+    participantes: quantidade,
+  });
+  return quantidade;
 }
 
 export async function addParticipantByInstructor(input: {
@@ -1301,6 +1345,99 @@ export async function listAllInstructorDocuments(): Promise<InstructorDocumentRo
       FROM instructor_documents ORDER BY created_at DESC`)
     .all<InstructorDocumentRow>();
   return rows(result);
+}
+
+// ---------------------------------------------------------------------------
+// Certificados
+// ---------------------------------------------------------------------------
+
+export type CertificateData = {
+  training: {
+    id: string;
+    nr: string;
+    title: string;
+    duration: string;
+    dates: string[];
+  };
+  client: { legalName: string };
+  instructor: {
+    name: string;
+    registry: string;
+    signatureDocumentId: string | null;
+  };
+  participants: { fullName: string; rg: string; documentId: string }[];
+};
+
+export async function getCertificateData(input: {
+  trainingId: string;
+  user: { id: string; role: string; instructor_id: string | null };
+}): Promise<CertificateData | null> {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const training = await d1
+    .prepare(`SELECT t.id, t.nr, t.title, t.duration, t.training_date, t.training_dates,
+      t.instructor_id, c.legal_name,
+      COALESCE(i.name, t.instructor) AS instructor_name,
+      COALESCE(i.professional_registry, '') AS instructor_registry
+      FROM trainings t
+      JOIN clients c ON c.id = t.client_id
+      LEFT JOIN instructors i ON i.id = t.instructor_id
+      WHERE t.id = ? LIMIT 1`)
+    .bind(input.trainingId)
+    .first<{
+      id: string; nr: string; title: string; duration: string;
+      training_date: string; training_dates: string; instructor_id: string | null;
+      legal_name: string; instructor_name: string; instructor_registry: string;
+    }>();
+  if (!training) return null;
+  if (input.user.role !== 'admin') {
+    if (!input.user.instructor_id || training.instructor_id !== input.user.instructor_id) return null;
+  }
+
+  let dates: string[] = [];
+  try {
+    dates = training.training_dates ? (JSON.parse(training.training_dates) as string[]) : [];
+  } catch { dates = []; }
+  if (!Array.isArray(dates) || dates.length === 0) dates = [training.training_date];
+
+  // A assinatura do instrutor é o documento "signature" já aprovado pela Space.
+  let signatureDocumentId: string | null = null;
+  if (training.instructor_id) {
+    const assinatura = await d1
+      .prepare(`SELECT id FROM instructor_documents
+        WHERE instructor_id = ? AND category = 'signature' AND status = 'approved'
+        ORDER BY created_at DESC LIMIT 1`)
+      .bind(training.instructor_id)
+      .first<{ id: string }>();
+    signatureDocumentId = assinatura?.id ?? null;
+  }
+
+  const participantsResult = await d1
+    .prepare(`SELECT full_name, rg, document_id FROM participants
+      WHERE training_id = ? ORDER BY full_name COLLATE NOCASE ASC`)
+    .bind(input.trainingId)
+    .all<{ full_name: string; rg: string; document_id: string }>();
+
+  return {
+    training: {
+      id: training.id,
+      nr: training.nr,
+      title: training.title,
+      duration: training.duration,
+      dates,
+    },
+    client: { legalName: training.legal_name },
+    instructor: {
+      name: training.instructor_name,
+      registry: training.instructor_registry,
+      signatureDocumentId,
+    },
+    participants: rows(participantsResult).map((item) => ({
+      fullName: item.full_name,
+      rg: item.rg,
+      documentId: item.document_id,
+    })),
+  };
 }
 
 // ---------------------------------------------------------------------------
