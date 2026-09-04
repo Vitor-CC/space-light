@@ -1,6 +1,8 @@
 import { del, get, put } from '@vercel/blob';
 
-export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+// Teto real do que passa por uma função da Vercel: 4,5 MB por requisição.
+// Ficamos abaixo disso de propósito, para o erro nunca virar um 413 cru.
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 export const ACCEPTED_PHOTO_TYPES = [
   'image/jpeg',

@@ -1,12 +1,13 @@
 'use client';
 
-import { Download, ExternalLink, FileText, Images, Loader2, Trash2, TriangleAlert, UploadCloud } from 'lucide-react';
+import { Download, ExternalLink, FileArchive, FileText, Images, Loader2, Trash2, TriangleAlert, UploadCloud } from 'lucide-react';
 import Image from 'next/image';
 import { useMemo, useRef, useState } from 'react';
 
 import { EmptyState, formatDate, formatFileSize, selectClass } from '@/components/company-portal/company-ui';
 import { Button } from '@/components/ui/button';
 import type { CompanyDashboardData, CompanyFile } from '@/lib/company-types';
+import { downloadFilesAsZip } from '@/lib/download-zip';
 import { deleteCompanyFile, uploadCompanyFiles } from '@/lib/mock-company-database';
 
 type Kind = 'photo' | 'document';
@@ -16,13 +17,13 @@ const kindCopy: Record<Kind, { label: string; plural: string; accept: string; hi
     label: 'Foto',
     plural: 'Fotos',
     accept: 'image/jpeg,image/png,image/webp,image/heic,image/heif',
-    hint: 'JPG, PNG, WEBP ou HEIC — até 12 MB cada.',
+    hint: 'JPG, PNG, WEBP ou HEIC — até 4 MB cada.',
   },
   document: {
     label: 'Documento',
     plural: 'Documentos',
     accept: '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt',
-    hint: 'PDF, Word, Excel, CSV ou TXT — até 12 MB cada.',
+    hint: 'PDF, Word, Excel, CSV ou TXT — até 4 MB cada.',
   },
 };
 
@@ -76,8 +77,8 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
   const [trainingId, setTrainingId] = useState('');
   const [queue, setQueue] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [filter, setFilter] = useState('');
+  const [busy, setBusy] = useState('');
+  const [zipping, setZipping] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const clientTrainings = useMemo(
@@ -85,17 +86,22 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
     [data.trainings, clientId],
   );
 
-  const visible = useMemo(() => {
-    const term = filter.trim().toLowerCase();
-    return data.files.filter((file) =>
-      file.kind === kind &&
-      (!term || `${file.name} ${file.client_name} ${file.training_nr} ${file.training_title}`.toLowerCase().includes(term)));
-  }, [data.files, kind, filter]);
+  // A lista mostra só a turma escolhida; sem turma, mostra as do cliente.
+  const scoped = useMemo(
+    () => data.files.filter((file) => (trainingId ? file.training_id === trainingId : file.client_id === clientId)),
+    [data.files, clientId, trainingId],
+  );
+
+  const visible = useMemo(() => scoped.filter((file) => file.kind === kind), [scoped, kind]);
+  const downloadable = useMemo(() => visible.filter((file) => file.status === 'stored'), [visible]);
 
   const counts = useMemo(() => ({
-    photo: data.files.filter((file) => file.kind === 'photo').length,
-    document: data.files.filter((file) => file.kind === 'document').length,
-  }), [data.files]);
+    photo: scoped.filter((file) => file.kind === 'photo').length,
+    document: scoped.filter((file) => file.kind === 'document').length,
+  }), [scoped]);
+
+  const selectedTraining = clientTrainings.find((training) => training.id === trainingId);
+  const clientName = data.clients.find((client) => client.id === clientId)?.name ?? '';
 
   function changeClient(value: string) {
     setClientId(value);
@@ -109,20 +115,41 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
 
   async function send() {
     if (!trainingId || queue.length === 0) return;
-    setBusy(true);
+    setBusy('Enviando…');
     try {
-      const result = await uploadCompanyFiles({ clientId, trainingId, kind, files: queue });
+      const result = await uploadCompanyFiles({
+        clientId, trainingId, kind, files: queue,
+        onProgress: (done, total, name) => setBusy(done >= total ? 'Finalizando…' : `Enviando ${done + 1} de ${total}: ${name}`),
+      });
       setQueue([]);
-      if (result.rejected.length) {
-        notify(`${result.saved} enviado(s). Recusado(s): ${result.rejected.join(', ')} — tipo ou tamanho não aceito.`);
-      } else {
-        notify(`${result.saved} arquivo(s) enviado(s).`);
-      }
+      notify(result.rejected.length
+        ? `${result.saved} enviado(s). Recusado(s): ${result.rejected.join(', ')} — tipo não aceito ou acima de 4 MB.`
+        : `${result.saved} arquivo(s) enviado(s).`);
       await reload();
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Erro ao enviar os arquivos.');
     } finally {
-      setBusy(false);
+      setBusy('');
+    }
+  }
+
+  async function downloadAll() {
+    if (downloadable.length === 0) return;
+    setZipping('Preparando…');
+    try {
+      const rotulo = selectedTraining ? `${selectedTraining.nr}-${selectedTraining.code}` : clientName;
+      const result = await downloadFilesAsZip({
+        entries: downloadable.map((file) => ({ id: file.id, name: file.name })),
+        zipName: `${copy.plural.toLowerCase()}-${rotulo}`.replace(/\s+/g, '-'),
+        onProgress: (done, total) => setZipping(done >= total ? 'Compactando…' : `Baixando ${done + 1} de ${total}`),
+      });
+      notify(result.failed.length
+        ? `${result.zipped} arquivo(s) no zip. Falhou: ${result.failed.join(', ')}.`
+        : `${result.zipped} arquivo(s) baixados em zip.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao montar o zip.');
+    } finally {
+      setZipping('');
     }
   }
 
@@ -167,18 +194,26 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
           <div className="max-h-44 divide-y divide-black/8 overflow-y-auto">{queue.slice(0, 40).map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs"><span className="min-w-0 truncate">{file.name}</span><span className="shrink-0 text-[#888]">{formatFileSize(file.size)}</span></div>)}{queue.length > 40 ? <p className="px-4 py-2.5 text-xs text-[#777]">+ {queue.length - 40} arquivos</p> : null}</div>
         </div> : null}
 
-        <Button type="button" disabled={!trainingId || queue.length === 0 || busy} onClick={() => void send()} className="mt-5 h-12 w-full rounded-none bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[.12em] text-black hover:bg-[#ff9900] disabled:opacity-50">{busy ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}{busy ? 'Enviando…' : `Enviar ${copy.plural.toLowerCase()}`}</Button>
-        <p className="mt-3 text-[10px] leading-relaxed text-[#888]">O arquivo fica guardado e aparece para o cliente na área dele, dentro do treinamento escolhido.</p>
+        <Button type="button" disabled={!trainingId || queue.length === 0 || Boolean(busy)} onClick={() => void send()} className="mt-5 h-12 w-full rounded-none bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[.12em] text-black hover:bg-[#ff9900] disabled:opacity-50">{busy ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}{busy || `Enviar ${copy.plural.toLowerCase()}`}</Button>
+        {!trainingId ? <p className="mt-3 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[10px] leading-relaxed text-[#8a6107]">Escolha o treinamento para enviar e para ver os arquivos dele.</p> : null}
+        <p className="mt-3 text-[10px] leading-relaxed text-[#888]">Pode escolher vários de uma vez: eles são enviados um a um. O arquivo fica guardado e aparece para o cliente dentro do treinamento escolhido.</p>
       </section>
 
       <section>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div><span className="eyebrow text-[#8a6107]">Histórico</span><h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[-.04em]">{copy.plural} no portal</h2></div>
-          <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Buscar por nome, cliente ou NR" aria-label={`Buscar ${copy.plural.toLowerCase()}`} className="h-11 w-full border border-black/16 bg-white px-3 text-sm outline-none focus:border-[#f2ad19] sm:max-w-xs" />
+          <div>
+            <span className="eyebrow text-[#8a6107]">{selectedTraining ? `${selectedTraining.nr} · ${selectedTraining.title}` : clientName || 'Histórico'}</span>
+            <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[-.04em]">{copy.plural} {selectedTraining ? 'desta turma' : 'do cliente'}</h2>
+            {!selectedTraining ? <p className="mt-1 text-xs text-[#888]">Escolha um treinamento ao lado para ver só os arquivos dele.</p> : null}
+          </div>
+          <button type="button" onClick={() => void downloadAll()} disabled={downloadable.length === 0 || Boolean(zipping)} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 border border-black/16 bg-white px-4 text-[9px] font-extrabold uppercase tracking-[.1em] transition hover:border-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
+            {zipping ? <Loader2 className="size-4 animate-spin" /> : <FileArchive className="size-4" />}
+            {zipping || (downloadable.length === 1 ? 'Baixar 1 arquivo em zip' : downloadable.length > 1 ? `Baixar os ${downloadable.length} em zip` : 'Baixar em zip')}
+          </button>
         </div>
 
         {visible.length === 0
-          ? <EmptyState icon={kind === 'photo' ? Images : FileText} title={`Nenhum${kind === 'photo' ? 'a foto' : ' documento'} por aqui`} text={filter ? 'Nada bate com essa busca.' : `Escolha um cliente e um treinamento ao lado para enviar ${kind === 'photo' ? 'as primeiras fotos' : 'os primeiros documentos'}.`} />
+          ? <EmptyState icon={kind === 'photo' ? Images : FileText} title={`Nenhum${kind === 'photo' ? 'a foto' : ' documento'} ${selectedTraining ? 'nesta turma' : 'deste cliente'}`} text={`Escolha o treinamento ao lado e envie ${kind === 'photo' ? 'as primeiras fotos' : 'os primeiros documentos'}.`} />
           : kind === 'photo'
             ? <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">{visible.map((file) => <PhotoCard key={file.id} file={file} onDelete={remove} />)}</div>
             : <div className="space-y-3">{visible.map((file) => <DocumentRow key={file.id} file={file} onDelete={remove} />)}</div>}

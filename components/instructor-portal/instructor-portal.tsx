@@ -147,7 +147,7 @@ const uploadKinds = {
     title: 'Foto da lista assinada',
     help: 'Fotografe a lista de presença assinada em papel e envie aqui. Fica guardada com o treinamento e visível para você, para a Space Light e para o cliente.',
     accept: 'image/jpeg,image/png,image/webp,image/heic,image/heif',
-    empty: 'Nenhuma foto enviada ainda. Aceita JPG, PNG, WEBP ou HEIC, até 12 MB.',
+    empty: 'Nenhuma foto enviada ainda. Aceita JPG, PNG, WEBP ou HEIC, até 4 MB.',
     button: 'Enviar foto',
   },
   document: {
@@ -155,7 +155,7 @@ const uploadKinds = {
     title: 'Documentos do treinamento',
     help: 'Relatórios, ordens de serviço ou qualquer PDF ligado a esta turma. Separado das fotos para não misturar as coisas.',
     accept: '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt',
-    empty: 'Nenhum documento enviado ainda. Aceita PDF, Word, Excel, CSV ou TXT, até 12 MB.',
+    empty: 'Nenhum documento enviado ainda. Aceita PDF, Word, Excel, CSV ou TXT, até 4 MB.',
     button: 'Enviar documento',
   },
 } as const;
@@ -176,24 +176,31 @@ function TrainingFiles({ trainingId, kind, notify }: { trainingId: string; kind:
 
   async function send(event: SyntheticEvent<HTMLInputElement>) {
     const input = event.currentTarget;
-    const chosen = input.files?.[0];
-    if (!chosen) return;
+    const chosen = Array.from(input.files ?? []);
+    if (chosen.length === 0) return;
     setUploading(true);
-    try {
-      const body = new FormData();
-      body.append('file', chosen);
-      body.append('kind', kind);
-      const response = await fetch(`/api/instructor/trainings/${trainingId}/files`, { method: 'POST', body });
-      const payload = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || 'Não foi possível enviar o arquivo.');
-      notify(kind === 'photo' ? 'Foto enviada.' : 'Documento enviado.');
-      await load();
-    } catch (error) {
-      notify(error instanceof Error ? error.message : 'Erro ao enviar o arquivo.');
-    } finally {
-      setUploading(false);
-      input.value = '';
+    let ok = 0;
+    const falhas: string[] = [];
+    // Um arquivo por requisição: função da Vercel aceita no máximo 4,5 MB por vez.
+    for (const file of chosen) {
+      try {
+        const body = new FormData();
+        body.append('file', file);
+        body.append('kind', kind);
+        const response = await fetch(`/api/instructor/trainings/${trainingId}/files`, { method: 'POST', body });
+        const payload = await response.json().catch(() => ({})) as { error?: string };
+        if (!response.ok) throw new Error(payload.error || 'falhou');
+        ok += 1;
+      } catch (error) {
+        falhas.push(`${file.name} (${error instanceof Error ? error.message : 'erro'})`);
+      }
     }
+    notify(falhas.length
+      ? `${ok} enviado(s). Falhou: ${falhas.join('; ')}`
+      : `${ok} arquivo(s) enviado(s).`);
+    await load();
+    setUploading(false);
+    input.value = '';
   }
 
   return <section className="border border-black/10 bg-white p-6 md:p-8">
@@ -201,7 +208,7 @@ function TrainingFiles({ trainingId, kind, notify }: { trainingId: string; kind:
       <div><span className="eyebrow text-[#8a6107]">{copy.eyebrow}</span><h2 className="mt-2 text-2xl font-extrabold uppercase">{copy.title}</h2><p className="mt-2 max-w-xl text-xs leading-relaxed text-[#666]">{copy.help}</p></div>
       <label className={`inline-flex h-12 shrink-0 cursor-pointer items-center justify-center gap-2 bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[.12em] text-black hover:bg-[#ff9900] ${uploading ? 'pointer-events-none opacity-60' : ''}`}>
         {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}{uploading ? 'Enviando…' : copy.button}
-        <input type="file" accept={copy.accept} onChange={(event) => void send(event)} className="hidden" />
+        <input type="file" multiple accept={copy.accept} onChange={(event) => void send(event)} className="hidden" />
       </label>
     </div>
     {files === null ? <div className="mt-6 flex h-24 items-center justify-center"><Loader2 className="size-5 animate-spin text-[#8a6107]" /></div>

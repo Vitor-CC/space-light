@@ -34,17 +34,37 @@ export function createMockTraining(input: { clientId: string; instructorId: stri
   return requestJson<{ id: string; code: string; qrToken: string }>('/api/company/trainings', { method: 'POST', body: JSON.stringify(input) });
 }
 
-export function uploadCompanyFiles(input: { clientId: string; trainingId: string; kind: 'photo' | 'document'; files: File[] }) {
-  const body = new FormData();
-  body.append('clientId', input.clientId);
-  body.append('trainingId', input.trainingId);
-  body.append('kind', input.kind);
-  for (const file of input.files) body.append('files', file);
-  return fetch('/api/company/files', { method: 'POST', body }).then(async (response) => {
-    const payload = (await response.json().catch(() => ({}))) as { error?: string; saved?: number; rejected?: string[] };
-    if (!response.ok) throw new Error(payload.error || 'Não foi possível enviar os arquivos.');
-    return { saved: payload.saved ?? 0, rejected: payload.rejected ?? [] };
-  });
+/**
+ * Envia um arquivo por requisição de propósito: uma função da Vercel aceita
+ * no máximo 4,5 MB por requisição, então um lote inteiro de uma vez estouraria.
+ */
+export async function uploadCompanyFiles(input: {
+  clientId: string;
+  trainingId: string;
+  kind: 'photo' | 'document';
+  files: File[];
+  onProgress?: (done: number, total: number, name: string) => void;
+}) {
+  const saved: string[] = [];
+  const rejected: string[] = [];
+  for (const [index, file] of input.files.entries()) {
+    input.onProgress?.(index, input.files.length, file.name);
+    const body = new FormData();
+    body.append('clientId', input.clientId);
+    body.append('trainingId', input.trainingId);
+    body.append('kind', input.kind);
+    body.append('files', file);
+    try {
+      const response = await fetch('/api/company/files', { method: 'POST', body });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string; saved?: number };
+      if (!response.ok || !payload.saved) throw new Error(payload.error || 'falhou');
+      saved.push(file.name);
+    } catch {
+      rejected.push(file.name);
+    }
+  }
+  input.onProgress?.(input.files.length, input.files.length, '');
+  return { saved: saved.length, rejected };
 }
 
 export function deleteCompanyFile(fileId: string) {
