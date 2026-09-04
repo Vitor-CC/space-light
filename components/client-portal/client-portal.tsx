@@ -27,7 +27,9 @@ import {
   UserRound,
 } from 'lucide-react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import type { SyntheticEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { downloadFilesAsZip, type ZipEntry } from '@/lib/download-zip';
@@ -510,15 +512,44 @@ function Certificates({ data }: { data: ClientPortalData }) {
 
 function Profile({ data }: { data: ClientPortalData }) {
   const organization = data.organization;
-  const fields = [
-    ['Razão social', organization.legalName],
-    ['CNPJ', organization.document],
-    ['Unidade', organization.unit],
-    ['Responsável', organization.contactName],
-    ['Cargo', organization.contactRole],
-    ['E-mail', organization.email],
-    ['Telefone', organization.phone],
-  ];
+  const router = useRouter();
+  const [draft, setDraft] = useState({
+    unit: organization.unit,
+    contactName: organization.contactName,
+    contactPhone: organization.phone,
+  });
+  const [saving, setSaving] = useState(false);
+  const [aviso, setAviso] = useState<{ tom: 'ok' | 'erro'; texto: string } | null>(null);
+
+  const mudou =
+    draft.unit !== organization.unit ||
+    draft.contactName !== organization.contactName ||
+    draft.contactPhone !== organization.phone;
+
+  async function salvar(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setAviso(null);
+    try {
+      const response = await fetch('/api/client/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || 'Não foi possível salvar.');
+      setAviso({ tom: 'ok', texto: 'Dados atualizados.' });
+      router.refresh();
+    } catch (error) {
+      setAviso({ tom: 'erro', texto: error instanceof Error ? error.message : 'Não foi possível salvar.' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const campo = 'h-12 w-full border border-black/16 bg-white px-3 text-sm outline-none transition focus:border-[#f2ad19] focus:ring-2 focus:ring-[#f2ad19]/20';
+  const rotulo = 'mb-2 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#555]';
+
   return (
     <div className="grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
       <section className="border border-black/10 bg-white p-6 md:p-8">
@@ -526,24 +557,47 @@ function Profile({ data }: { data: ClientPortalData }) {
           <span className="flex size-16 items-center justify-center bg-black text-[#f2ad19]"><Building2 className="size-7" /></span>
           <div><span className="eyebrow text-[#8a6107]">Empresa contratante</span><h2 className="mt-2 text-2xl font-black uppercase tracking-[-0.04em]">{organization.displayName}</h2></div>
         </div>
-        <dl className="mt-2 divide-y divide-black/8">
-          {fields.map(([label, value]) => <div key={label} className="grid gap-1 py-4 sm:grid-cols-[150px_1fr]"><dt className="text-xs font-bold text-[#777]">{label}</dt><dd className="text-sm font-semibold">{value}</dd></div>)}
-        </dl>
+
+        <form onSubmit={salvar} className="mt-7">
+          <span className="eyebrow text-[#8a6107]">Você pode atualizar</span>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="sm:col-span-2"><span className={rotulo}>Unidade / cidade</span><input required value={draft.unit} onChange={(event) => setDraft({ ...draft, unit: event.target.value })} className={campo} /></label>
+            <label><span className={rotulo}>Responsável</span><input required value={draft.contactName} onChange={(event) => setDraft({ ...draft, contactName: event.target.value })} className={campo} /></label>
+            <label><span className={rotulo}>Telefone</span><input value={draft.contactPhone} onChange={(event) => setDraft({ ...draft, contactPhone: event.target.value })} placeholder="(11) 90000-0000" className={campo} /></label>
+          </div>
+
+          {aviso ? <p role="status" className={`mt-4 border-l-4 p-3 text-sm ${aviso.tom === 'ok' ? 'border-[#17642d] bg-[#daf2df] text-[#17642d]' : 'border-[#b62525] bg-[#f3d4d4] text-[#8f1717]'}`}>{aviso.texto}</p> : null}
+
+          <button type="submit" disabled={!mudou || saving} className="mt-5 inline-flex h-12 items-center justify-center gap-2 bg-[#f2ad19] px-6 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black transition hover:bg-[#ff9900] disabled:cursor-not-allowed disabled:opacity-40">
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}{saving ? 'Salvando…' : 'Salvar alterações'}
+          </button>
+        </form>
+
+        <div className="mt-8 border-t border-black/8 pt-6">
+          <span className="eyebrow text-[#8a6107]">Só a Space Light altera</span>
+          <dl className="mt-3 divide-y divide-black/8">
+            {[['Razão social', organization.legalName], ['CNPJ', organization.document], ['E-mail de acesso', organization.email]].map(([label, value]) => (
+              <div key={label} className="grid gap-1 py-3 sm:grid-cols-[150px_1fr]"><dt className="text-xs font-bold text-[#777]">{label}</dt><dd className="text-sm font-semibold">{value}</dd></div>
+            ))}
+          </dl>
+          <p className="mt-3 text-xs leading-relaxed text-[#888]">Razão social e CNPJ saem impressos na lista de presença, e o e-mail é o seu login — por isso a mudança passa pela equipe.</p>
+        </div>
       </section>
+
       <aside className="space-y-5">
         <div className="bg-black p-7 text-white">
           <ShieldCheck className="size-8 text-[#f2ad19]" />
           <h2 className="mt-7 text-2xl font-black uppercase tracking-[-0.04em]">Como funciona este acesso</h2>
           <ul className="mt-6 space-y-4 text-sm leading-relaxed text-white/65">
-            <li className="flex gap-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#f2ad19]" />A empresa consulta e baixa materiais liberados.</li>
-            <li className="flex gap-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#f2ad19]" />Não há envio, edição ou exclusão de arquivos pelo cliente.</li>
+            <li className="flex gap-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#f2ad19]" />A empresa consulta e baixa os materiais liberados.</li>
+            <li className="flex gap-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#f2ad19]" />Fotos e documentos são publicados pela equipe Space Light.</li>
             <li className="flex gap-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#f2ad19]" />Participantes e alunos não possuem conta individual.</li>
           </ul>
         </div>
         <div className="border border-black/10 bg-white p-6">
-          <span className="eyebrow text-[#8a6107]">Precisa corrigir um dado?</span>
-          <p className="mt-3 text-sm leading-relaxed text-[#666]">Como o portal é somente leitura, a atualização cadastral é feita pela equipe Space Light.</p>
-          <a href="https://wa.me/5511941318646?text=Ol%C3%A1%2C%20preciso%20de%20ajuda%20com%20a%20%C3%81rea%20do%20Cliente." target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107] hover:text-black"><Phone className="size-4" /> Falar com a Space Light</a>
+          <span className="eyebrow text-[#8a6107]">Precisa mudar razão social, CNPJ ou e-mail?</span>
+          <p className="mt-3 text-sm leading-relaxed text-[#666]">Esses dados são alterados pela equipe Space Light, para manter documentos e acesso consistentes.</p>
+          <a href="https://wa.me/5511941318646?text=Ol%C3%A1%2C%20preciso%20atualizar%20um%20dado%20cadastral%20da%20minha%20empresa." target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107] hover:text-black"><Phone className="size-4" /> Falar com a Space Light</a>
         </div>
       </aside>
     </div>

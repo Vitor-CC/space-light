@@ -1107,6 +1107,32 @@ export async function updateInstructorProfile(input: {
   await writeAudit(input.userId, 'instructor.profile_updated', 'instructor', input.instructorId, {});
 }
 
+/**
+ * O cliente edita só o que é dele no dia a dia. Razão social, CNPJ e nome de
+ * exibição ficam de fora porque saem impressos na lista de presença; e-mail
+ * fica de fora porque é o login.
+ */
+export async function updateClientProfile(input: {
+  clientId: string;
+  userId: string;
+  unit: string;
+  contactName: string;
+  contactPhone: string;
+}) {
+  await ensurePortalSchema();
+  if (!input.contactName.trim()) throw new Error('Informe o nome do responsável.');
+  if (!input.unit.trim()) throw new Error('Informe a unidade ou cidade.');
+  await getD1()
+    .prepare(`UPDATE clients
+      SET unit = ?, contact_name = ?, contact_phone = ?, updated_at = datetime('now')
+      WHERE id = ?`)
+    .bind(input.unit.trim(), input.contactName.trim(), input.contactPhone.trim(), input.clientId)
+    .run();
+  await writeAudit(input.userId, 'client.profile_updated', 'client', input.clientId, {
+    contactName: input.contactName.trim(),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Exclusões
 // ---------------------------------------------------------------------------
