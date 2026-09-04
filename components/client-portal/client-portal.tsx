@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ArrowLeft,
   Award,
   Building2,
   CalendarDays,
@@ -9,6 +10,7 @@ import {
   Clock3,
   Download,
   Eye,
+  FolderOpen,
   FileCheck2,
   FileText,
   GraduationCap,
@@ -263,39 +265,6 @@ function Trainings({ data }: { data: ClientPortalData }) {
   return data.trainings.length ? <div className="space-y-4">{data.trainings.map((training) => <TrainingCard key={training.id} training={training} />)}</div> : <EmptyState text="Nenhum treinamento disponível no momento." />;
 }
 
-function Photos({ data }: { data: ClientPortalData }) {
-  const trainingById = new Map(data.trainings.map((training) => [training.id, training]));
-  return (
-    <div>
-      <div className="mb-6 flex items-start gap-3 border-l-4 border-[#f2ad19] bg-white p-4 text-sm text-[#666]">
-        <ImageIcon className="mt-0.5 size-5 shrink-0 text-[#8a6107]" />
-        <p>Registros visuais dos treinamentos da sua equipe. Clique para ver em tamanho cheio ou baixe o arquivo original.</p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {data.photos.map((photo) => {
-          const training = trainingById.get(photo.trainingId);
-          return (
-            <figure key={photo.id} className="group border border-black/10 bg-white">
-              <a href={photo.src} target="_blank" rel="noreferrer" className="relative block aspect-[4/3] overflow-hidden bg-black" aria-label={`Ver ${photo.alt} em tamanho cheio`}>
-                <Image src={photo.src} alt={photo.alt} fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition duration-500 group-hover:scale-[1.03]" />
-              </a>
-              <figcaption className="p-4">
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training?.nr ?? 'Treinamento'} · {photo.dateLabel}</span>
-                <strong className="mt-1 block truncate text-sm font-extrabold uppercase tracking-[-0.02em]" title={training?.title}>{training?.title ?? 'Registro do treinamento'}</strong>
-                <div className="mt-4 flex gap-2">
-                  <a href={photo.src} target="_blank" rel="noreferrer" className="inline-flex h-10 flex-1 items-center justify-center gap-2 border border-black/16 text-[9px] font-extrabold uppercase tracking-[0.1em] transition hover:border-black hover:bg-black hover:text-white"><Eye className="size-4" />Ver</a>
-                  <a href={`${photo.src}?download=1`} className="inline-flex h-10 flex-1 items-center justify-center gap-2 bg-[#f2ad19] text-[9px] font-extrabold uppercase tracking-[0.1em] text-black transition hover:bg-[#ff9900]"><Download className="size-4" />Baixar</a>
-                </div>
-              </figcaption>
-            </figure>
-          );
-        })}
-      </div>
-      {!data.photos.length ? <EmptyState text="Nenhuma foto foi publicada para esta empresa ainda." /> : null}
-    </div>
-  );
-}
-
 function DocumentRow({ document, data }: { document: ClientDocument; data: ClientPortalData }) {
   const training = data.trainings.find((item) => item.id === document.trainingId);
   return (
@@ -314,8 +283,140 @@ function DocumentRow({ document, data }: { document: ClientDocument; data: Clien
   );
 }
 
+function BackToFolders({ onBack, training }: { onBack: () => void; training?: ClientTraining }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-4">
+      <div>
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training ? `${training.nr} · ${training.dateLabel}` : 'Turma'}</span>
+        <h2 className="mt-1 text-xl font-extrabold uppercase tracking-[-0.035em]">{training?.title ?? 'Treinamento'}</h2>
+      </div>
+      <button type="button" onClick={onBack} className="inline-flex h-11 items-center gap-2 border border-black/16 px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] transition hover:border-black hover:bg-black hover:text-white">
+        <ArrowLeft className="size-4" /> Todas as turmas
+      </button>
+    </div>
+  );
+}
+
+function TrainingFolders({
+  data, countFor, coverFor, onOpen, unit,
+}: {
+  data: ClientPortalData;
+  countFor: (trainingId: string) => number;
+  coverFor?: (trainingId: string) => string | undefined;
+  onOpen: (trainingId: string) => void;
+  unit: { one: string; many: string; none: string };
+}) {
+  if (!data.trainings.length) return <EmptyState text="Nenhum treinamento cadastrado para esta empresa ainda." />;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {data.trainings.map((training) => {
+        const total = countFor(training.id);
+        const cover = coverFor?.(training.id);
+        return (
+          <button key={training.id} type="button" onClick={() => onOpen(training.id)} className="group flex flex-col overflow-hidden border border-black/10 bg-white text-left transition hover:border-[#f2ad19]">
+            <span className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-[#f7f7f4]">
+              {cover
+                ? <Image src={cover} alt="" fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition duration-500 group-hover:scale-[1.03]" />
+                : <FolderOpen className="size-10 text-black/15" />}
+              <span className="absolute right-3 top-3 bg-black px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.1em] text-[#f2ad19]">
+                {total === 0 ? unit.none : total === 1 ? `1 ${unit.one}` : `${total} ${unit.many}`}
+              </span>
+            </span>
+            <span className="flex flex-1 flex-col p-5">
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training.nr} · {training.dateLabel}</span>
+              <strong className="mt-1 line-clamp-2 text-base font-extrabold uppercase leading-tight tracking-[-0.02em]">{training.title}</strong>
+              <span className="mt-auto pt-4 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#666] transition group-hover:text-black">
+                Abrir turma <ChevronRight className="size-3.5" />
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Photos({ data }: { data: ClientPortalData }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const photosOf = (trainingId: string) => data.photos.filter((photo) => photo.trainingId === trainingId);
+  const training = openId ? data.trainings.find((item) => item.id === openId) : undefined;
+  const shown = openId ? photosOf(openId) : [];
+
+  if (openId) {
+    return (
+      <div>
+        <BackToFolders onBack={() => setOpenId(null)} training={training} />
+        {shown.length ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {shown.map((photo) => (
+              <figure key={photo.id} className="group border border-black/10 bg-white">
+                <a href={photo.src} target="_blank" rel="noreferrer" className="relative block aspect-[4/3] overflow-hidden bg-black" aria-label={`Ver ${photo.alt} em tamanho cheio`}>
+                  <Image src={photo.src} alt={photo.alt} fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition duration-500 group-hover:scale-[1.03]" />
+                </a>
+                <figcaption className="p-4">
+                  <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{photo.dateLabel}</span>
+                  <strong className="mt-1 block truncate text-sm" title={photo.alt}>{photo.alt}</strong>
+                  <div className="mt-4 flex gap-2">
+                    <a href={photo.src} target="_blank" rel="noreferrer" className="inline-flex h-10 flex-1 items-center justify-center gap-2 border border-black/16 text-[9px] font-extrabold uppercase tracking-[0.1em] transition hover:border-black hover:bg-black hover:text-white"><Eye className="size-4" />Ver</a>
+                    <a href={`${photo.src}?download=1`} className="inline-flex h-10 flex-1 items-center justify-center gap-2 bg-[#f2ad19] text-[9px] font-extrabold uppercase tracking-[0.1em] text-black transition hover:bg-[#ff9900]"><Download className="size-4" />Baixar</a>
+                  </div>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : <EmptyState text="Nenhuma foto foi publicada para esta turma ainda." />}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-6 flex items-start gap-3 border-l-4 border-[#f2ad19] bg-white p-4 text-sm text-[#666]">
+        <ImageIcon className="mt-0.5 size-5 shrink-0 text-[#8a6107]" />
+        <p>As fotos ficam organizadas por turma. Abra um treinamento para ver e baixar os registros dele.</p>
+      </div>
+      <TrainingFolders
+        data={data}
+        countFor={(id) => photosOf(id).length}
+        coverFor={(id) => photosOf(id)[0]?.src}
+        onOpen={setOpenId}
+        unit={{ one: 'foto', many: 'fotos', none: 'Sem fotos' }}
+      />
+    </div>
+  );
+}
+
 function Documents({ data }: { data: ClientPortalData }) {
-  return data.documents.length ? <div className="space-y-3">{data.documents.map((document) => <DocumentRow key={document.id} document={document} data={data} />)}</div> : <EmptyState text="Nenhum documento foi publicado para esta empresa ainda." />;
+  const [openId, setOpenId] = useState<string | null>(null);
+  const docsOf = (trainingId: string) => data.documents.filter((document) => document.trainingId === trainingId);
+  const training = openId ? data.trainings.find((item) => item.id === openId) : undefined;
+  const shown = openId ? docsOf(openId) : [];
+
+  if (openId) {
+    return (
+      <div>
+        <BackToFolders onBack={() => setOpenId(null)} training={training} />
+        {shown.length
+          ? <div className="space-y-3">{shown.map((document) => <DocumentRow key={document.id} document={document} data={data} />)}</div>
+          : <EmptyState text="Nenhum documento foi publicado para esta turma ainda." />}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-6 flex items-start gap-3 border-l-4 border-[#f2ad19] bg-white p-4 text-sm text-[#666]">
+        <FileText className="mt-0.5 size-5 shrink-0 text-[#8a6107]" />
+        <p>Os documentos ficam organizados por turma. Abra um treinamento para ver e baixar os arquivos dele.</p>
+      </div>
+      <TrainingFolders
+        data={data}
+        countFor={(id) => docsOf(id).length}
+        onOpen={setOpenId}
+        unit={{ one: 'documento', many: 'documentos', none: 'Sem documentos' }}
+      />
+    </div>
+  );
 }
 
 function CertificateCard({ certificate, data }: { certificate: ClientCertificate; data: ClientPortalData }) {
