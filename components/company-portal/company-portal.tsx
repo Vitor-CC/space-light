@@ -53,7 +53,7 @@ export function CompanyPortal({ initialData }: { initialData: CompanyDashboardDa
     if (section === 'trainings') return <CompanyTrainings data={data} reload={reload} notify={setNotice} />;
     if (section === 'files') return <CompanyFiles data={data} reload={reload} notify={setNotice} />;
     if (section === 'participants') return <CompanyParticipants data={data} reload={reload} />;
-    if (section === 'certificates') return <CompanyCertificates data={data} />;
+    if (section === 'certificates') return <CompanyCertificates data={data} reload={reload} notify={setNotice} />;
     if (section === 'team') return isOwner ? <CompanyTeam notify={setNotice} /> : null;
     if (section === 'audit') return isOwner ? <CompanyAudit notify={setNotice} /> : null;
     return null;

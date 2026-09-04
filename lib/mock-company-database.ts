@@ -130,3 +130,7 @@ export function readInstructorDocuments() {
 export function reviewInstructorDocument(documentId: string, status: 'approved' | 'rejected') {
   return requestJson<{ ok: true; activated: boolean }>('/api/company/instructor-documents', { method: 'POST', body: JSON.stringify({ documentId, status }) });
 }
+
+export function generateCertificates(trainingId: string) {
+  return requestJson<{ ok: true; fileId: string }>('/api/company/certificates', { method: 'POST', body: JSON.stringify({ trainingId }) });
+}

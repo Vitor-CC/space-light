@@ -1005,6 +1005,49 @@ export async function issueCertificateBatch(input: { trainingId: string; byUserI
   return quantidade;
 }
 
+/** Substitui o PDF de certificados do treinamento nos documentos da turma. */
+export async function replaceCertificateDocument(input: {
+  trainingId: string;
+  clientId: string;
+  name: string;
+  objectKey: string;
+  size: number;
+  byUserId: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const anteriores = await d1
+    .prepare(`SELECT id, object_key FROM files
+      WHERE training_id = ? AND kind = 'document' AND name = ?`)
+    .bind(input.trainingId, input.name)
+    .all<{ id: string; object_key: string }>();
+  await d1
+    .prepare(`DELETE FROM files WHERE training_id = ? AND kind = 'document' AND name = ?`)
+    .bind(input.trainingId, input.name)
+    .run();
+  const id = makeId('file');
+  await d1
+    .prepare(`INSERT INTO files (
+      id, client_id, training_id, name, object_key, content_type, size, kind, status
+    ) VALUES (?, ?, ?, ?, ?, 'application/pdf', ?, 'document', 'stored')`)
+    .bind(id, input.clientId, input.trainingId, input.name, input.objectKey, input.size)
+    .run();
+  await writeAudit(input.byUserId, 'certificates.published', 'training', input.trainingId, {
+    arquivo: input.name,
+  });
+  return { id, substituidos: rows(anteriores).map((item) => item.object_key) };
+}
+
+/** Cliente do treinamento, para saber onde arquivar o PDF. */
+export async function findTrainingClientId(trainingId: string) {
+  await ensurePortalSchema();
+  const row = await getD1()
+    .prepare('SELECT client_id FROM trainings WHERE id = ? LIMIT 1')
+    .bind(trainingId)
+    .first<{ client_id: string }>();
+  return row?.client_id ?? null;
+}
+
 export async function addParticipantByInstructor(input: {
   instructorId: string;
   trainingId: string;
@@ -1370,13 +1413,13 @@ export type CertificateData = {
 
 export async function getCertificateData(input: {
   trainingId: string;
-  user: { id: string; role: string; instructor_id: string | null };
+  user: { id: string; role: string; instructor_id: string | null; client_id?: string | null };
 }): Promise<CertificateData | null> {
   await ensurePortalSchema();
   const d1 = getD1();
   const training = await d1
     .prepare(`SELECT t.id, t.nr, t.title, t.duration, t.training_date, t.training_dates,
-      t.instructor_id, c.legal_name,
+      t.instructor_id, t.client_id, c.legal_name,
       COALESCE(i.name, t.instructor) AS instructor_name,
       COALESCE(i.professional_registry, '') AS instructor_registry
       FROM trainings t
@@ -1387,11 +1430,16 @@ export async function getCertificateData(input: {
     .first<{
       id: string; nr: string; title: string; duration: string;
       training_date: string; training_dates: string; instructor_id: string | null;
-      legal_name: string; instructor_name: string; instructor_registry: string;
+      client_id: string; legal_name: string; instructor_name: string; instructor_registry: string;
     }>();
   if (!training) return null;
-  if (input.user.role !== 'admin') {
+  if (input.user.role === 'instructor') {
     if (!input.user.instructor_id || training.instructor_id !== input.user.instructor_id) return null;
+  } else if (input.user.role === 'client') {
+    // O cliente baixa o certificado da própria turma, e só depois de concluída.
+    if (!input.user.client_id || training.client_id !== input.user.client_id) return null;
+  } else if (input.user.role !== 'admin') {
+    return null;
   }
 
   let dates: string[] = [];

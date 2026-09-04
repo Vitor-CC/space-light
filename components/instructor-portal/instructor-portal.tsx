@@ -275,10 +275,12 @@ function TrainingRoom({ data, selectedId, selectTraining, reload, notify }: { da
     if (!training) return;
     setEnding(true);
     try {
-      const resultado = await requestJson<{ certificates?: number }>(`/api/instructor/trainings/${encodeURIComponent(training.id)}/complete`, { method: 'POST' });
-      notify(resultado.certificates
-        ? `Treinamento encerrado. ${resultado.certificates} certificado(s) emitido(s) a partir da lista de presença.`
-        : 'Treinamento encerrado. A lista de presença foi congelada.');
+      const resultado = await requestJson<{ certificates?: number; certificatePublished?: boolean; certificateProblem?: string | null }>(`/api/instructor/trainings/${encodeURIComponent(training.id)}/complete`, { method: 'POST' });
+      notify(!resultado.certificates
+        ? 'Treinamento encerrado. A lista de presença foi congelada.'
+        : resultado.certificatePublished
+          ? `Treinamento encerrado. ${resultado.certificates} certificado(s) gerados e arquivados nos documentos da turma.`
+          : `Treinamento encerrado, mas o PDF dos certificados não foi gerado: ${resultado.certificateProblem ?? 'motivo desconhecido'}. Avise a Space Light.`);
       await reload();
     } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao encerrar o treinamento.'); }
     finally { setEnding(false); }
