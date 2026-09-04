@@ -36,7 +36,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if ('error' in context) {
     return NextResponse.json({ error: context.error }, { status: context.status });
   }
-  const files = await listTrainingFiles(id);
+  // O instrutor só enxerga as fotos que ele mesmo usa para comprovar a lista.
+  // Documento do cliente é assunto da Space Light, não dele.
+  const files = (await listTrainingFiles(id)).filter((file) => file.kind === 'photo');
   return NextResponse.json({
     files: files.map((file) => ({
       id: file.id,

@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, ExternalLink, FileArchive, FileText, Images, Loader2, Trash2, TriangleAlert, UploadCloud } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Download, ExternalLink, FileArchive, FileText, FolderOpen, Images, Loader2, Trash2, TriangleAlert, UploadCloud } from 'lucide-react';
 import Image from 'next/image';
 import { useMemo, useRef, useState } from 'react';
 
@@ -203,20 +203,40 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <span className="eyebrow text-[#8a6107]">{selectedTraining ? `${selectedTraining.nr} · ${selectedTraining.title}` : clientName || 'Histórico'}</span>
-            <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[-.04em]">{copy.plural} {selectedTraining ? 'desta turma' : 'do cliente'}</h2>
-            {!selectedTraining ? <p className="mt-1 text-xs text-[#888]">Escolha um treinamento ao lado para ver só os arquivos dele.</p> : null}
+            <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[-.04em]">{copy.plural} {selectedTraining ? 'desta turma' : 'por turma'}</h2>
           </div>
-          <button type="button" onClick={() => void downloadAll()} disabled={downloadable.length === 0 || Boolean(zipping)} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 border border-black/16 bg-white px-4 text-[9px] font-extrabold uppercase tracking-[.1em] transition hover:border-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
-            {zipping ? <Loader2 className="size-4 animate-spin" /> : <FileArchive className="size-4" />}
-            {zipping || (downloadable.length === 1 ? 'Baixar 1 arquivo em zip' : downloadable.length > 1 ? `Baixar os ${downloadable.length} em zip` : 'Baixar em zip')}
-          </button>
+          {selectedTraining ? <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => void downloadAll()} disabled={downloadable.length === 0 || Boolean(zipping)} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 border border-black/16 bg-white px-4 text-[9px] font-extrabold uppercase tracking-[.1em] transition hover:border-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
+              {zipping ? <Loader2 className="size-4 animate-spin" /> : <FileArchive className="size-4" />}
+              {zipping || (downloadable.length === 1 ? 'Baixar 1 em zip' : downloadable.length > 1 ? `Baixar os ${downloadable.length} em zip` : 'Baixar em zip')}
+            </button>
+            <button type="button" onClick={() => setTrainingId('')} className="inline-flex h-11 shrink-0 items-center gap-2 border border-black/16 bg-white px-4 text-[9px] font-extrabold uppercase tracking-[.1em] transition hover:border-black hover:bg-black hover:text-white"><ArrowLeft className="size-4" />Todas as turmas</button>
+          </div> : null}
         </div>
 
-        {visible.length === 0
-          ? <EmptyState icon={kind === 'photo' ? Images : FileText} title={`Nenhum${kind === 'photo' ? 'a foto' : ' documento'} ${selectedTraining ? 'nesta turma' : 'deste cliente'}`} text={`Escolha o treinamento ao lado e envie ${kind === 'photo' ? 'as primeiras fotos' : 'os primeiros documentos'}.`} />
-          : kind === 'photo'
-            ? <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">{visible.map((file) => <PhotoCard key={file.id} file={file} onDelete={remove} />)}</div>
-            : <div className="space-y-3">{visible.map((file) => <DocumentRow key={file.id} file={file} onDelete={remove} />)}</div>}
+        {!selectedTraining
+          ? (clientTrainings.length === 0
+            ? <EmptyState icon={FolderOpen} title="Nenhuma turma para este cliente" text="Crie um treinamento na aba Treinamentos para poder anexar arquivos." />
+            : <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">{clientTrainings.map((training) => {
+                const doTreino = data.files.filter((file) => file.training_id === training.id && file.kind === kind);
+                const capa = kind === 'photo' ? doTreino.find((file) => file.status === 'stored') : undefined;
+                return <button key={training.id} type="button" onClick={() => setTrainingId(training.id)} className="group flex flex-col overflow-hidden border border-black/10 bg-white text-left transition hover:border-[#f2ad19]">
+                  <span className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-[#f7f7f4]">
+                    {capa ? <Image src={`/api/files/${capa.id}`} alt="" fill unoptimized sizes="(min-width:1280px) 33vw, 100vw" className="object-cover transition duration-500 group-hover:scale-[1.03]" /> : <FolderOpen className="size-10 text-black/15" />}
+                    <span className="absolute right-3 top-3 bg-black px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-[.1em] text-[#f2ad19]">{doTreino.length === 0 ? `Sem ${copy.plural.toLowerCase()}` : `${doTreino.length} ${doTreino.length === 1 ? copy.label.toLowerCase() : copy.plural.toLowerCase()}`}</span>
+                  </span>
+                  <span className="flex flex-1 flex-col p-5">
+                    <span className="text-[9px] font-extrabold uppercase tracking-[.11em] text-[#8a6107]">{training.nr} · {formatDate(training.training_date)}</span>
+                    <strong className="mt-1 line-clamp-2 text-sm font-extrabold uppercase leading-tight">{training.title}</strong>
+                    <span className="mt-auto pt-4 inline-flex items-center gap-2 text-[9px] font-bold uppercase tracking-[.12em] text-[#666] transition group-hover:text-black">Abrir turma <ChevronRight className="size-3.5" /></span>
+                  </span>
+                </button>;
+              })}</div>)
+          : visible.length === 0
+            ? <EmptyState icon={kind === 'photo' ? Images : FileText} title={`Nenhum${kind === 'photo' ? 'a foto' : ' documento'} nesta turma`} text={`Envie ${kind === 'photo' ? 'as primeiras fotos' : 'os primeiros documentos'} pelo painel ao lado.`} />
+            : kind === 'photo'
+              ? <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">{visible.map((file) => <PhotoCard key={file.id} file={file} onDelete={remove} />)}</div>
+              : <div className="space-y-3">{visible.map((file) => <DocumentRow key={file.id} file={file} onDelete={remove} />)}</div>}
       </section>
     </div>
   </div>;

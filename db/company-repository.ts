@@ -1535,6 +1535,8 @@ export async function findFileForUser(input: {
     return user.client_id && user.client_id === file.client_id ? file : null;
   }
   if (user.role === 'instructor' && user.instructor_id) {
+    // Documento do cliente não é do escopo do instrutor, mesmo na turma dele.
+    if (file.kind !== 'photo') return null;
     const owned = await getD1()
       .prepare('SELECT id FROM trainings WHERE id = ? AND instructor_id = ? LIMIT 1')
       .bind(file.training_id, user.instructor_id)
