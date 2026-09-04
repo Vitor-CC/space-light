@@ -199,7 +199,7 @@ export default function Home() {
               </span>
             </div>
 
-            <h1 className="max-w-[820px] text-[clamp(3.2rem,7vw,7.2rem)] font-black uppercase leading-[0.86] tracking-[-0.04em] md:tracking-[-0.055em] xl:tracking-[-0.065em]">
+            <h1 className="max-w-[820px] text-[clamp(3.2rem,7vw,7.2rem)] font-black uppercase leading-[0.86] tracking-normal md:tracking-[-0.01em] xl:tracking-[-0.02em]">
               Segurança que sai do papel.
             </h1>
             <p className="mt-8 max-w-[610px] text-lg leading-relaxed text-white/72 md:text-xl">
@@ -285,7 +285,7 @@ export default function Home() {
                 />
                 <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,.96)_0%,rgba(0,0,0,.2)_72%)]" />
                 <div className="absolute inset-x-0 top-0 flex items-center justify-between border-b border-white/18 p-5">
-                  <span className="font-heading text-3xl font-black tracking-[-0.02em] text-[#f2ad19]">
+                  <span className="font-heading text-3xl font-black tracking-[-0.01em] text-[#f2ad19]">
                     {training.nr}
                   </span>
                   <span className="text-[10px] font-bold tracking-[0.16em] text-white/50">
@@ -293,7 +293,7 @@ export default function Home() {
                   </span>
                 </div>
                 <div className="absolute inset-x-0 bottom-0 p-6 md:p-7">
-                  <h3 className="max-w-sm text-2xl font-extrabold uppercase leading-tight">
+                  <h3 className="max-w-sm text-2xl font-extrabold uppercase tracking-[0.03em] leading-tight">
                     {training.title}
                   </h3>
                   <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/68">
@@ -315,7 +315,7 @@ export default function Home() {
                 <span className="block text-xs font-bold uppercase tracking-[0.1em] text-[#f2ad19]">
                   Também oferecemos
                 </span>
-                <strong className="mt-1 block text-xl uppercase tracking-[0.015em]">
+                <strong className="mt-1 block text-xl uppercase tracking-[0.04em]">
                   NR 35 — Trabalho em Altura
                 </strong>
               </div>
@@ -345,7 +345,7 @@ export default function Home() {
         <div className="page-shell grid gap-16 lg:grid-cols-[1.35fr_.65fr] lg:items-end">
           <div>
             <span className="eyebrow text-[#f2ad19]">Nosso ponto de vista</span>
-            <h2 className="mt-7 max-w-[1040px] text-[clamp(3rem,7.7vw,8.8rem)] font-black uppercase leading-[0.84] tracking-[-0.04em] md:tracking-[-0.055em] xl:tracking-[-0.065em]">
+            <h2 className="mt-7 max-w-[1040px] text-[clamp(3rem,7.7vw,8.8rem)] font-black uppercase leading-[0.84] tracking-normal md:tracking-[-0.01em] xl:tracking-[-0.02em]">
               Segurança não se aprende só na teoria.
             </h2>
           </div>
@@ -370,7 +370,7 @@ export default function Home() {
             />
             <div className="absolute bottom-0 left-0 max-w-[330px] bg-[#f2ad19] p-7 text-black md:p-9">
               <span className="eyebrow">Space Light Engenharia</span>
-              <p className="mt-4 font-heading text-2xl font-extrabold uppercase leading-tight">
+              <p className="mt-4 font-heading text-2xl font-extrabold uppercase tracking-[0.03em] leading-tight">
                 Compromisso técnico sem perder a conexão humana.
               </p>
             </div>
@@ -436,12 +436,12 @@ export default function Home() {
                 className="group min-h-[300px] bg-[#171716] p-7 transition hover:bg-[#222220]"
               >
                 <div className="flex items-start justify-between">
-                  <span className="font-heading text-5xl font-black tracking-[-0.04em] text-[#f2ad19]">
+                  <span className="font-heading text-5xl font-black tracking-[-0.02em] text-[#f2ad19]">
                     {step.number}
                   </span>
                   <ArrowUpRight className="size-5 text-white/22 transition group-hover:text-[#f2ad19]" />
                 </div>
-                <h3 className="mt-16 text-lg font-extrabold uppercase tracking-[0.025em]">
+                <h3 className="mt-16 text-lg font-extrabold uppercase tracking-[0.05em]">
                   {step.title}
                 </h3>
                 <p className="mt-4 text-sm leading-relaxed text-white/55">
@@ -484,7 +484,7 @@ export default function Home() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent" />
                 <figcaption className="absolute inset-x-0 bottom-0 flex items-end justify-between p-6 text-white md:p-8">
-                  <span className="font-heading text-xl font-extrabold uppercase tracking-[0.015em]">
+                  <span className="font-heading text-xl font-extrabold uppercase tracking-[0.04em]">
                     {item.label}
                   </span>
                   <span className="eyebrow text-[#f2ad19]">0{index + 1}</span>
@@ -531,7 +531,7 @@ export default function Home() {
                 <span className="flex size-14 items-center justify-center bg-black text-[#f2ad19]">
                   <Icon className="size-7" strokeWidth={1.7} />
                 </span>
-                <h3 className="mt-14 text-xl font-extrabold uppercase tracking-[0.015em]">
+                <h3 className="mt-14 text-xl font-extrabold uppercase tracking-[0.04em]">
                   {title}
                 </h3>
                 <p className="mt-4 text-sm leading-relaxed text-[#666]">{text}</p>
@@ -557,7 +557,7 @@ export default function Home() {
         <div className="page-shell grid gap-14 lg:grid-cols-[1.25fr_.75fr] lg:items-end">
           <div>
             <span className="eyebrow text-[#f2ad19]">Vamos conversar</span>
-            <h2 className="mt-6 max-w-[900px] text-[clamp(3.2rem,7vw,8rem)] font-black uppercase leading-[0.84] tracking-[-0.04em] md:tracking-[-0.055em] xl:tracking-[-0.065em]">
+            <h2 className="mt-6 max-w-[900px] text-[clamp(3.2rem,7vw,8rem)] font-black uppercase leading-[0.84] tracking-normal md:tracking-[-0.01em] xl:tracking-[-0.02em]">
               Sua equipe pronta para trabalhar com mais segurança.
             </h2>
             <p className="mt-8 max-w-xl text-lg leading-relaxed text-white/62">
@@ -577,7 +577,7 @@ export default function Home() {
                 <MessageCircle className="size-7" />
                 <span>
                   <span className="eyebrow block">Atendimento direto</span>
-                  <strong className="mt-1 block font-heading text-xl uppercase tracking-[0.015em]">
+                  <strong className="mt-1 block font-heading text-xl uppercase tracking-[0.04em]">
                     Falar no WhatsApp
                   </strong>
                 </span>

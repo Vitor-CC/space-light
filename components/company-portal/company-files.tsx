@@ -176,7 +176,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
     <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
       <section className="h-fit border border-black/10 bg-white p-6">
         <span className="eyebrow text-[#8a6107]">Enviar {copy.plural.toLowerCase()}</span>
-        <h2 className="mt-2 text-xl font-extrabold uppercase tracking-[0.015em]">Destino do arquivo</h2>
+        <h2 className="mt-2 text-xl font-extrabold uppercase tracking-[0.04em]">Destino do arquivo</h2>
         <div className="mt-5 grid gap-4">
           <label><span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Cliente</span><select value={clientId} onChange={(event) => changeClient(event.target.value)} className={selectClass}>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>
           <label><span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Treinamento</span><select value={trainingId} onChange={(event) => setTrainingId(event.target.value)} className={selectClass}><option value="">Selecione</option>{clientTrainings.map((training) => <option key={training.id} value={training.id}>{training.nr} · {training.title}</option>)}</select></label>
@@ -185,7 +185,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
         <input ref={inputRef} type="file" multiple accept={copy.accept} className="sr-only" onChange={(event) => addFiles(event.target.files)} />
         <button type="button" onClick={() => inputRef.current?.click()} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(event.dataTransfer.files); }} className={`mt-5 flex min-h-44 w-full flex-col items-center justify-center border-2 border-dashed p-6 text-center transition ${dragging ? 'border-[#f2ad19] bg-[#fff8e8]' : 'border-black/18 bg-[#f7f7f4] hover:border-[#f2ad19]'}`}>
           <span className="flex size-12 items-center justify-center bg-black text-[#f2ad19]"><UploadCloud className="size-5" /></span>
-          <strong className="mt-4 text-sm uppercase tracking-[0.06em]">Arraste {copy.plural.toLowerCase()} aqui</strong>
+          <strong className="mt-4 text-sm uppercase tracking-[0.08em]">Arraste {copy.plural.toLowerCase()} aqui</strong>
           <span className="mt-2 text-xs leading-relaxed text-[#777]">{copy.hint}</span>
         </button>
 
@@ -203,7 +203,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <span className="eyebrow text-[#8a6107]">{selectedTraining ? `${selectedTraining.nr} · ${selectedTraining.title}` : clientName || 'Histórico'}</span>
-            <h2 className="mt-2 text-2xl font-extrabold uppercase">{copy.plural} {selectedTraining ? 'desta turma' : 'por turma'}</h2>
+            <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">{copy.plural} {selectedTraining ? 'desta turma' : 'por turma'}</h2>
           </div>
           {selectedTraining ? <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => void downloadAll()} disabled={downloadable.length === 0 || Boolean(zipping)} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 border border-black/16 bg-white px-4 text-[9px] font-extrabold uppercase tracking-[0.12em] transition hover:border-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
@@ -227,7 +227,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
                   </span>
                   <span className="flex flex-1 flex-col p-5">
                     <span className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training.nr} · {formatDate(training.training_date)}</span>
-                    <strong className="mt-1 line-clamp-2 text-sm font-extrabold uppercase tracking-[0.06em] leading-tight">{training.title}</strong>
+                    <strong className="mt-1 line-clamp-2 text-sm font-extrabold uppercase tracking-[0.08em] leading-tight">{training.title}</strong>
                     <span className="mt-auto pt-4 inline-flex items-center gap-2 text-[9px] font-bold uppercase tracking-[.12em] text-[#666] transition group-hover:text-black">Abrir turma <ChevronRight className="size-3.5" /></span>
                   </span>
                 </button>;

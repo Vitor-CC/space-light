@@ -127,8 +127,9 @@
     font-weight: 900;
     /* Acompanha o clamp acima: no celular o título cai para 2.5rem, e o
        espaçamento fechado que funciona em display gruda as letras nesse tamanho.
-       Os breakpoints abaixo reapertam conforme a fonte cresce. */
-    letter-spacing: -0.035em;
+       Os breakpoints abaixo reapertam conforme a fonte cresce. Os valores vêm
+       de medição por renderização — abaixo de 48px o negativo sempre encosta. */
+    letter-spacing: 0.01em;
     line-height: 0.92;
     text-transform: uppercase;
   }
@@ -148,13 +149,7 @@
   }
 
   .section-title {
-    letter-spacing: -0.05em;
-  }
-}
-
-@media (min-width: 1280px) {
-  .section-title {
-    letter-spacing: -0.06em;
+    letter-spacing: 0;
   }
 }
 

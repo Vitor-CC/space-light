@@ -64,7 +64,7 @@ export function CompanyCertificates({
     </div>
 
     <div className="border-l-4 border-[#f2ad19] bg-white p-5">
-      <strong className="text-sm uppercase tracking-[0.06em]">Como funciona</strong>
+      <strong className="text-sm uppercase tracking-[0.08em]">Como funciona</strong>
       <p className="mt-2 text-sm leading-relaxed text-[#666]">
         Encerrar a turma gera três documentos e os arquiva nos <strong>documentos daquele
         treinamento</strong>: os certificados dos alunos (um por página), o certificado da
@@ -85,7 +85,7 @@ export function CompanyCertificates({
             </span>
             <div className="min-w-0">
               <span className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training.client_name} · {training.nr}</span>
-              <h2 className="mt-1 text-sm font-bold uppercase tracking-[0.06em]">{training.title}</h2>
+              <h2 className="mt-1 text-sm font-bold uppercase tracking-[0.08em]">{training.title}</h2>
               <p className="mt-1 text-[10px] text-[#888]">{training.participant_count} participante(s) · {formatDate(training.training_date)}</p>
             </div>
           </div>

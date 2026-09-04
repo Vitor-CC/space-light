@@ -70,7 +70,7 @@ export function CompanyAvailability({ data }: { data: CompanyDashboardData }) {
 
   return <section className="border border-black/10 bg-white p-5 md:p-7">
     <span className="eyebrow text-[#8a6107]">Agenda informada</span>
-    <h2 className="mt-2 text-2xl font-extrabold uppercase">Quem está disponível</h2>
+    <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Quem está disponível</h2>
     <p className="mt-2 max-w-2xl text-xs leading-relaxed text-[#666]">Clique em uma data para ver os instrutores que se declararam disponíveis nela.</p>
 
     <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)]">
@@ -110,7 +110,7 @@ export function CompanyAvailability({ data }: { data: CompanyDashboardData }) {
           </div> : <p className="mt-5 text-xs text-[#888]">Nenhum instrutor informou disponibilidade ainda.</p>}
         </div> : <div>
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-black/10 pb-3">
-            <strong className="text-sm font-extrabold uppercase capitalize tracking-[0.06em]">{longDate(selectedIso)}</strong>
+            <strong className="text-sm font-extrabold uppercase capitalize tracking-[0.08em]">{longDate(selectedIso)}</strong>
             <span className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#999]">{onSelectedDate.length} disponível(is)</span>
           </div>
 
@@ -124,7 +124,7 @@ export function CompanyAvailability({ data }: { data: CompanyDashboardData }) {
             return <li key={item.id} className="flex items-start gap-4 border border-black/10 p-4">
               <span className="flex size-11 shrink-0 items-center justify-center bg-[#f2ad19]/18 text-[#8a6107]"><UserRound className="size-5" /></span>
               <div className="min-w-0 flex-1">
-                <strong className="block text-sm font-extrabold uppercase tracking-[0.06em]">{item.instructor_name}</strong>
+                <strong className="block text-sm font-extrabold uppercase tracking-[0.08em]">{item.instructor_name}</strong>
                 {instructor?.specialties ? <p className="mt-1 text-[11px] font-bold text-[#8a6107]">{instructor.specialties}</p> : null}
                 <p className="mt-1 text-xs text-[#777]">{item.note || 'Disponível para novas turmas'}</p>
                 {instructor?.phone ? <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-[#666]"><Phone className="size-3.5" />{instructor.phone}</p> : null}

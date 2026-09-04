@@ -38,7 +38,7 @@ export function Certificate({
   if (!setup) {
     return (
       <div className="mx-auto max-w-2xl border-l-4 border-[#b62525] bg-white p-6">
-        <strong className="text-sm uppercase tracking-[0.06em]">Certificado indisponível para {data.training.nr}</strong>
+        <strong className="text-sm uppercase tracking-[0.08em]">Certificado indisponível para {data.training.nr}</strong>
         <p className="mt-2 text-sm leading-relaxed text-[#666]">
           A base legal e a arte desta norma ainda não foram cadastradas. Sem o texto legal correto
           o certificado não pode ser emitido — fale com quem cuida do sistema.

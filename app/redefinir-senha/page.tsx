@@ -32,7 +32,7 @@ export default async function ResetPasswordPage({
       <Link href="/" aria-label="Voltar ao site da Space Light" className="block w-fit"><Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={232} height={84} className="h-12 w-auto brightness-0 invert" /></Link>
       <div className="mt-9 flex size-13 items-center justify-center bg-[#f2ad19] text-black"><KeyRound className="size-6" /></div>
       <span className="eyebrow mt-7 block text-[#f2ad19]">Recuperação de acesso</span>
-      <h1 className="mt-3 text-4xl font-black uppercase leading-none tracking-[-0.035em]">Crie sua nova senha</h1>
+      <h1 className="mt-3 text-4xl font-black uppercase leading-none tracking-[0.01em]">Crie sua nova senha</h1>
       <p className="mt-5 text-sm leading-relaxed text-white/58">{firstName ? `Olá, ${firstName}. ` : ''}Escolha uma senha nova para <strong className="font-bold text-white/80">{valid.email}</strong>. Ela substitui a anterior imediatamente.</p>
 
       {status === 'invalid' ? <p role="alert" className="mt-5 border-l-4 border-[#b62525] bg-[#b62525]/12 p-4 text-sm leading-relaxed">Use ao menos 10 caracteres e repita a mesma senha nos dois campos.</p> : null}
