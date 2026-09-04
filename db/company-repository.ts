@@ -3,6 +3,7 @@ import type { DatabaseBinding, DatabaseResult } from '@/db/sqlite-adapter';
 import type {
   ClientCertificate,
   ClientDocument,
+  ClientPhoto,
   ClientPortalData,
   ClientTraining,
 } from '@/lib/client-portal-data';
@@ -1413,6 +1414,117 @@ export async function registerFileMetadata(input: {
   return { count: statements.length };
 }
 
+// ---------------------------------------------------------------------------
+// Arquivos com conteúdo real (Vercel Blob)
+// ---------------------------------------------------------------------------
+
+export type StoredFileRow = {
+  id: string;
+  client_id: string;
+  training_id: string;
+  name: string;
+  object_key: string;
+  content_type: string;
+  size: number;
+  kind: string;
+  status: string;
+  created_at: string;
+};
+
+export function newFileId() {
+  return makeId('file');
+}
+
+/** Confere se o treinamento é mesmo do instrutor logado. */
+export async function findTrainingForInstructor(input: {
+  trainingId: string;
+  instructorId: string;
+}) {
+  await ensurePortalSchema();
+  return getD1()
+    .prepare(`SELECT id, client_id, nr, title, status
+      FROM trainings WHERE id = ? AND instructor_id = ? LIMIT 1`)
+    .bind(input.trainingId, input.instructorId)
+    .first<{ id: string; client_id: string; nr: string; title: string; status: string }>();
+}
+
+export async function registerStoredFile(input: {
+  fileId: string;
+  clientId: string;
+  trainingId: string;
+  name: string;
+  objectKey: string;
+  contentType: string;
+  size: number;
+  kind: 'photo' | 'document';
+  createdByUserId: string;
+}) {
+  await ensurePortalSchema();
+  await getD1()
+    .prepare(`INSERT INTO files (
+      id, client_id, training_id, name, object_key, content_type,
+      size, kind, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'stored')`)
+    .bind(
+      input.fileId,
+      input.clientId,
+      input.trainingId,
+      input.name,
+      input.objectKey,
+      input.contentType,
+      input.size,
+      input.kind,
+    )
+    .run();
+  await writeAudit(input.createdByUserId, 'file.uploaded', 'training', input.trainingId, {
+    fileId: input.fileId,
+    kind: input.kind,
+  });
+}
+
+export async function listTrainingFiles(trainingId: string): Promise<StoredFileRow[]> {
+  await ensurePortalSchema();
+  const result = await getD1()
+    .prepare(`SELECT id, client_id, training_id, name, object_key, content_type,
+      size, kind, status, created_at
+      FROM files WHERE training_id = ? ORDER BY created_at DESC`)
+    .bind(trainingId)
+    .all<StoredFileRow>();
+  return rows(result);
+}
+
+/**
+ * Devolve o arquivo apenas se o usuário puder vê-lo: admin vê tudo,
+ * cliente vê o da própria empresa, instrutor vê o das próprias turmas.
+ */
+export async function findFileForUser(input: {
+  fileId: string;
+  user: StoredUser;
+}): Promise<StoredFileRow | null> {
+  await ensurePortalSchema();
+  const file = await getD1()
+    .prepare(`SELECT id, client_id, training_id, name, object_key, content_type,
+      size, kind, status, created_at
+      FROM files WHERE id = ? LIMIT 1`)
+    .bind(input.fileId)
+    .first<StoredFileRow>();
+  if (!file) return null;
+  const { user } = input;
+  if (user.role === 'admin') return file;
+  if (user.role === 'client') {
+    return user.client_id && user.client_id === file.client_id ? file : null;
+  }
+  if (user.role === 'instructor' && user.instructor_id) {
+    const owned = await getD1()
+      .prepare('SELECT id FROM trainings WHERE id = ? AND instructor_id = ? LIMIT 1')
+      .bind(file.training_id, user.instructor_id)
+      .first<{ id: string }>();
+    return owned ? file : null;
+  }
+  return null;
+}
+
+
 export async function findTrainingByToken(token: string) {
   await ensurePortalSchema();
   return getD1()
@@ -1528,7 +1640,7 @@ export async function getClientPortalData(
       }>(),
     d1
       .prepare(
-        `SELECT id, training_id, name, content_type, size, kind, created_at
+        `SELECT id, training_id, name, content_type, size, kind, status, created_at
          FROM files WHERE client_id = ? ORDER BY created_at DESC`,
       )
       .bind(clientId)
@@ -1539,6 +1651,7 @@ export async function getClientPortalData(
         content_type: string;
         size: number;
         kind: string;
+        status: string;
         created_at: string;
       }>(),
     d1
@@ -1584,6 +1697,17 @@ export async function getClientPortalData(
     certificateCount: item.certificate_count,
   }));
 
+  const photos: ClientPhoto[] = rows(fileResult)
+    .filter((item) => item.kind === 'photo' && item.status === 'stored')
+    .map((item) => ({
+      id: item.id,
+      clientId,
+      trainingId: item.training_id,
+      src: `/api/files/${item.id}`,
+      alt: item.name,
+      dateLabel: formatDate(item.created_at),
+    }));
+
   const documents: ClientDocument[] = rows(fileResult)
     .filter((item) => item.kind === 'document')
     .map((item) => ({
@@ -1623,7 +1747,7 @@ export async function getClientPortalData(
       phone: organization.contact_phone,
     },
     trainings,
-    photos: [],
+    photos,
     documents,
     certificates,
   };
