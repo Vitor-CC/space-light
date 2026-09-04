@@ -120,3 +120,13 @@ export function deleteEmployee(userId: string) {
 export function resetUserPassword(target: { userId?: string; clientId?: string; instructorId?: string }) {
   return requestJson<{ userId: string; name: string; email: string; active: boolean; temporaryPassword: string }>('/api/company/users/reset-password', { method: 'POST', body: JSON.stringify(target) });
 }
+
+// --- Documentos obrigatórios do instrutor ---
+
+export function readInstructorDocuments() {
+  return requestJson<{ documents: Array<{ id: string; instructorId: string; category: string; name: string; status: string; size: number; createdAt: string }> }>('/api/company/instructor-documents', { cache: 'no-store' }).then((result) => result.documents);
+}
+
+export function reviewInstructorDocument(documentId: string, status: 'approved' | 'rejected') {
+  return requestJson<{ ok: true }>('/api/company/instructor-documents', { method: 'POST', body: JSON.stringify({ documentId, status }) });
+}

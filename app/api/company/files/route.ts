@@ -28,13 +28,6 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
   }
-  if (!isStorageConfigured()) {
-    return NextResponse.json(
-      { error: 'O armazenamento de arquivos ainda não foi configurado nesta instalação.' },
-      { status: 503 },
-    );
-  }
-
   const form = await request.formData();
   const clientId = String(form.get('clientId') ?? '');
   const trainingId = String(form.get('trainingId') ?? '');
@@ -51,6 +44,13 @@ export async function POST(request: Request) {
   const training = await findTrainingForClient({ clientId, trainingId });
   if (!training) {
     return NextResponse.json({ error: 'Treinamento não pertence a este cliente.' }, { status: 400 });
+  }
+
+  if (!isStorageConfigured()) {
+    return NextResponse.json(
+      { error: 'O armazenamento de arquivos ainda não foi configurado nesta instalação.' },
+      { status: 503 },
+    );
   }
 
   const accepted = kind === 'photo' ? ACCEPTED_PHOTO_TYPES : ACCEPTED_DOCUMENT_TYPES;

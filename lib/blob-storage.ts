@@ -73,3 +73,22 @@ export async function readStoredFile(objectKey: string) {
 export async function deleteStoredFile(objectKey: string) {
   await del(objectKey, { token: requireToken() });
 }
+
+/** Documento pessoal do instrutor: caminho próprio, fora da pasta dos treinamentos. */
+export async function uploadInstructorFile(input: {
+  instructorId: string;
+  documentId: string;
+  category: string;
+  name: string;
+  contentType: string;
+  body: ArrayBuffer;
+}) {
+  const pathname = `instrutores/${input.instructorId}/${input.category}-${input.documentId}${extensionFor(input.name, input.contentType)}`;
+  const result = await put(pathname, input.body, {
+    access: 'private',
+    contentType: input.contentType,
+    addRandomSuffix: false,
+    token: requireToken(),
+  });
+  return { objectKey: result.pathname };
+}

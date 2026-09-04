@@ -18,6 +18,7 @@ import {
   Plus,
   QrCode,
   RefreshCw,
+  ShieldCheck,
   Trash2,
   Upload,
   UserRound,
@@ -32,15 +33,17 @@ import { ptBR } from 'date-fns/locale';
 
 import { Calendar } from '@/components/ui/calendar';
 import type { CompanyParticipant, CompanyTraining } from '@/lib/company-types';
+import { INSTRUCTOR_DOCUMENT_STATUS, REQUIRED_INSTRUCTOR_DOCUMENTS } from '@/lib/instructor-documents';
 import type { InstructorDashboardData } from '@/lib/instructor-types';
 
-type Section = 'overview' | 'calendar' | 'trainings' | 'active' | 'profile';
+type Section = 'overview' | 'calendar' | 'trainings' | 'active' | 'documents' | 'profile';
 
 const navigation = [
   { id: 'overview' as const, label: 'Visão geral', icon: LayoutDashboard },
   { id: 'calendar' as const, label: 'Calendário', icon: CalendarDays },
   { id: 'trainings' as const, label: 'Treinamentos', icon: GraduationCap },
   { id: 'active' as const, label: 'Iniciar treinamento', icon: Play },
+  { id: 'documents' as const, label: 'Meus documentos', icon: ShieldCheck },
   { id: 'profile' as const, label: 'Meu cadastro', icon: UserRound },
 ];
 
@@ -49,6 +52,7 @@ const copy: Record<Section, { title: string; description: string }> = {
   calendar: { title: 'Agenda e disponibilidade', description: 'Confira os treinamentos atribuídos e informe quando pode atender novas turmas.' },
   trainings: { title: 'Meus treinamentos', description: 'Veja somente as turmas atribuídas ao seu cadastro pela Space Light.' },
   active: { title: 'Sala do treinamento', description: 'Inicie a turma, apresente o QR Code e acompanhe as inscrições.' },
+  documents: { title: 'Meus documentos', description: 'CNH, assinatura e MTE/RÉ exigidos pela Space Light para liberar as turmas.' },
   profile: { title: 'Meu cadastro', description: 'Consulte os dados profissionais usados pela equipe de gestão.' },
 };
 
@@ -354,6 +358,93 @@ function Profile({ data, reload, notify }: { data: InstructorDashboardData; relo
   </div>;
 }
 
+type MyDocument = { id: string; category: string; name: string; status: string; size: number; createdAt: string };
+
+function InstructorDocuments({ notify }: { notify: (message: string) => void }) {
+  const [documents, setDocuments] = useState<MyDocument[] | null>(null);
+  const [sending, setSending] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const result = await requestJson<{ documents: MyDocument[] }>('/api/instructor/documents', { cache: 'no-store' });
+      setDocuments(result.documents);
+    } catch { setDocuments([]); }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function send(category: string, event: SyntheticEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const chosen = input.files?.[0];
+    if (!chosen) return;
+    setSending(category);
+    try {
+      const body = new FormData();
+      body.append('category', category);
+      body.append('file', chosen);
+      const response = await fetch('/api/instructor/documents', { method: 'POST', body });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || 'Não foi possível enviar.');
+      notify('Documento enviado. A Space Light vai analisar.');
+      await load();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao enviar o documento.');
+    } finally {
+      setSending('');
+      input.value = '';
+    }
+  }
+
+  const porCategoria = new Map((documents ?? []).map((item) => [item.category, item]));
+
+  return <div className="space-y-4">
+    {documents === null ? <div className="flex h-32 items-center justify-center"><Loader2 className="size-6 animate-spin text-[#8a6107]" /></div>
+      : REQUIRED_INSTRUCTOR_DOCUMENTS.map((required) => {
+        const enviado = porCategoria.get(required.category);
+        const situacao = enviado ? INSTRUCTOR_DOCUMENT_STATUS[enviado.status] : null;
+        const cor = !situacao ? 'bg-[#f3f3f0] text-[#777]'
+          : situacao.tone === 'ok' ? 'bg-[#daf2df] text-[#17642d]'
+          : situacao.tone === 'bad' ? 'bg-[#f3d4d4] text-[#8f1717]'
+          : 'bg-[#fff0d2] text-[#8a6107]';
+        return <article key={required.category} className="border border-black/10 bg-white p-5 md:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <strong className="text-base font-extrabold uppercase tracking-[-.02em]">{required.label}</strong>
+                <span className={`px-2 py-1 text-[9px] font-extrabold uppercase ${cor}`}>{situacao?.label ?? 'Não enviado'}</span>
+              </div>
+              <p className="mt-2 max-w-lg text-xs leading-relaxed text-[#666]">{required.help}</p>
+              {enviado ? <p className="mt-2 text-[10px] text-[#999]">{enviado.name} · {Math.max(1, Math.round(enviado.size / 1024))} KB · {formatMoment(enviado.createdAt)}</p> : null}
+              {enviado?.status === 'rejected' ? <p className="mt-2 border-l-2 border-[#b62525] bg-[#f3d4d4]/50 px-3 py-2 text-[11px] leading-relaxed text-[#8f1717]">A Space Light recusou este documento. Envie outro arquivo, mais legível ou dentro da validade.</p> : null}
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {enviado ? <a href={`/api/instructor-documents/${enviado.id}`} target="_blank" rel="noopener" className="inline-flex h-11 items-center gap-2 border border-black/15 px-3 text-[9px] font-extrabold uppercase hover:bg-black hover:text-white">Ver</a> : null}
+              <label className={`inline-flex h-11 cursor-pointer items-center justify-center gap-2 px-4 text-[9px] font-extrabold uppercase tracking-[.1em] ${enviado ? 'border border-black/15 hover:bg-black hover:text-white' : 'bg-[#f2ad19] text-black hover:bg-[#ff9900]'} ${sending === required.category ? 'pointer-events-none opacity-60' : ''}`}>
+                {sending === required.category ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                {sending === required.category ? 'Enviando…' : enviado ? 'Reenviar' : 'Enviar'}
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf" onChange={(event) => void send(required.category, event)} className="hidden" />
+              </label>
+            </div>
+          </div>
+        </article>;
+      })}
+  </div>;
+}
+
+function PendingApproval({ data, notify }: { data: InstructorDashboardData; notify: (message: string) => void }) {
+  return <div className="mx-auto w-full max-w-3xl px-5 py-12 sm:px-8">
+    <div className="border-l-4 border-[#f2ad19] bg-white p-6 md:p-8">
+      <span className="eyebrow text-[#8a6107]">Cadastro em análise</span>
+      <h1 className="mt-3 text-3xl font-black uppercase leading-none tracking-[-.05em]">Falta pouco, {data.instructor.name.split(' ')[0]}</h1>
+      <p className="mt-4 text-sm leading-relaxed text-[#666]">Envie os três documentos abaixo. A Space Light analisa e libera o seu acesso às turmas — você recebe o aviso pelo WhatsApp cadastrado.</p>
+    </div>
+    <div className="mt-6"><InstructorDocuments notify={notify} /></div>
+    <form action="/api/auth/logout" method="post" className="mt-8">
+      <button type="submit" className="inline-flex h-11 items-center gap-2 border border-black/15 bg-white px-4 text-[9px] font-extrabold uppercase tracking-[.1em] hover:bg-black hover:text-white"><LogOut className="size-4" />Sair</button>
+    </form>
+  </div>;
+}
+
 export function InstructorPortal({ initialData }: { initialData: InstructorDashboardData }) {
   const [section, setSection] = useState<Section>('overview');
   const [data, setData] = useState(initialData);
@@ -367,8 +458,14 @@ export function InstructorPortal({ initialData }: { initialData: InstructorDashb
     if (section === 'calendar') return <InstructorCalendar data={data} reload={reload} notify={setNotice} />;
     if (section === 'trainings') return <div className="grid gap-4 xl:grid-cols-2">{data.trainings.map((training) => <TrainingCard key={training.id} training={training} onStart={openTraining} />)}{data.trainings.length === 0 ? <div className="xl:col-span-2"><Empty icon={GraduationCap} title="Nenhuma turma atribuída" text="A gestão da Space Light vinculará seus próximos treinamentos aqui." /></div> : null}</div>;
     if (section === 'active') return <TrainingRoom data={data} selectedId={selectedTrainingId} selectTraining={setSelectedTrainingId} reload={reload} notify={setNotice} />;
+    if (section === 'documents') return <InstructorDocuments notify={setNotice} />;
     return <Profile data={data} reload={reload} notify={setNotice} />;
   }, [data, reload, section, selectedTrainingId]);
+
+  // Cadastro em análise: a única coisa que ele pode fazer é enviar documento.
+  if (data.instructor.status === 'pending') {
+    return <main className="min-h-screen bg-[#efefeb] text-[#0b0b0b]">{notice ? <output className="fixed inset-x-4 top-6 z-[70] border-l-4 border-[#f2ad19] bg-black p-4 text-sm text-white shadow-xl sm:inset-x-auto sm:right-6">{notice}</output> : null}<header className="flex h-[76px] items-center border-b border-black/10 bg-black px-5 sm:px-8"><Link href="/"><Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={232} height={84} className="h-11 w-auto brightness-0 invert" /></Link></header><PendingApproval data={data} notify={setNotice} /></main>;
+  }
 
   return <main className="min-h-screen bg-[#efefeb] text-[#0b0b0b]">{notice ? <output className="fixed inset-x-4 top-20 z-[70] max-w-none border-l-4 border-[#f2ad19] bg-black p-4 text-sm text-white shadow-xl sm:inset-x-auto sm:right-4 sm:top-24 sm:max-w-sm">{notice}</output> : null}<header className="sticky top-0 z-50 flex h-[76px] items-center justify-between border-b border-white/10 bg-black px-4 text-white sm:px-7"><div className="flex items-center gap-5"><Link href="/"><Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={232} height={84} className="h-11 w-auto brightness-0 invert" /></Link><span className="hidden h-8 w-px bg-white/15 sm:block" /><div className="hidden sm:block"><strong className="block text-xs">Área do Instrutor</strong><span className="mt-1 block text-[9px] font-bold uppercase tracking-[.1em] text-white/40">{data.instructor.name}</span></div></div><div className="flex gap-2"><button type="button" onClick={() => void reload()} aria-label="Atualizar dados" className="flex size-10 items-center justify-center border border-white/15 text-white/65 hover:border-[#f2ad19] hover:text-white"><RefreshCw className="size-4" /></button><form action="/api/auth/logout" method="post"><button type="submit" aria-label="Sair" className="flex size-10 items-center justify-center border border-white/15 text-white/65 hover:border-[#f2ad19] hover:text-white"><LogOut className="size-4" /></button></form></div></header><div className="lg:grid lg:grid-cols-[260px_minmax(0,1fr)]"><aside className="hidden min-h-[calc(100vh-76px)] bg-[#171716] p-5 text-white lg:block"><div className="sticky top-[96px]"><span className="eyebrow px-3 text-[#f2ad19]">Minha rotina</span><nav className="mt-5 space-y-1" aria-label="Navegação do instrutor">{navigation.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => setSection(id)} className={`flex h-12 w-full items-center gap-3 px-3 text-left text-[10px] font-extrabold uppercase tracking-[.08em] ${section === id ? 'bg-[#f2ad19] text-black' : 'text-white/58 hover:bg-white/8 hover:text-white'}`}><Icon className="size-4" />{label}</button>)}</nav></div></aside><div className="min-w-0"><nav className="grid grid-cols-5 overflow-x-auto border-b border-black/10 bg-white lg:hidden" aria-label="Navegação móvel do instrutor">{navigation.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => setSection(id)} className={`flex min-w-[72px] flex-col items-center gap-1.5 border-r border-black/8 px-2 py-3 text-[8px] font-extrabold uppercase ${section === id ? 'bg-[#f2ad19]' : 'text-[#666]'}`}><Icon className="size-4" />{label.split(' ')[0]}</button>)}</nav><section className="p-4 sm:p-6 md:p-8 xl:p-11"><SectionHeader section={section} /><div className="mt-7">{content}</div></section></div></div></main>;
 }

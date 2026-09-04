@@ -719,7 +719,7 @@ export async function selfRegisterInstructor(input: {
       .prepare(`INSERT INTO users (
         id, instructor_id, name, email, password_hash, password_salt,
         role, active, must_reset
-      ) VALUES (?, ?, ?, ?, ?, ?, 'instructor', 0, 0)`)
+      ) VALUES (?, ?, ?, ?, ?, ?, 'instructor', 1, 0)`)
       .bind(
         userId,
         instructorId,
@@ -1131,6 +1131,122 @@ export async function updateClientProfile(input: {
   await writeAudit(input.userId, 'client.profile_updated', 'client', input.clientId, {
     contactName: input.contactName.trim(),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Documentos obrigatórios do instrutor
+// ---------------------------------------------------------------------------
+
+export type InstructorDocumentRow = {
+  id: string;
+  instructor_id: string;
+  name: string;
+  object_key: string;
+  content_type: string;
+  size: number;
+  category: string;
+  status: string;
+  created_at: string;
+};
+
+export async function listInstructorDocuments(instructorId: string): Promise<InstructorDocumentRow[]> {
+  await ensurePortalSchema();
+  const result = await getD1()
+    .prepare(`SELECT id, instructor_id, name, object_key, content_type, size,
+      category, status, created_at
+      FROM instructor_documents WHERE instructor_id = ?
+      ORDER BY created_at DESC`)
+    .bind(instructorId)
+    .all<InstructorDocumentRow>();
+  return rows(result);
+}
+
+/** Reenviar substitui o anterior da mesma categoria: vale sempre o último. */
+export async function replaceInstructorDocument(input: {
+  instructorId: string;
+  category: string;
+  name: string;
+  objectKey: string;
+  contentType: string;
+  size: number;
+  byUserId: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const previous = await d1
+    .prepare('SELECT id, object_key FROM instructor_documents WHERE instructor_id = ? AND category = ?')
+    .bind(input.instructorId, input.category)
+    .all<{ id: string; object_key: string }>();
+  await d1
+    .prepare('DELETE FROM instructor_documents WHERE instructor_id = ? AND category = ?')
+    .bind(input.instructorId, input.category)
+    .run();
+  const id = makeId('idoc');
+  await d1
+    .prepare(`INSERT INTO instructor_documents (
+      id, instructor_id, name, object_key, content_type, size, category, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`)
+    .bind(id, input.instructorId, input.name, input.objectKey, input.contentType, input.size, input.category)
+    .run();
+  await writeAudit(input.byUserId, 'instructor.document_uploaded', 'instructor', input.instructorId, {
+    category: input.category,
+  });
+  return { id, replaced: rows(previous).map((item) => item.object_key) };
+}
+
+/** Só o dono do documento e a equipe Space podem abrir. */
+export async function findInstructorDocumentForUser(input: {
+  documentId: string;
+  user: StoredUser;
+}): Promise<InstructorDocumentRow | null> {
+  await ensurePortalSchema();
+  const document = await getD1()
+    .prepare(`SELECT id, instructor_id, name, object_key, content_type, size,
+      category, status, created_at
+      FROM instructor_documents WHERE id = ? LIMIT 1`)
+    .bind(input.documentId)
+    .first<InstructorDocumentRow>();
+  if (!document) return null;
+  if (input.user.role === 'admin') return document;
+  if (input.user.role === 'instructor' && input.user.instructor_id === document.instructor_id) {
+    return document;
+  }
+  return null;
+}
+
+export async function setInstructorDocumentStatus(input: {
+  documentId: string;
+  status: 'approved' | 'rejected';
+  byUserId: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const document = await d1
+    .prepare('SELECT id, instructor_id, category FROM instructor_documents WHERE id = ? LIMIT 1')
+    .bind(input.documentId)
+    .first<{ id: string; instructor_id: string; category: string }>();
+  if (!document) throw new Error('Documento não encontrado.');
+  await d1
+    .prepare('UPDATE instructor_documents SET status = ? WHERE id = ?')
+    .bind(input.status, input.documentId)
+    .run();
+  await writeAudit(
+    input.byUserId,
+    input.status === 'approved' ? 'instructor.document_approved' : 'instructor.document_rejected',
+    'instructor',
+    document.instructor_id,
+    { category: document.category },
+  );
+}
+
+export async function listAllInstructorDocuments(): Promise<InstructorDocumentRow[]> {
+  await ensurePortalSchema();
+  const result = await getD1()
+    .prepare(`SELECT id, instructor_id, name, object_key, content_type, size,
+      category, status, created_at
+      FROM instructor_documents ORDER BY created_at DESC`)
+    .all<InstructorDocumentRow>();
+  return rows(result);
 }
 
 // ---------------------------------------------------------------------------
