@@ -68,7 +68,10 @@ function drawJustified(
   lines.forEach((words, indice) => {
     const ultima = indice === lines.length - 1;
     const texto = words.join(' ');
-    if (ultima || words.length === 1) {
+    // Linha curta demais fica alinhada à esquerda: esticá-la abriria buracos
+    // entre as palavras, que é pior do que a margem irregular.
+    const curta = options.font.widthOfTextAtSize(texto, options.size) < options.maxWidth * 0.88;
+    if (ultima || curta || words.length === 1) {
       page.drawText(texto, { x: options.x, y, size: options.size, font: options.font, color: options.color });
     } else {
       const larguraPalavras = words.reduce((soma, w) => soma + options.font.widthOfTextAtSize(w, options.size), 0);

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import type { PDFFont, PDFImage } from 'pdf-lib';
+import type { PDFFont, PDFImage, PDFPage } from 'pdf-lib';
 
 import type { CertificateData } from '@/db/company-repository';
 import {
@@ -15,8 +15,14 @@ import {
 /** O atestado é A4 retrato: é um documento de texto com tabela. */
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
-const MARGIN = 56;
+const MARGIN = 52;
 const CONTENT = PAGE_W - MARGIN * 2;
+
+const PRETO = rgb(0, 0, 0);
+const AMARELO = rgb(0.949, 0.678, 0.098);
+const CINZA = rgb(0.45, 0.45, 0.45);
+const LINHA = rgb(0.82, 0.82, 0.82);
+const FUNDO_SUAVE = rgb(0.965, 0.965, 0.953);
 
 async function embedImage(pdf: PDFDocument, relative: string): Promise<PDFImage | null> {
   try {
@@ -81,6 +87,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const logo = await embedImage(pdf, '/images/certificado/logo-space.png');
+  const selo = setup.seal ? await embedImage(pdf, setup.seal) : null;
   const assinaturaResponsavel = await embedImage(pdf, TECHNICAL_LEAD.signature);
 
   let assinaturaInstrutor: PDFImage | null = null;
@@ -92,129 +99,146 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
     } catch { assinaturaInstrutor = null; }
   }
 
-  const preto = rgb(0, 0, 0);
-  const cinza = rgb(0.42, 0.42, 0.42);
   let page = pdf.addPage([PAGE_W, PAGE_H]);
-  let y = PAGE_H - MARGIN;
+  let y = 0;
+
+  /** Cabeçalho repetido em toda página: selo, logo e faixa amarela. */
+  function abrirPagina() {
+    page.drawRectangle({ x: 0, y: PAGE_H - 6, width: PAGE_W, height: 6, color: AMARELO });
+    let topo = PAGE_H - 34;
+    if (selo) {
+      const altura = 52;
+      page.drawImage(selo, { x: MARGIN, y: topo - altura, width: (selo.width / selo.height) * altura, height: altura });
+    }
+    if (logo) {
+      const altura = 46;
+      const largura = (logo.width / logo.height) * altura;
+      page.drawImage(logo, { x: PAGE_W - MARGIN - largura, y: topo - altura + 3, width: largura, height: altura });
+    }
+    topo -= 66;
+    page.drawLine({ start: { x: MARGIN, y: topo }, end: { x: PAGE_W - MARGIN, y: topo }, thickness: 0.6, color: LINHA });
+    y = topo - 30;
+  }
 
   function novaPagina() {
     page = pdf.addPage([PAGE_W, PAGE_H]);
-    y = PAGE_H - MARGIN;
+    abrirPagina();
   }
 
-  if (logo) {
-    const altura = 52;
-    const largura = (logo.width / logo.height) * altura;
-    page.drawImage(logo, { x: PAGE_W - MARGIN - largura, y: y - altura, width: largura, height: altura });
-  }
+  abrirPagina();
 
-  y -= 62;
+  // Título com sublinhado curto em amarelo.
   const titulo = 'ATESTADO';
-  page.drawText(titulo, {
-    x: MARGIN + (CONTENT - bold.widthOfTextAtSize(titulo, 20)) / 2,
-    y, size: 20, font: bold, color: preto,
-  });
+  const tituloSize = 22;
+  const larguraTitulo = bold.widthOfTextAtSize(titulo, tituloSize);
+  page.drawText(titulo, { x: MARGIN + (CONTENT - larguraTitulo) / 2, y, size: tituloSize, font: bold, color: PRETO });
+  page.drawRectangle({ x: MARGIN + (CONTENT - 54) / 2, y: y - 10, width: 54, height: 3, color: AMARELO });
 
-  // Parágrafo de abertura, justificado.
-  y -= 38;
+  // Parágrafo de abertura, justificado sem esticar linha curta.
+  y -= 40;
   const corpo = 10.5;
   const paragrafo = `Atesto, para os devidos fins, que as pessoas abaixo relacionadas participaram com bom aproveitamento do treinamento de "${setup.attestationSubject}", ${setup.attestationLegalBasis} referente à edificação localizada no endereço abaixo e estão aptas ao manuseio dos equipamentos de prevenção e combate a incêndio da edificação:`;
   const linhas = wrap(paragrafo, regular, corpo, CONTENT);
   linhas.forEach((palavras, indice) => {
-    const ultima = indice === linhas.length - 1;
-    if (ultima || palavras.length === 1) {
-      page.drawText(palavras.join(' '), { x: MARGIN, y, size: corpo, font: regular, color: preto });
+    const texto = palavras.join(' ');
+    const curta = regular.widthOfTextAtSize(texto, corpo) < CONTENT * 0.88;
+    if (indice === linhas.length - 1 || curta || palavras.length === 1) {
+      page.drawText(texto, { x: MARGIN, y, size: corpo, font: regular, color: PRETO });
     } else {
       const larguraPalavras = palavras.reduce((soma, w) => soma + regular.widthOfTextAtSize(w, corpo), 0);
       const espaco = (CONTENT - larguraPalavras) / (palavras.length - 1);
       let x = MARGIN;
       for (const palavra of palavras) {
-        page.drawText(palavra, { x, y, size: corpo, font: regular, color: preto });
+        page.drawText(palavra, { x, y, size: corpo, font: regular, color: PRETO });
         x += regular.widthOfTextAtSize(palavra, corpo) + espaco;
       }
     }
-    y -= 17;
+    y -= 16;
   });
 
-  // Bloco da empresa e da edificação.
-  y -= 14;
-  const enderecoLinha = [data.client.address, data.client.district ? `BAIRRO: ${data.client.district}` : '']
-    .filter(Boolean)
-    .join(' - ');
-  const municipioLinha = [
-    data.client.city ? `MUNICÍPIO: ${data.client.city}` : '',
-    data.client.state ? `UF: ${data.client.state}` : '',
-  ].filter(Boolean).join('   ');
-
-  const blocos: [string, string][] = [
-    ['EMPRESA:', data.client.legalName.toUpperCase()],
-    ['ENDEREÇO:', enderecoLinha || '—'],
-    ['', municipioLinha],
-    ['CNPJ:', data.client.document || '—'],
+  // Caixa com os dados da edificação.
+  y -= 18;
+  const campos: [string, string][] = [
+    ['EMPRESA', data.client.legalName.toUpperCase()],
+    ['CNPJ', data.client.document || '—'],
+    ['ENDEREÇO', [data.client.address, data.client.district].filter(Boolean).join(' - ') || '—'],
+    ['MUNICÍPIO / UF', [data.client.city, data.client.state].filter(Boolean).join(' / ') || '—'],
   ];
-  for (const [rotulo, valor] of blocos) {
-    if (!valor) continue;
-    let x = MARGIN;
-    if (rotulo) {
-      page.drawText(rotulo, { x, y, size: corpo, font: bold, color: preto });
-      x += bold.widthOfTextAtSize(`${rotulo} `, corpo);
-    }
-    page.drawText(fit(valor, regular, corpo, CONTENT - (x - MARGIN)), {
-      x, y, size: corpo, font: regular, color: preto,
+  const alturaCaixa = campos.length * 17 + 26;
+  page.drawRectangle({ x: MARGIN, y: y - alturaCaixa + 12, width: CONTENT, height: alturaCaixa, color: FUNDO_SUAVE });
+  page.drawRectangle({ x: MARGIN, y: y - alturaCaixa + 12, width: 3, height: alturaCaixa, color: AMARELO });
+  page.drawText('DADOS DA EDIFICAÇÃO', { x: MARGIN + 16, y: y - 2, size: 7.5, font: bold, color: rgb(0.54, 0.38, 0.03) });
+  let campoY = y - 20;
+  for (const [rotulo, valor] of campos) {
+    page.drawText(rotulo, { x: MARGIN + 16, y: campoY, size: 8, font: bold, color: CINZA });
+    page.drawText(fit(valor, regular, corpo - 0.5, CONTENT - 130), {
+      x: MARGIN + 120, y: campoY, size: corpo - 0.5, font: regular, color: PRETO,
     });
-    y -= 16;
+    campoY -= 17;
   }
+  y = y - alturaCaixa - 6;
 
   // Tabela de participantes.
-  y -= 16;
-  const colunas: { titulo: string; largura: number; valor: (p: CertificateData['participants'][number]) => string }[] = [
-    { titulo: 'NOME', largura: 196, valor: (p) => p.fullName },
-    { titulo: 'RG', largura: 78, valor: (p) => p.rg },
-    { titulo: 'CPF', largura: 92, valor: (p) => p.documentId },
-    { titulo: 'DATA NASC.', largura: 68, valor: (p) => formatBirthDate(p.birthDate) },
-    { titulo: 'CARGA HORÁRIA', largura: 49, valor: () => data.training.duration },
-  ];
-  const alturaLinha = 20;
-  const tabelaSize = 8;
+  y -= 18;
+  page.drawText('PARTICIPANTES', { x: MARGIN, y, size: 8, font: bold, color: rgb(0.54, 0.38, 0.03) });
+  y -= 14;
 
-  function cabecalhoTabela() {
+  const colunas: { titulo: string; largura: number; valor: (p: CertificateData['participants'][number]) => string }[] = [
+    { titulo: 'NOME', largura: CONTENT * 0.38, valor: (p) => p.fullName },
+    { titulo: 'RG', largura: CONTENT * 0.15, valor: (p) => p.rg },
+    { titulo: 'CPF', largura: CONTENT * 0.18, valor: (p) => p.documentId },
+    { titulo: 'DATA NASC.', largura: CONTENT * 0.14, valor: (p) => formatBirthDate(p.birthDate) },
+    { titulo: 'CARGA HORÁRIA', largura: CONTENT * 0.15, valor: () => data.training.duration },
+  ];
+  const alturaLinha = 19;
+  const tabelaSize = 7.6;
+
+  function cabecalhoTabela(destino: PDFPage) {
+    destino.drawRectangle({ x: MARGIN, y: y - alturaLinha, width: CONTENT, height: alturaLinha, color: PRETO });
     let x = MARGIN;
-    page.drawRectangle({ x: MARGIN, y: y - alturaLinha + 5, width: CONTENT, height: alturaLinha, color: rgb(0.93, 0.93, 0.91) });
     for (const coluna of colunas) {
-      page.drawText(coluna.titulo, { x: x + 4, y: y - alturaLinha + 11, size: tabelaSize, font: bold, color: preto });
+      destino.drawText(coluna.titulo, {
+        x: x + 6, y: y - alturaLinha + 6.5, size: tabelaSize, font: bold, color: AMARELO,
+      });
       x += coluna.largura;
     }
     y -= alturaLinha;
   }
 
-  cabecalhoTabela();
-  for (const participante of data.participants) {
-    if (y < 210) {
+  cabecalhoTabela(page);
+  data.participants.forEach((participante, indice) => {
+    if (y - alturaLinha < 230) {
       novaPagina();
-      cabecalhoTabela();
+      cabecalhoTabela(page);
+    }
+    if (indice % 2 === 1) {
+      page.drawRectangle({ x: MARGIN, y: y - alturaLinha, width: CONTENT, height: alturaLinha, color: FUNDO_SUAVE });
     }
     let x = MARGIN;
     for (const coluna of colunas) {
-      page.drawText(fit(coluna.valor(participante), regular, tabelaSize, coluna.largura - 8), {
-        x: x + 4, y: y - alturaLinha + 11, size: tabelaSize, font: regular, color: preto,
+      page.drawText(fit(coluna.valor(participante), regular, tabelaSize, coluna.largura - 12), {
+        x: x + 6, y: y - alturaLinha + 6.5, size: tabelaSize, font: regular, color: PRETO,
       });
       x += coluna.largura;
     }
     page.drawLine({
-      start: { x: MARGIN, y: y - alturaLinha + 5 },
-      end: { x: MARGIN + CONTENT, y: y - alturaLinha + 5 },
-      thickness: 0.4, color: rgb(0.8, 0.8, 0.8),
+      start: { x: MARGIN, y: y - alturaLinha },
+      end: { x: MARGIN + CONTENT, y: y - alturaLinha },
+      thickness: 0.4, color: LINHA,
     });
     y -= alturaLinha;
-  }
+  });
 
   // Data e assinaturas: se não couberem, vão para a página seguinte.
-  if (y < 200) novaPagina();
-  y -= 34;
+  if (y < 215) novaPagina();
+  y -= 32;
   const linhaData = `${ISSUING_CITY}, ${formatCertificateDates(data.training.dates)}.`;
-  page.drawText(linhaData, { x: MARGIN, y, size: corpo, font: regular, color: preto });
+  page.drawText(linhaData, {
+    x: PAGE_W - MARGIN - regular.widthOfTextAtSize(linhaData, corpo),
+    y, size: corpo, font: regular, color: PRETO,
+  });
 
-  const baseY = Math.max(y - 96, 96);
+  const baseY = Math.max(y - 92, 104);
   const vao = CONTENT / 2;
   const assinaturas = [
     {
@@ -230,31 +254,39 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   ];
   assinaturas.forEach((bloco, indice) => {
     const meio = MARGIN + vao * indice + vao / 2;
-    const larguraLinha = Math.min(vao - 30, 190);
+    const larguraLinha = Math.min(vao - 30, 200);
     if (bloco.assinatura) {
-      const altura = bloco.destaque ? 62 : 44;
+      const altura = bloco.destaque ? 66 : 46;
       const largura = Math.min((bloco.assinatura.width / bloco.assinatura.height) * altura, larguraLinha + 20);
       page.drawImage(bloco.assinatura, { x: meio - largura / 2, y: baseY + 3, width: largura, height: altura });
     }
     page.drawLine({
       start: { x: meio - larguraLinha / 2, y: baseY },
       end: { x: meio + larguraLinha / 2, y: baseY },
-      thickness: 0.8, color: preto,
+      thickness: 0.8, color: PRETO,
     });
     let linhaY = baseY - 12;
     for (const texto of bloco.linhas.filter(Boolean)) {
-      page.drawText(texto, {
-        x: meio - regular.widthOfTextAtSize(texto, 8.5) / 2,
-        y: linhaY, size: 8.5, font: regular, color: preto,
+      page.drawText(fit(texto, regular, 8.5, larguraLinha + 40), {
+        x: meio - Math.min(regular.widthOfTextAtSize(texto, 8.5), larguraLinha + 40) / 2,
+        y: linhaY, size: 8.5, font: regular, color: PRETO,
       });
       linhaY -= 11;
     }
   });
 
-  page.drawText('SPACE LIGHT ENGENHARIA', {
-    x: MARGIN + (CONTENT - regular.widthOfTextAtSize('SPACE LIGHT ENGENHARIA', 8)) / 2,
-    y: 48, size: 8, font: regular, color: cinza,
-  });
+  // Rodapé em todas as páginas.
+  for (const pagina of pdf.getPages()) {
+    pagina.drawLine({
+      start: { x: MARGIN, y: 56 }, end: { x: PAGE_W - MARGIN, y: 56 },
+      thickness: 0.5, color: LINHA,
+    });
+    const rodape = 'SPACE LIGHT ENGENHARIA · Treinamentos em Segurança do Trabalho';
+    pagina.drawText(rodape, {
+      x: MARGIN + (CONTENT - regular.widthOfTextAtSize(rodape, 7.5)) / 2,
+      y: 42, size: 7.5, font: regular, color: CINZA,
+    });
+  }
 
   return pdf.save();
 }
