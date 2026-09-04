@@ -399,6 +399,62 @@ export async function updateUserPassword(input: {
     .run();
 }
 
+async function findUserForReset(target: {
+  userId?: string;
+  clientId?: string;
+  instructorId?: string;
+}): Promise<StoredUser | null> {
+  if (target.userId) return findUserById(target.userId);
+  const column = target.clientId ? 'client_id' : target.instructorId ? 'instructor_id' : null;
+  const value = target.clientId ?? target.instructorId;
+  if (!column || !value) return null;
+  return getD1()
+    .prepare(`SELECT id, client_id, instructor_id, name, email, password_hash, password_salt,
+      role, is_owner, active, must_reset
+      FROM users WHERE ${column} = ? ORDER BY created_at ASC LIMIT 1`)
+    .bind(value)
+    .first<StoredUser>();
+}
+
+export async function resetUserPasswordByAdmin(input: {
+  userId?: string;
+  clientId?: string;
+  instructorId?: string;
+  passwordHash: string;
+  passwordSalt: string;
+  byUserId: string;
+  actorIsOwner: boolean;
+}) {
+  await ensurePortalSchema();
+  const target = await findUserForReset(input);
+  if (!target) throw new Error('Este cadastro ainda não tem uma conta de acesso.');
+  if (target.id === input.byUserId) {
+    throw new Error('Para trocar a própria senha, use a página Definir senha.');
+  }
+  if (target.role === 'admin' && !input.actorIsOwner) {
+    throw new Error('Somente o dono pode redefinir a senha de um funcionário.');
+  }
+  if (isOwnerByEmailOrFlag(target.email, target.is_owner)) {
+    throw new Error('A senha do dono só pode ser trocada pelo próprio dono.');
+  }
+  await getD1()
+    .prepare(`UPDATE users
+      SET password_hash = ?, password_salt = ?, must_reset = 1
+      WHERE id = ?`)
+    .bind(input.passwordHash, input.passwordSalt, target.id)
+    .run();
+  await writeAudit(input.byUserId, 'user.password_reset', 'user', target.id, {
+    email: target.email,
+    role: target.role,
+  });
+  return {
+    userId: target.id,
+    name: target.name,
+    email: target.email,
+    active: target.active === 1,
+  };
+}
+
 export async function approveClientAccess(
   clientId: string,
   approvedByUserId: string,

@@ -21,6 +21,11 @@ const actionLabels: Record<string, string> = {
   'employee.created': 'criou um funcionário',
   'employee.activated': 'reativou um funcionário',
   'employee.deactivated': 'desativou um funcionário',
+  'user.password_reset': 'redefiniu a senha de um acesso',
+  'client.deleted': 'excluiu um cliente',
+  'instructor.deleted': 'excluiu um instrutor',
+  'training.deleted': 'excluiu um treinamento',
+  'employee.deleted': 'excluiu um funcionário',
 };
 
 function describe(action: string) {

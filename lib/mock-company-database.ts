@@ -81,3 +81,9 @@ export function deleteTraining(trainingId: string) {
 export function deleteEmployee(userId: string) {
   return requestJson<{ ok: true }>('/api/company/employees', { method: 'DELETE', body: JSON.stringify({ userId }) });
 }
+
+// --- Redefinição de senha pelo painel ---
+
+export function resetUserPassword(target: { userId?: string; clientId?: string; instructorId?: string }) {
+  return requestJson<{ userId: string; name: string; email: string; active: boolean; temporaryPassword: string }>('/api/company/users/reset-password', { method: 'POST', body: JSON.stringify(target) });
+}
