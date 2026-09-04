@@ -37,12 +37,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Informe o documento e a decisão.' }, { status: 400 });
   }
   try {
-    await setInstructorDocumentStatus({
+    const result = await setInstructorDocumentStatus({
       documentId: input.documentId,
       status: input.status,
       byUserId: user.id,
     });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, activated: result.activated });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erro ao avaliar o documento.' },

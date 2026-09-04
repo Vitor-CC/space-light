@@ -1,4 +1,5 @@
 import { getD1 } from '@/db';
+import { INSTRUCTOR_DOCUMENT_CATEGORIES } from '@/lib/instructor-documents';
 import type { DatabaseBinding, DatabaseResult } from '@/db/sqlite-adapter';
 import type {
   ClientCertificate,
@@ -1237,6 +1238,59 @@ export async function setInstructorDocumentStatus(input: {
     document.instructor_id,
     { category: document.category },
   );
+
+  if (input.status === 'approved') {
+    const liberado = await activateInstructorIfDocumentsApproved({
+      instructorId: document.instructor_id,
+      byUserId: input.byUserId,
+    });
+    return { activated: liberado };
+  }
+  return { activated: false };
+}
+
+/**
+ * Aprovado o último documento que faltava, o acesso se libera sozinho. A Space
+ * Light ainda pode liberar na mão pelo botão "Aprovar acesso", quando quiser
+ * adiantar alguém.
+ */
+export async function activateInstructorIfDocumentsApproved(input: {
+  instructorId: string;
+  byUserId: string;
+}) {
+  const d1 = getD1();
+  const placeholders = INSTRUCTOR_DOCUMENT_CATEGORIES.map(() => '?').join(', ');
+  const aprovados = await d1
+    .prepare(`SELECT count(DISTINCT category) AS total FROM instructor_documents
+      WHERE instructor_id = ? AND status = 'approved' AND category IN (${placeholders})`)
+    .bind(input.instructorId, ...INSTRUCTOR_DOCUMENT_CATEGORIES)
+    .first<{ total: number }>();
+  if ((aprovados?.total ?? 0) < INSTRUCTOR_DOCUMENT_CATEGORIES.length) return false;
+
+  const instrutor = await d1
+    .prepare('SELECT status FROM instructors WHERE id = ? LIMIT 1')
+    .bind(input.instructorId)
+    .first<{ status: string }>();
+  if (instrutor?.status !== 'pending') return false;
+
+  await d1.batch([
+    d1
+      .prepare(`UPDATE instructors SET status = 'active', updated_at = datetime('now')
+        WHERE id = ? AND status = 'pending'`)
+      .bind(input.instructorId),
+    d1
+      .prepare(`UPDATE users SET active = 1
+        WHERE instructor_id = ? AND role = 'instructor'`)
+      .bind(input.instructorId),
+  ]);
+  await writeAudit(
+    input.byUserId,
+    'instructor.access_approved',
+    'instructor',
+    input.instructorId,
+    { motivo: 'documentos aprovados' },
+  );
+  return true;
 }
 
 export async function listAllInstructorDocuments(): Promise<InstructorDocumentRow[]> {

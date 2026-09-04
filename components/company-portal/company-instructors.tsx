@@ -80,9 +80,12 @@ export function CompanyInstructors({ data, reload, notify }: { data: CompanyDash
 
   async function decideDocument(documentId: string, status: 'approved' | 'rejected') {
     try {
-      await reviewInstructorDocument(documentId, status);
-      notify(status === 'approved' ? 'Documento aprovado.' : 'Documento recusado.');
+      const result = await reviewInstructorDocument(documentId, status);
+      notify(result.activated
+        ? 'Documento aprovado. Os três estão em ordem: o acesso do instrutor foi liberado.'
+        : status === 'approved' ? 'Documento aprovado.' : 'Documento recusado.');
       await loadDocuments();
+      if (result.activated) await reload();
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Erro ao avaliar o documento.');
     }
@@ -99,8 +102,17 @@ export function CompanyInstructors({ data, reload, notify }: { data: CompanyDash
     } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao cadastrar instrutor.'); }
   }
 
+  // Liberar na mão continua possível, mas com aviso: normalmente o acesso se
+  // libera sozinho quando os três documentos são aprovados.
   async function approve(id: string) {
-    try { await approveInstructor(id); notify('Acesso do instrutor aprovado.'); await reload(); }
+    const aprovados = REQUIRED_INSTRUCTOR_DOCUMENTS.filter((required) =>
+      instructorDocuments.some((doc) => doc.instructorId === id && doc.category === required.category && doc.status === 'approved'),
+    ).length;
+    if (aprovados < REQUIRED_INSTRUCTOR_DOCUMENTS.length) {
+      const faltam = REQUIRED_INSTRUCTOR_DOCUMENTS.length - aprovados;
+      if (!window.confirm(`Ainda ${faltam === 1 ? 'falta 1 documento aprovado' : `faltam ${faltam} documentos aprovados`}. Liberar o acesso mesmo assim?`)) return;
+    }
+    try { await approveInstructor(id); notify('Acesso do instrutor liberado.'); await reload(); }
     catch (error) { notify(error instanceof Error ? error.message : 'Erro ao aprovar instrutor.'); }
   }
 

@@ -128,5 +128,5 @@ export function readInstructorDocuments() {
 }
 
 export function reviewInstructorDocument(documentId: string, status: 'approved' | 'rejected') {
-  return requestJson<{ ok: true }>('/api/company/instructor-documents', { method: 'POST', body: JSON.stringify({ documentId, status }) });
+  return requestJson<{ ok: true; activated: boolean }>('/api/company/instructor-documents', { method: 'POST', body: JSON.stringify({ documentId, status }) });
 }
