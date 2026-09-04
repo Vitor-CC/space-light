@@ -107,7 +107,7 @@ function drawSignatureRow(
     const larguraLinha = Math.min(vao - 26, 170);
     if (bloco.assinatura) {
       // A da responsável técnica é maior: é a assinatura que valida o documento.
-      const altura = bloco.destaque ? 74 : 50;
+      const altura = bloco.destaque ? 96 : 68;
       const largura = Math.min((bloco.assinatura.width / bloco.assinatura.height) * altura, larguraLinha + 30);
       page.drawImage(bloco.assinatura, {
         x: meio - largura / 2, y: options.baseY + 3, width: largura, height: altura,
@@ -287,16 +287,16 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     let y = PAGE_H - 30;
 
     if (selo) {
-      const altura = 66;
+      const altura = 88;
       page.drawImage(selo, { x: LEFT, y: y - altura, width: (selo.width / selo.height) * altura, height: altura });
     }
     if (logo) {
-      const altura = 54;
+      const altura = 72;
       const largura = (logo.width / logo.height) * altura;
       page.drawImage(logo, { x: PAGE_W - RIGHT_SAFE - largura, y: y - altura, width: largura, height: altura });
     }
 
-    y -= 96;
+    y -= 112;
     const titulo = 'CERTIFICADO';
     const tituloSize = 36;
     const centro = LEFT + (PAGE_W - RIGHT_SAFE - LEFT) / 2;
@@ -381,7 +381,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
       const larguraLinha = Math.min(vao - 26, 170);
       if (bloco.assinatura) {
         // A da responsável técnica é maior: é a assinatura que valida o documento.
-        const altura = bloco.destaque ? 74 : 50;
+        const altura = bloco.destaque ? 96 : 68;
         const largura = Math.min((bloco.assinatura.width / bloco.assinatura.height) * altura, larguraLinha + 30);
         page.drawImage(bloco.assinatura, {
           x: meio - largura / 2, y: baseY + 3, width: largura, height: altura,
@@ -450,16 +450,16 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
 
   let y = PAGE_H - 30;
   if (selo) {
-    const altura = 66;
+    const altura = 88;
     page.drawImage(selo, { x: LEFT, y: y - altura, width: (selo.width / selo.height) * altura, height: altura });
   }
   if (logo) {
-    const altura = 54;
+    const altura = 72;
     const largura = (logo.width / logo.height) * altura;
     page.drawImage(logo, { x: PAGE_W - RIGHT_SAFE - largura, y: y - altura, width: largura, height: altura });
   }
 
-  y -= 96;
+  y -= 112;
   const tituloSize = 36;
   const centro = LEFT + (PAGE_W - RIGHT_SAFE - LEFT) / 2;
   page.drawText('CERTIFICADO', {

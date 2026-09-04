@@ -107,15 +107,15 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
     page.drawRectangle({ x: 0, y: PAGE_H - 6, width: PAGE_W, height: 6, color: AMARELO });
     let topo = PAGE_H - 34;
     if (selo) {
-      const altura = 52;
+      const altura = 68;
       page.drawImage(selo, { x: MARGIN, y: topo - altura, width: (selo.width / selo.height) * altura, height: altura });
     }
     if (logo) {
-      const altura = 46;
+      const altura = 62;
       const largura = (logo.width / logo.height) * altura;
       page.drawImage(logo, { x: PAGE_W - MARGIN - largura, y: topo - altura + 3, width: largura, height: altura });
     }
-    topo -= 66;
+    topo -= 86;
     page.drawLine({ start: { x: MARGIN, y: topo }, end: { x: PAGE_W - MARGIN, y: topo }, thickness: 0.6, color: LINHA });
     y = topo - 30;
   }
@@ -207,7 +207,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
 
   cabecalhoTabela(page);
   data.participants.forEach((participante, indice) => {
-    if (y - alturaLinha < 230) {
+    if (y - alturaLinha < 250) {
       novaPagina();
       cabecalhoTabela(page);
     }
@@ -230,7 +230,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   });
 
   // Data e assinaturas: se não couberem, vão para a página seguinte.
-  if (y < 215) novaPagina();
+  if (y < 235) novaPagina();
   y -= 32;
   const linhaData = `${ISSUING_CITY}, ${formatCertificateDates(data.training.dates)}.`;
   page.drawText(linhaData, {
@@ -238,7 +238,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
     y, size: corpo, font: regular, color: PRETO,
   });
 
-  const baseY = Math.max(y - 92, 104);
+  const baseY = Math.max(y - 112, 104);
   const vao = CONTENT / 2;
   const assinaturas = [
     {
@@ -256,7 +256,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
     const meio = MARGIN + vao * indice + vao / 2;
     const larguraLinha = Math.min(vao - 30, 200);
     if (bloco.assinatura) {
-      const altura = bloco.destaque ? 66 : 46;
+      const altura = bloco.destaque ? 88 : 62;
       const largura = Math.min((bloco.assinatura.width / bloco.assinatura.height) * altura, larguraLinha + 20);
       page.drawImage(bloco.assinatura, { x: meio - largura / 2, y: baseY + 3, width: largura, height: altura });
     }
