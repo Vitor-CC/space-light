@@ -58,13 +58,13 @@ export function CompanyCertificates({
 
   return <div className="space-y-5">
     <div className="grid gap-4 md:grid-cols-3">
-      <div className="border border-black/10 bg-white p-6"><FileCheck2 className="size-6 text-[#8a6107]" /><strong className="mt-6 block text-3xl">{prontos}</strong><span className="mt-2 block text-[9px] font-extrabold uppercase text-[#777]">Turmas com documentos prontos</span></div>
-      <div className="border border-black/10 bg-white p-6"><Award className="size-6 text-[#8a6107]" /><strong className="mt-6 block text-3xl">{concluidos.length}</strong><span className="mt-2 block text-[9px] font-extrabold uppercase text-[#777]">Turmas concluídas</span></div>
-      <div className="border border-black/10 bg-white p-6"><Download className="size-6 text-[#8a6107]" /><strong className="mt-6 block text-3xl">{concluidos.reduce((soma, item) => soma + item.participant_count, 0)}</strong><span className="mt-2 block text-[9px] font-extrabold uppercase text-[#777]">Certificados emitidos</span></div>
+      <div className="border border-black/10 bg-white p-6"><FileCheck2 className="size-6 text-[#8a6107]" /><strong className="mt-6 block text-3xl">{prontos}</strong><span className="mt-2 block text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#777]">Turmas com documentos prontos</span></div>
+      <div className="border border-black/10 bg-white p-6"><Award className="size-6 text-[#8a6107]" /><strong className="mt-6 block text-3xl">{concluidos.length}</strong><span className="mt-2 block text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#777]">Turmas concluídas</span></div>
+      <div className="border border-black/10 bg-white p-6"><Download className="size-6 text-[#8a6107]" /><strong className="mt-6 block text-3xl">{concluidos.reduce((soma, item) => soma + item.participant_count, 0)}</strong><span className="mt-2 block text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#777]">Certificados emitidos</span></div>
     </div>
 
     <div className="border-l-4 border-[#f2ad19] bg-white p-5">
-      <strong className="text-sm uppercase">Como funciona</strong>
+      <strong className="text-sm uppercase tracking-[0.06em]">Como funciona</strong>
       <p className="mt-2 text-sm leading-relaxed text-[#666]">
         Encerrar a turma gera três documentos e os arquiva nos <strong>documentos daquele
         treinamento</strong>: os certificados dos alunos (um por página), o certificado da
@@ -84,12 +84,12 @@ export function CompanyCertificates({
               {emFalta === 0 ? <FileCheck2 className="size-5" /> : <Award className="size-5" />}
             </span>
             <div className="min-w-0">
-              <span className="text-[9px] font-extrabold uppercase tracking-[0.11em] text-[#8a6107]">{training.client_name} · {training.nr}</span>
-              <h2 className="mt-1 text-sm font-bold uppercase">{training.title}</h2>
+              <span className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training.client_name} · {training.nr}</span>
+              <h2 className="mt-1 text-sm font-bold uppercase tracking-[0.06em]">{training.title}</h2>
               <p className="mt-1 text-[10px] text-[#888]">{training.participant_count} participante(s) · {formatDate(training.training_date)}</p>
             </div>
           </div>
-          <button type="button" onClick={() => void gerar(training)} disabled={ocupado || training.participant_count === 0} className="inline-flex h-11 shrink-0 items-center gap-2 border border-black/15 px-4 text-[9px] font-extrabold uppercase hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
+          <button type="button" onClick={() => void gerar(training)} disabled={ocupado || training.participant_count === 0} className="inline-flex h-11 shrink-0 items-center gap-2 border border-black/15 px-4 text-[9px] font-extrabold uppercase tracking-[0.12em] hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
             {ocupado ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
             {ocupado ? 'Gerando…' : emFalta === DOCUMENT_KINDS.length ? 'Gerar documentos' : 'Gerar de novo'}
           </button>
@@ -99,9 +99,9 @@ export function CompanyCertificates({
           <li key={item.prefix} className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-bold">{item.label}</span>
             {item.file ? <span className="flex gap-2">
-              <a href={`/api/files/${item.file.id}`} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-2 border border-black/15 px-3 text-[8px] font-extrabold uppercase hover:bg-black hover:text-white"><ExternalLink className="size-3.5" />Abrir</a>
-              <a href={`/api/files/${item.file.id}?download=1`} className="inline-flex h-9 items-center gap-2 bg-[#f2ad19] px-3 text-[8px] font-extrabold uppercase text-black hover:bg-[#ff9900]"><Download className="size-3.5" />Baixar</a>
-            </span> : <span className="text-[9px] font-bold uppercase tracking-[.08em] text-[#999]">Ainda não gerado</span>}
+              <a href={`/api/files/${item.file.id}`} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-2 border border-black/15 px-3 text-[8px] font-extrabold uppercase tracking-[0.14em] hover:bg-black hover:text-white"><ExternalLink className="size-3.5" />Abrir</a>
+              <a href={`/api/files/${item.file.id}?download=1`} className="inline-flex h-9 items-center gap-2 bg-[#f2ad19] px-3 text-[8px] font-extrabold uppercase tracking-[0.14em] text-black hover:bg-[#ff9900]"><Download className="size-3.5" />Baixar</a>
+            </span> : <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#999]">Ainda não gerado</span>}
           </li>
         ))}</ul>
       </article>;

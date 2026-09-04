@@ -44,7 +44,7 @@ export default async function ChooseAreaPage({ searchParams }: { searchParams: P
     <div className="flex flex-1 items-center justify-center px-5 py-14 sm:px-8">
       <div className="w-full max-w-3xl">
         <span className="eyebrow block text-[#f2ad19]">Portal Space Light</span>
-        <h1 className="mt-4 text-[clamp(2.6rem,6vw,4.5rem)] font-black uppercase leading-[0.88] tracking-[-0.06em]">Por onde você entra?</h1>
+        <h1 className="mt-4 text-[clamp(2.6rem,6vw,4.5rem)] font-black uppercase leading-[0.88] tracking-[-0.03em] md:tracking-[-0.045em]">Por onde você entra?</h1>
         <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/58 sm:text-base">Escolha a sua área para ir direto ao login certo.</p>
         {status === 'password-updated' ? <p role="status" className="mt-6 border-l-4 border-[#f2ad19] bg-[#f2ad19]/12 p-4 text-sm leading-relaxed text-white/85">Senha alterada. Entre com a nova senha pela sua área.</p> : null}
 
@@ -52,7 +52,7 @@ export default async function ChooseAreaPage({ searchParams }: { searchParams: P
           <span className="flex size-13 shrink-0 items-center justify-center bg-[#f2ad19] text-black transition group-hover:bg-black group-hover:text-[#f2ad19]"><area.icon className="size-6" /></span>
           <span className="min-w-0 flex-1">
             <span className="eyebrow block text-[#f2ad19] transition group-hover:text-black/60">{area.eyebrow}</span>
-            <strong className="mt-2 block text-xl font-extrabold uppercase tracking-[-.03em] sm:text-2xl">{area.title}</strong>
+            <strong className="mt-2 block text-xl font-extrabold uppercase tracking-[0.015em] sm:text-2xl sm:tracking-normal">{area.title}</strong>
             <span className="mt-2 block text-xs leading-relaxed text-white/55 transition group-hover:text-black/70 sm:text-sm">{area.text}</span>
           </span>
           <ArrowUpRight className="size-6 shrink-0 text-white/30 transition group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:text-black" />

@@ -104,7 +104,7 @@ function SectionHeading({ section }: { section: PortalSection }) {
     <div className="flex flex-col gap-4 border-b border-black/12 pb-7 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <span className="eyebrow text-[#8a6107]">Área do Cliente</span>
-        <h1 className="mt-3 text-4xl font-black uppercase leading-none tracking-[-0.055em] md:text-5xl">
+        <h1 className="mt-3 text-4xl font-black uppercase leading-none tracking-[-0.035em] md:text-5xl md:tracking-[-0.045em]">
           {copy.title}
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-[#666] md:text-base">{copy.description}</p>
@@ -129,7 +129,7 @@ function TrainingCard({ training }: { training: ClientTraining }) {
               <StatusTag status={training.status} />
               <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#888]">{training.code}</span>
             </div>
-            <h2 className="mt-3 max-w-2xl text-xl font-extrabold uppercase leading-tight tracking-[-0.035em] md:text-2xl">
+            <h2 className="mt-3 max-w-2xl text-xl font-extrabold uppercase leading-tight tracking-[0.015em] md:text-2xl md:tracking-normal">
               {training.title}
             </h2>
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[#666]">
@@ -147,7 +147,7 @@ function TrainingCard({ training }: { training: ClientTraining }) {
           ].map(([label, value]) => (
             <div key={label} className="bg-[#f5f5f2] px-3 py-4 text-center">
               <strong className="block font-heading text-xl">{value}</strong>
-              <span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.1em] text-[#777]">{label}</span>
+              <span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.12em] text-[#777]">{label}</span>
             </div>
           ))}
         </div>
@@ -176,7 +176,7 @@ function Dashboard({ data, userName, onNavigate }: { data: ClientPortalData; use
         <div className="relative z-10 grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
             <span className="eyebrow text-[#f2ad19]">Olá, {userName}</span>
-            <h2 className="mt-4 max-w-3xl text-3xl font-black uppercase leading-[0.94] tracking-[-0.055em] md:text-5xl">
+            <h2 className="mt-4 max-w-3xl text-3xl font-black uppercase leading-[0.94] tracking-[-0.02em] md:text-5xl md:tracking-[-0.045em]">
               Seus treinamentos estão organizados e disponíveis.
             </h2>
             <p className="mt-5 max-w-2xl text-sm leading-relaxed text-white/62 md:text-base">
@@ -186,7 +186,7 @@ function Dashboard({ data, userName, onNavigate }: { data: ClientPortalData; use
           <button
             type="button"
             onClick={() => onNavigate('trainings')}
-            className="inline-flex h-12 items-center justify-center gap-2 bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-black transition hover:bg-[#ff9900]"
+            className="inline-flex h-12 items-center justify-center gap-2 bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black transition hover:bg-[#ff9900]"
           >
             Ver treinamentos <ChevronRight className="size-4" />
           </button>
@@ -207,7 +207,7 @@ function Dashboard({ data, userName, onNavigate }: { data: ClientPortalData; use
             className="group flex min-h-36 items-center justify-between bg-white p-6 text-left transition hover:bg-[#fff8e8]"
           >
             <div>
-              <strong className="font-heading text-4xl font-black tracking-[-0.05em]">{value}</strong>
+              <strong className="font-heading text-4xl font-black tracking-[-0.03em]">{value}</strong>
               <span className="mt-2 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#777]">{label}</span>
             </div>
             <span className="flex size-11 items-center justify-center bg-black text-[#f2ad19] transition group-hover:bg-[#f2ad19] group-hover:text-black">
@@ -221,7 +221,7 @@ function Dashboard({ data, userName, onNavigate }: { data: ClientPortalData; use
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
             <span className="eyebrow text-[#8a6107]">Atividade recente</span>
-            <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[-0.04em]">Último treinamento</h2>
+            <h2 className="mt-2 text-2xl font-extrabold uppercase">Último treinamento</h2>
           </div>
           <button
             type="button"
@@ -242,7 +242,7 @@ function Dashboard({ data, userName, onNavigate }: { data: ClientPortalData; use
         >
           <span className="flex items-center gap-4">
             <span className="flex size-12 items-center justify-center bg-[#f2ad19]"><Images className="size-5" /></span>
-            <span><strong className="block text-sm uppercase">Ver fotos recentes</strong><span className="mt-1 block text-xs text-[#777]">Registros separados por treinamento</span></span>
+            <span><strong className="block text-sm uppercase tracking-[0.06em]">Ver fotos recentes</strong><span className="mt-1 block text-xs text-[#777]">Registros separados por treinamento</span></span>
           </span>
           <ChevronRight className="size-5 text-black/30 transition group-hover:translate-x-1 group-hover:text-black" />
         </button>
@@ -253,7 +253,7 @@ function Dashboard({ data, userName, onNavigate }: { data: ClientPortalData; use
         >
           <span className="flex items-center gap-4">
             <span className="flex size-12 items-center justify-center bg-black text-[#f2ad19]"><FileCheck2 className="size-5" /></span>
-            <span><strong className="block text-sm uppercase">Consultar documentos</strong><span className="mt-1 block text-xs text-[#777]">Arquivos liberados pela Space Light</span></span>
+            <span><strong className="block text-sm uppercase tracking-[0.06em]">Consultar documentos</strong><span className="mt-1 block text-xs text-[#777]">Arquivos liberados pela Space Light</span></span>
           </span>
           <ChevronRight className="size-5 text-black/30 transition group-hover:translate-x-1 group-hover:text-black" />
         </button>
@@ -277,7 +277,7 @@ function DocumentRow({ document, data }: { document: ClientDocument; data: Clien
       <span className="flex size-12 items-center justify-center bg-black text-[#f2ad19]"><FileText className="size-5" /></span>
       <div className="min-w-0">
         <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{document.category}</span>
-        <h2 className="mt-1 truncate text-base font-extrabold uppercase tracking-[-0.02em]" title={document.title}>{document.title}</h2>
+        <h2 className="mt-1 truncate text-base font-extrabold uppercase tracking-[0.04em]" title={document.title}>{document.title}</h2>
         <p className="mt-2 text-xs text-[#777]">{training ? `${training.nr} · ${training.dateLabel}` : 'Documento geral da empresa'} · {document.format} · {document.size} · Enviado em {document.updatedAt}</p>
       </div>
       <div className="flex gap-2">
@@ -322,7 +322,7 @@ function BackToFolders({ onBack, training, download }: { onBack: () => void; tra
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-4">
       <div>
         <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training ? `${training.nr} · ${training.dateLabel}` : 'Turma'}</span>
-        <h2 className="mt-1 text-xl font-extrabold uppercase tracking-[-0.035em]">{training?.title ?? 'Treinamento'}</h2>
+        <h2 className="mt-1 text-xl font-extrabold uppercase tracking-[0.015em]">{training?.title ?? 'Treinamento'}</h2>
       </div>
       <div className="flex flex-wrap gap-2">
         {download ? <DownloadAllButton entries={download} zipName={slug || 'arquivos'} /> : null}
@@ -355,13 +355,13 @@ function TrainingFolders({
               {cover
                 ? <Image src={cover} alt="" fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition duration-500 group-hover:scale-[1.03]" />
                 : <FolderOpen className="size-10 text-black/15" />}
-              <span className="absolute right-3 top-3 bg-black px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.1em] text-[#f2ad19]">
+              <span className="absolute right-3 top-3 bg-black px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#f2ad19]">
                 {total === 0 ? unit.none : total === 1 ? `1 ${unit.one}` : `${total} ${unit.many}`}
               </span>
             </span>
             <span className="flex flex-1 flex-col p-5">
               <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training.nr} · {training.dateLabel}</span>
-              <strong className="mt-1 line-clamp-2 text-base font-extrabold uppercase leading-tight tracking-[-0.02em]">{training.title}</strong>
+              <strong className="mt-1 line-clamp-2 text-base font-extrabold uppercase leading-tight tracking-[0.04em]">{training.title}</strong>
               <span className="mt-auto pt-4 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#666] transition group-hover:text-black">
                 Abrir turma <ChevronRight className="size-3.5" />
               </span>
@@ -394,8 +394,8 @@ function Photos({ data }: { data: ClientPortalData }) {
                   <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{photo.dateLabel}</span>
                   <strong className="mt-1 block truncate text-sm" title={photo.alt}>{photo.alt}</strong>
                   <div className="mt-4 flex gap-2">
-                    <a href={photo.src} target="_blank" rel="noreferrer" className="inline-flex h-10 flex-1 items-center justify-center gap-2 border border-black/16 text-[9px] font-extrabold uppercase tracking-[0.1em] transition hover:border-black hover:bg-black hover:text-white"><Eye className="size-4" />Ver</a>
-                    <a href={`${photo.src}?download=1`} className="inline-flex h-10 flex-1 items-center justify-center gap-2 bg-[#f2ad19] text-[9px] font-extrabold uppercase tracking-[0.1em] text-black transition hover:bg-[#ff9900]"><Download className="size-4" />Baixar</a>
+                    <a href={photo.src} target="_blank" rel="noreferrer" className="inline-flex h-10 flex-1 items-center justify-center gap-2 border border-black/16 text-[9px] font-extrabold uppercase tracking-[0.12em] transition hover:border-black hover:bg-black hover:text-white"><Eye className="size-4" />Ver</a>
+                    <a href={`${photo.src}?download=1`} className="inline-flex h-10 flex-1 items-center justify-center gap-2 bg-[#f2ad19] text-[9px] font-extrabold uppercase tracking-[0.12em] text-black transition hover:bg-[#ff9900]"><Download className="size-4" />Baixar</a>
                   </div>
                 </figcaption>
               </figure>
@@ -463,10 +463,10 @@ function CertificateCard({ certificate, data }: { certificate: ClientCertificate
       <div className="absolute right-0 top-0 h-1 w-24 bg-[#f2ad19]" />
       <div className="flex items-start justify-between gap-6">
         <span className="flex size-14 items-center justify-center bg-[#f2ad19] text-black"><Award className="size-6" /></span>
-        <span className="font-heading text-4xl font-black tracking-[-0.05em] text-black/12">{String(certificate.quantity).padStart(2, '0')}</span>
+        <span className="font-heading text-4xl font-black tracking-[-0.03em] text-black/12">{String(certificate.quantity).padStart(2, '0')}</span>
       </div>
       <span className="eyebrow mt-8 block text-[#8a6107]">{training?.nr} · {certificate.reference}</span>
-      <h2 className="mt-3 text-xl font-extrabold uppercase leading-tight tracking-[-0.035em]">{certificate.title}</h2>
+      <h2 className="mt-3 text-xl font-extrabold uppercase leading-tight tracking-[0.015em]">{certificate.title}</h2>
       <dl className="mt-6 grid gap-3 border-y border-black/8 py-5 text-xs">
         <div className="flex justify-between gap-4"><dt className="text-[#777]">Emissão</dt><dd className="font-bold text-right">{certificate.issuedAt}</dd></div>
         <div className="flex justify-between gap-4"><dt className="text-[#777]">Validade</dt><dd className="font-bold text-right">{certificate.expiresAt}</dd></div>
@@ -485,7 +485,7 @@ function Certificates({ data }: { data: ClientPortalData }) {
   return (
     <div>
       <div className="mb-6 border-l-4 border-[#f2ad19] bg-white p-5">
-        <strong className="text-sm uppercase">Como funciona</strong>
+        <strong className="text-sm uppercase tracking-[0.06em]">Como funciona</strong>
         <p className="mt-2 text-sm leading-relaxed text-[#666]">Os certificados são emitidos pela Space Light por turma, para a empresa contratante — participantes não têm conta individual. Quando o lote fica pronto, o arquivo é publicado em <strong className="font-bold text-black">Documentos</strong>, de onde você baixa.</p>
       </div>
 
@@ -493,15 +493,15 @@ function Certificates({ data }: { data: ClientPortalData }) {
 
       {completed.length ? <div className="mt-6">
         <span className="eyebrow text-[#8a6107]">Turmas concluídas</span>
-        <h2 className="mt-2 text-xl font-extrabold uppercase tracking-[-0.035em]">Elegíveis para certificado</h2>
+        <h2 className="mt-2 text-xl font-extrabold uppercase tracking-[0.015em]">Elegíveis para certificado</h2>
         <div className="mt-4 space-y-3">{completed.map((training) => <article key={training.id} className="flex flex-wrap items-center gap-4 border border-black/10 bg-white p-5">
           <span className="flex size-12 shrink-0 items-center justify-center bg-[#daf2df] text-[#17642d]"><FileCheck2 className="size-5" /></span>
           <div className="min-w-0 flex-1">
             <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training.nr} · {training.dateLabel}</span>
-            <h3 className="mt-1 text-sm font-extrabold uppercase tracking-[-0.02em]">{training.title}</h3>
+            <h3 className="mt-1 text-sm font-extrabold uppercase tracking-[0.06em]">{training.title}</h3>
             <p className="mt-1 text-xs text-[#777]">{training.participantCount} participante(s) concluíram</p>
           </div>
-          <span className="w-fit bg-[#f2ad19]/18 px-3 py-2 text-[9px] font-extrabold uppercase tracking-[0.1em] text-[#785303]">Certificado em preparação</span>
+          <span className="w-fit bg-[#f2ad19]/18 px-3 py-2 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#785303]">Certificado em preparação</span>
         </article>)}</div>
       </div> : null}
 
@@ -555,7 +555,7 @@ function Profile({ data }: { data: ClientPortalData }) {
       <section className="border border-black/10 bg-white p-6 md:p-8">
         <div className="flex items-center gap-4 border-b border-black/8 pb-6">
           <span className="flex size-16 items-center justify-center bg-black text-[#f2ad19]"><Building2 className="size-7" /></span>
-          <div><span className="eyebrow text-[#8a6107]">Empresa contratante</span><h2 className="mt-2 text-2xl font-black uppercase tracking-[-0.04em]">{organization.displayName}</h2></div>
+          <div><span className="eyebrow text-[#8a6107]">Empresa contratante</span><h2 className="mt-2 text-2xl font-black uppercase">{organization.displayName}</h2></div>
         </div>
 
         <form onSubmit={salvar} className="mt-7">
@@ -587,7 +587,7 @@ function Profile({ data }: { data: ClientPortalData }) {
       <aside className="space-y-5">
         <div className="bg-black p-7 text-white">
           <ShieldCheck className="size-8 text-[#f2ad19]" />
-          <h2 className="mt-7 text-2xl font-black uppercase tracking-[-0.04em]">Como funciona este acesso</h2>
+          <h2 className="mt-7 text-2xl font-black uppercase">Como funciona este acesso</h2>
           <ul className="mt-6 space-y-4 text-sm leading-relaxed text-white/65">
             <li className="flex gap-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#f2ad19]" />A empresa consulta e baixa os materiais liberados.</li>
             <li className="flex gap-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#f2ad19]" />Fotos e documentos são publicados pela equipe Space Light.</li>
@@ -641,10 +641,10 @@ export function ClientPortal({ data, user }: { data: ClientPortalData; user: { n
             <nav aria-label="Navegação da Área do Cliente" className="mt-5 space-y-1">
               {navigation.map(({ id, label, icon: Icon }) => {
                 const active = section === id;
-                return <button key={id} type="button" onClick={() => setSection(id)} className={`flex h-12 w-full items-center gap-3 px-3 text-left text-[11px] font-extrabold uppercase tracking-[0.1em] transition ${active ? 'bg-[#f2ad19] text-black' : 'text-white/62 hover:bg-white/8 hover:text-white'}`}><Icon className="size-4" />{label}<ChevronRight className={`ml-auto size-4 ${active ? 'opacity-100' : 'opacity-20'}`} /></button>;
+                return <button key={id} type="button" onClick={() => setSection(id)} className={`flex h-12 w-full items-center gap-3 px-3 text-left text-[11px] font-extrabold uppercase tracking-[0.11em] transition ${active ? 'bg-[#f2ad19] text-black' : 'text-white/62 hover:bg-white/8 hover:text-white'}`}><Icon className="size-4" />{label}<ChevronRight className={`ml-auto size-4 ${active ? 'opacity-100' : 'opacity-20'}`} /></button>;
               })}
             </nav>
-            <div className="mt-7 border border-white/10 p-4"><div className="flex items-center gap-3"><UserRound className="size-5 text-[#f2ad19]" /><div className="min-w-0"><strong className="block truncate text-xs">{user.name}</strong><span className="mt-1 block truncate text-[9px] uppercase tracking-[0.1em] text-white/40">{user.email}</span></div></div></div>
+            <div className="mt-7 border border-white/10 p-4"><div className="flex items-center gap-3"><UserRound className="size-5 text-[#f2ad19]" /><div className="min-w-0"><strong className="block truncate text-xs">{user.name}</strong><span className="mt-1 block truncate text-[9px] uppercase tracking-[0.12em] text-white/40">{user.email}</span></div></div></div>
           </div>
         </aside>
 
@@ -652,7 +652,7 @@ export function ClientPortal({ data, user }: { data: ClientPortalData; user: { n
           <nav aria-label="Navegação móvel da Área do Cliente" className="grid grid-cols-6 overflow-x-auto border-b border-black/10 bg-white lg:hidden">
             {navigation.map(({ id, shortLabel, icon: Icon }) => {
               const active = section === id;
-              return <button key={id} type="button" onClick={() => setSection(id)} aria-label={sectionCopy[id].title} className={`flex min-w-[74px] flex-col items-center gap-1.5 border-r border-black/8 px-2 py-3 text-[9px] font-extrabold uppercase tracking-[0.08em] ${active ? 'bg-[#f2ad19] text-black' : 'text-[#666]'}`}><Icon className="size-4" />{shortLabel}</button>;
+              return <button key={id} type="button" onClick={() => setSection(id)} aria-label={sectionCopy[id].title} className={`flex min-w-[74px] flex-col items-center gap-1.5 border-r border-black/8 px-2 py-3 text-[9px] font-extrabold uppercase tracking-[0.12em] ${active ? 'bg-[#f2ad19] text-black' : 'text-[#666]'}`}><Icon className="size-4" />{shortLabel}</button>;
             })}
           </nav>
 

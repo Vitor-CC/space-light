@@ -30,13 +30,13 @@ const kindCopy: Record<Kind, { label: string; plural: string; accept: string; hi
 function FileActions({ file, onDelete }: { file: CompanyFile; onDelete: (file: CompanyFile) => void }) {
   if (file.status !== 'stored') {
     return <div className="flex items-center gap-2">
-      <span className="inline-flex h-9 items-center gap-2 border border-[#e0c48a] bg-[#fff8e8] px-3 text-[8px] font-extrabold uppercase text-[#8a6107]" title="Este registro é anterior ao armazenamento de arquivos: só a ficha foi salva, o arquivo em si não existe."><TriangleAlert className="size-3.5" />Arquivo não salvo</span>
+      <span className="inline-flex h-9 items-center gap-2 border border-[#e0c48a] bg-[#fff8e8] px-3 text-[8px] font-extrabold uppercase tracking-[0.14em] text-[#8a6107]" title="Este registro é anterior ao armazenamento de arquivos: só a ficha foi salva, o arquivo em si não existe."><TriangleAlert className="size-3.5" />Arquivo não salvo</span>
       <button type="button" onClick={() => onDelete(file)} aria-label={`Excluir ${file.name}`} className="inline-flex size-9 items-center justify-center border border-black/10 text-[#999] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-3.5" /></button>
     </div>;
   }
   return <div className="flex items-center gap-2">
-    <a href={`/api/files/${file.id}`} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-2 border border-black/15 px-3 text-[8px] font-extrabold uppercase hover:bg-black hover:text-white"><ExternalLink className="size-3.5" />Abrir</a>
-    <a href={`/api/files/${file.id}?download=1`} className="inline-flex h-9 items-center gap-2 border border-black/15 px-3 text-[8px] font-extrabold uppercase hover:bg-black hover:text-white"><Download className="size-3.5" />Baixar</a>
+    <a href={`/api/files/${file.id}`} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-2 border border-black/15 px-3 text-[8px] font-extrabold uppercase tracking-[0.14em] hover:bg-black hover:text-white"><ExternalLink className="size-3.5" />Abrir</a>
+    <a href={`/api/files/${file.id}?download=1`} className="inline-flex h-9 items-center gap-2 border border-black/15 px-3 text-[8px] font-extrabold uppercase tracking-[0.14em] hover:bg-black hover:text-white"><Download className="size-3.5" />Baixar</a>
     <button type="button" onClick={() => onDelete(file)} aria-label={`Excluir ${file.name}`} className="inline-flex size-9 items-center justify-center border border-black/10 text-[#999] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-3.5" /></button>
   </div>;
 }
@@ -46,10 +46,10 @@ function PhotoCard({ file, onDelete }: { file: CompanyFile; onDelete: (file: Com
     <div className="relative aspect-[4/3] bg-[#f7f7f4]">
       {file.status === 'stored'
         ? <Image src={`/api/files/${file.id}`} alt={file.name} fill unoptimized sizes="(min-width:1280px) 25vw, (min-width:640px) 50vw, 100vw" className="object-cover" />
-        : <span className="flex h-full items-center justify-center text-[9px] font-extrabold uppercase text-[#999]">Sem conteúdo</span>}
+        : <span className="flex h-full items-center justify-center text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#999]">Sem conteúdo</span>}
     </div>
     <div className="p-4">
-      <span className="block text-[9px] font-extrabold uppercase tracking-[.1em] text-[#8a6107]">{file.client_name} · {file.training_nr}</span>
+      <span className="block text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{file.client_name} · {file.training_nr}</span>
       <strong className="mt-1 block truncate text-sm" title={file.name}>{file.name}</strong>
       <p className="mt-1 text-[10px] text-[#888]">{formatFileSize(file.size)} · {formatDate(file.created_at)}</p>
       {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[10px] leading-relaxed text-[#8a6107]">Enviado antes do armazenamento entrar no ar: o arquivo em si não foi guardado. Exclua e envie de novo.</p> : null}
@@ -62,7 +62,7 @@ function DocumentRow({ file, onDelete }: { file: CompanyFile; onDelete: (file: C
   return <article className="grid gap-4 border border-black/10 bg-white p-5 sm:grid-cols-[auto_1fr_auto] sm:items-center">
     <span className="flex size-11 items-center justify-center bg-black text-[#f2ad19]"><FileText className="size-5" /></span>
     <div className="min-w-0">
-      <span className="text-[9px] font-extrabold uppercase tracking-[.11em] text-[#8a6107]">{file.client_name} · {file.training_nr}</span>
+      <span className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{file.client_name} · {file.training_nr}</span>
       <h3 className="mt-1 truncate text-sm font-bold" title={file.name}>{file.name}</h3>
       <p className="mt-1 text-[10px] text-[#888]">{file.training_title} · {formatFileSize(file.size)} · {formatDate(file.created_at)}</p>
       {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[10px] leading-relaxed text-[#8a6107]">Enviado antes do armazenamento entrar no ar: o arquivo em si não foi guardado. Exclua este registro e envie o arquivo de novo.</p> : null}
@@ -176,21 +176,21 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
     <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
       <section className="h-fit border border-black/10 bg-white p-6">
         <span className="eyebrow text-[#8a6107]">Enviar {copy.plural.toLowerCase()}</span>
-        <h2 className="mt-2 text-xl font-extrabold uppercase tracking-[-.04em]">Destino do arquivo</h2>
+        <h2 className="mt-2 text-xl font-extrabold uppercase tracking-[0.015em]">Destino do arquivo</h2>
         <div className="mt-5 grid gap-4">
-          <label><span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[.11em]">Cliente</span><select value={clientId} onChange={(event) => changeClient(event.target.value)} className={selectClass}>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>
-          <label><span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[.11em]">Treinamento</span><select value={trainingId} onChange={(event) => setTrainingId(event.target.value)} className={selectClass}><option value="">Selecione</option>{clientTrainings.map((training) => <option key={training.id} value={training.id}>{training.nr} · {training.title}</option>)}</select></label>
+          <label><span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Cliente</span><select value={clientId} onChange={(event) => changeClient(event.target.value)} className={selectClass}>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>
+          <label><span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Treinamento</span><select value={trainingId} onChange={(event) => setTrainingId(event.target.value)} className={selectClass}><option value="">Selecione</option>{clientTrainings.map((training) => <option key={training.id} value={training.id}>{training.nr} · {training.title}</option>)}</select></label>
         </div>
 
         <input ref={inputRef} type="file" multiple accept={copy.accept} className="sr-only" onChange={(event) => addFiles(event.target.files)} />
         <button type="button" onClick={() => inputRef.current?.click()} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(event.dataTransfer.files); }} className={`mt-5 flex min-h-44 w-full flex-col items-center justify-center border-2 border-dashed p-6 text-center transition ${dragging ? 'border-[#f2ad19] bg-[#fff8e8]' : 'border-black/18 bg-[#f7f7f4] hover:border-[#f2ad19]'}`}>
           <span className="flex size-12 items-center justify-center bg-black text-[#f2ad19]"><UploadCloud className="size-5" /></span>
-          <strong className="mt-4 text-sm uppercase">Arraste {copy.plural.toLowerCase()} aqui</strong>
+          <strong className="mt-4 text-sm uppercase tracking-[0.06em]">Arraste {copy.plural.toLowerCase()} aqui</strong>
           <span className="mt-2 text-xs leading-relaxed text-[#777]">{copy.hint}</span>
         </button>
 
         {queue.length > 0 ? <div className="mt-4 border border-black/10">
-          <div className="flex items-center justify-between bg-[#f7f7f4] px-4 py-3"><strong className="text-xs">{queue.length} na fila</strong><button type="button" onClick={() => setQueue([])} className="text-[9px] font-extrabold uppercase text-[#8f1717]">Limpar</button></div>
+          <div className="flex items-center justify-between bg-[#f7f7f4] px-4 py-3"><strong className="text-xs">{queue.length} na fila</strong><button type="button" onClick={() => setQueue([])} className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8f1717]">Limpar</button></div>
           <div className="max-h-44 divide-y divide-black/8 overflow-y-auto">{queue.slice(0, 40).map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs"><span className="min-w-0 truncate">{file.name}</span><span className="shrink-0 text-[#888]">{formatFileSize(file.size)}</span></div>)}{queue.length > 40 ? <p className="px-4 py-2.5 text-xs text-[#777]">+ {queue.length - 40} arquivos</p> : null}</div>
         </div> : null}
 
@@ -203,14 +203,14 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <span className="eyebrow text-[#8a6107]">{selectedTraining ? `${selectedTraining.nr} · ${selectedTraining.title}` : clientName || 'Histórico'}</span>
-            <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[-.04em]">{copy.plural} {selectedTraining ? 'desta turma' : 'por turma'}</h2>
+            <h2 className="mt-2 text-2xl font-extrabold uppercase">{copy.plural} {selectedTraining ? 'desta turma' : 'por turma'}</h2>
           </div>
           {selectedTraining ? <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void downloadAll()} disabled={downloadable.length === 0 || Boolean(zipping)} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 border border-black/16 bg-white px-4 text-[9px] font-extrabold uppercase tracking-[.1em] transition hover:border-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
+            <button type="button" onClick={() => void downloadAll()} disabled={downloadable.length === 0 || Boolean(zipping)} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 border border-black/16 bg-white px-4 text-[9px] font-extrabold uppercase tracking-[0.12em] transition hover:border-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
               {zipping ? <Loader2 className="size-4 animate-spin" /> : <FileArchive className="size-4" />}
               {zipping || (downloadable.length === 1 ? 'Baixar 1 em zip' : downloadable.length > 1 ? `Baixar os ${downloadable.length} em zip` : 'Baixar em zip')}
             </button>
-            <button type="button" onClick={() => setTrainingId('')} className="inline-flex h-11 shrink-0 items-center gap-2 border border-black/16 bg-white px-4 text-[9px] font-extrabold uppercase tracking-[.1em] transition hover:border-black hover:bg-black hover:text-white"><ArrowLeft className="size-4" />Todas as turmas</button>
+            <button type="button" onClick={() => setTrainingId('')} className="inline-flex h-11 shrink-0 items-center gap-2 border border-black/16 bg-white px-4 text-[9px] font-extrabold uppercase tracking-[0.12em] transition hover:border-black hover:bg-black hover:text-white"><ArrowLeft className="size-4" />Todas as turmas</button>
           </div> : null}
         </div>
 
@@ -223,11 +223,11 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
                 return <button key={training.id} type="button" onClick={() => setTrainingId(training.id)} className="group flex flex-col overflow-hidden border border-black/10 bg-white text-left transition hover:border-[#f2ad19]">
                   <span className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-[#f7f7f4]">
                     {capa ? <Image src={`/api/files/${capa.id}`} alt="" fill unoptimized sizes="(min-width:1280px) 33vw, 100vw" className="object-cover transition duration-500 group-hover:scale-[1.03]" /> : <FolderOpen className="size-10 text-black/15" />}
-                    <span className="absolute right-3 top-3 bg-black px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-[.1em] text-[#f2ad19]">{doTreino.length === 0 ? `Sem ${copy.plural.toLowerCase()}` : `${doTreino.length} ${doTreino.length === 1 ? copy.label.toLowerCase() : copy.plural.toLowerCase()}`}</span>
+                    <span className="absolute right-3 top-3 bg-black px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#f2ad19]">{doTreino.length === 0 ? `Sem ${copy.plural.toLowerCase()}` : `${doTreino.length} ${doTreino.length === 1 ? copy.label.toLowerCase() : copy.plural.toLowerCase()}`}</span>
                   </span>
                   <span className="flex flex-1 flex-col p-5">
-                    <span className="text-[9px] font-extrabold uppercase tracking-[.11em] text-[#8a6107]">{training.nr} · {formatDate(training.training_date)}</span>
-                    <strong className="mt-1 line-clamp-2 text-sm font-extrabold uppercase leading-tight">{training.title}</strong>
+                    <span className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training.nr} · {formatDate(training.training_date)}</span>
+                    <strong className="mt-1 line-clamp-2 text-sm font-extrabold uppercase tracking-[0.06em] leading-tight">{training.title}</strong>
                     <span className="mt-auto pt-4 inline-flex items-center gap-2 text-[9px] font-bold uppercase tracking-[.12em] text-[#666] transition group-hover:text-black">Abrir turma <ChevronRight className="size-3.5" /></span>
                   </span>
                 </button>;

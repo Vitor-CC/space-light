@@ -32,7 +32,7 @@ export function MobileNav() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className="border-b border-white/10 py-4 text-sm font-extrabold uppercase tracking-[0.1em] text-white/80 hover:text-[#f2ad19]"
+                className="border-b border-white/10 py-4 text-sm font-extrabold uppercase tracking-[0.06em] text-white/80 hover:text-[#f2ad19]"
               >
                 {link.label}
               </a>
@@ -40,7 +40,7 @@ export function MobileNav() {
             <a
               href="#contato"
               onClick={() => setOpen(false)}
-              className="mt-4 mb-2 inline-flex h-12 items-center justify-center gap-2 bg-[#f2ad19] px-5 text-xs font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]"
+              className="mt-4 mb-2 inline-flex h-12 items-center justify-center gap-2 bg-[#f2ad19] px-5 text-xs font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#ff9900]"
             >
               Solicitar proposta <ArrowUpRight className="size-4" />
             </a>

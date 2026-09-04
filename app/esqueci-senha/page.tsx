@@ -49,7 +49,7 @@ export default async function ForgotPasswordPage({
       <Link href="/" aria-label="Voltar ao site da Space Light" className="block w-fit"><Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={232} height={84} className="h-12 w-auto brightness-0 invert" /></Link>
       <div className="mt-9 flex size-13 items-center justify-center bg-[#f2ad19] text-black"><LifeBuoy className="size-6" /></div>
       <span className="eyebrow mt-7 block text-[#f2ad19]">Recuperação de acesso</span>
-      <h1 className="mt-3 text-4xl font-black uppercase leading-none tracking-[-.05em]">Esqueceu a senha?</h1>
+      <h1 className="mt-3 text-4xl font-black uppercase leading-none tracking-[-0.035em]">Esqueceu a senha?</h1>
 
       {notice ? <p role="status" className={`mt-6 border-l-4 p-4 text-sm leading-relaxed ${notice.tone === 'ok' ? 'border-[#f2ad19] bg-[#f2ad19]/12 text-white/85' : 'border-[#b62525] bg-[#b62525]/12 text-white/85'}`}>{notice.text}</p> : null}
 
@@ -61,7 +61,7 @@ export default async function ForgotPasswordPage({
             <span className="mb-2 block text-[10px] font-extrabold uppercase tracking-[.12em] text-white/50">Seu e-mail de acesso</span>
             <input name="email" type="email" autoComplete="email" required placeholder="voce@empresa.com.br" className="h-14 w-full border border-white/15 bg-black/40 px-4 text-sm outline-none focus:border-[#f2ad19]" />
           </label>
-          <button type="submit" className="h-14 w-full bg-[#f2ad19] text-xs font-extrabold uppercase tracking-[.13em] text-black hover:bg-[#ff9900]">Enviar link de redefinição</button>
+          <button type="submit" className="h-14 w-full bg-[#f2ad19] text-xs font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#ff9900]">Enviar link de redefinição</button>
         </form>
         <p className="mt-4 text-[11px] leading-relaxed text-white/40">Por segurança, a mesma mensagem aparece exista ou não uma conta com esse e-mail.</p>
 
@@ -75,7 +75,7 @@ export default async function ForgotPasswordPage({
       </> : <>
         <p className="mt-5 text-sm leading-relaxed text-white/58">Fale com a equipe da Space Light: ela gera uma senha temporária na hora, e você cria a sua no primeiro acesso.</p>
         <div className="mt-7 space-y-3">
-          <a href={WHATSAPP} target="_blank" rel="noreferrer" className="flex min-h-16 items-center gap-4 bg-[#f2ad19] px-6 text-black transition hover:bg-[#ff9900]"><MessageCircle className="size-6 shrink-0" /><span><span className="eyebrow block">Atendimento direto</span><strong className="mt-1 block text-base font-extrabold uppercase">Falar no WhatsApp</strong></span></a>
+          <a href={WHATSAPP} target="_blank" rel="noreferrer" className="flex min-h-16 items-center gap-4 bg-[#f2ad19] px-6 text-black transition hover:bg-[#ff9900]"><MessageCircle className="size-6 shrink-0" /><span><span className="eyebrow block">Atendimento direto</span><strong className="mt-1 block text-base font-extrabold uppercase tracking-[0.04em]">Falar no WhatsApp</strong></span></a>
           <a href="tel:+5511941318646" className="flex min-h-14 items-center gap-4 border border-white/18 px-6 text-sm font-bold transition hover:bg-white hover:text-black"><Phone className="size-4 shrink-0 text-[#f2ad19]" />+55 11 94131-8646</a>
         </div>
       </>}

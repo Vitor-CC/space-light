@@ -95,7 +95,7 @@
     position: relative;
     font-size: 0.69rem;
     font-weight: 700;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.11em;
     text-transform: uppercase;
     color: rgb(255 255 255 / 0.74);
     transition: color 180ms ease;
@@ -125,7 +125,10 @@
     font-family: var(--font-work-sans), Arial, Helvetica, sans-serif;
     font-size: clamp(2.5rem, 5vw, 5.4rem);
     font-weight: 900;
-    letter-spacing: -0.065em;
+    /* Acompanha o clamp acima: no celular o título cai para 2.5rem, e o
+       espaçamento fechado que funciona em display gruda as letras nesse tamanho.
+       Os breakpoints abaixo reapertam conforme a fonte cresce. */
+    letter-spacing: -0.035em;
     line-height: 0.92;
     text-transform: uppercase;
   }
@@ -142,6 +145,16 @@
 @media (min-width: 768px) {
   .page-shell {
     width: min(100% - 5rem, 1380px);
+  }
+
+  .section-title {
+    letter-spacing: -0.05em;
+  }
+}
+
+@media (min-width: 1280px) {
+  .section-title {
+    letter-spacing: -0.06em;
   }
 }
 

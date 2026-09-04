@@ -45,7 +45,7 @@ export function AttendanceList({ data }: { data: AttendanceListData }) {
       `}</style>
 
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Link href="/empresa" className="inline-flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107] hover:text-black"><ArrowLeft className="size-4" />Voltar</Link>
+        <Link href="/empresa" className="inline-flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107] hover:text-black"><ArrowLeft className="size-4" />Voltar</Link>
         <button type="button" onClick={() => window.print()} className="inline-flex h-11 items-center gap-2 bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]"><Printer className="size-4" />Imprimir / Salvar PDF</button>
       </div>
 

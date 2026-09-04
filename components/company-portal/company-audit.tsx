@@ -77,7 +77,7 @@ export function CompanyAudit({ notify }: { notify: (message: string) => void }) 
       <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center bg-black text-[#f2ad19]"><Activity className="size-4" /></span>
       <div className="min-w-0 flex-1">
         <p className="text-sm leading-relaxed"><strong className="font-extrabold">{entry.actor_name ?? 'Sistema'}</strong> <span className="text-[#555]">{describe(entry.action)}</span></p>
-        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#999]">{formatDateTime(entry.created_at)}{entry.actor_email ? ` · ${entry.actor_email}` : ''}</p>
+        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#999]">{formatDateTime(entry.created_at)}{entry.actor_email ? ` · ${entry.actor_email}` : ''}</p>
       </div>
     </li>
   ))}</ol>;
