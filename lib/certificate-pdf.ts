@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import type { PDFFont, PDFImage } from 'pdf-lib';
+import type { PDFFont, PDFImage, PDFPage } from 'pdf-lib';
 
 import type { CertificateData } from '@/db/company-repository';
 import {
@@ -11,6 +11,7 @@ import {
   certificateSetup,
   formatCertificateDates,
 } from '@/lib/certificate-config';
+import { programForNr } from '@/lib/nr23-program';
 
 /** A4 paisagem em pontos, o mesmo do modelo impresso da Space. */
 const PAGE_W = 842;
@@ -81,6 +82,153 @@ function drawJustified(
     y -= options.leading;
   });
   return y;
+}
+
+type SignatureBlock = { assinatura: PDFImage | null; linhas: string[]; destaque?: boolean };
+
+/** Fila de assinaturas na base da página, distribuídas na largura útil. */
+function drawSignatureRow(
+  page: PDFPage,
+  options: {
+    baseY: number;
+    left: number;
+    width: number;
+    font: PDFFont;
+    color: ReturnType<typeof rgb>;
+    blocks: SignatureBlock[];
+  },
+) {
+  const vao = options.width / options.blocks.length;
+  options.blocks.forEach((bloco, indice) => {
+    const meio = options.left + vao * indice + vao / 2;
+    const larguraLinha = Math.min(vao - 26, 170);
+    if (bloco.assinatura) {
+      // A da responsável técnica é maior: é a assinatura que valida o documento.
+      const altura = bloco.destaque ? 74 : 50;
+      const largura = Math.min((bloco.assinatura.width / bloco.assinatura.height) * altura, larguraLinha + 30);
+      page.drawImage(bloco.assinatura, {
+        x: meio - largura / 2, y: options.baseY + 3, width: largura, height: altura,
+      });
+    }
+    page.drawLine({
+      start: { x: meio - larguraLinha / 2, y: options.baseY },
+      end: { x: meio + larguraLinha / 2, y: options.baseY },
+      thickness: 0.8, color: options.color,
+    });
+    let linhaY = options.baseY - 13;
+    for (const texto of bloco.linhas.filter(Boolean)) {
+      const size = 9.5;
+      page.drawText(texto, {
+        x: meio - options.font.widthOfTextAtSize(texto, size) / 2,
+        y: linhaY, size, font: options.font, color: options.color,
+      });
+      linhaY -= 12;
+    }
+  });
+}
+
+/** A4 retrato, para as páginas de conteúdo programático. */
+const PROG_W = 595.28;
+const PROG_H = 841.89;
+const PROG_MARGIN = 40;
+
+/**
+ * Anexa o conteúdo programático da norma. A grade é fixa por NR; a carga
+ * horária vem do treinamento. Quebra em quantas páginas forem necessárias.
+ */
+function appendProgramPages(
+  pdf: PDFDocument,
+  options: { nr: string; duration: string; regular: PDFFont; bold: PDFFont },
+) {
+  const grade = programForNr(options.nr);
+  if (!grade || grade.length === 0) return;
+
+  const preto = rgb(0, 0, 0);
+  const linhaCor = rgb(0.72, 0.72, 0.72);
+  const cabecalhoFundo = rgb(0.93, 0.93, 0.91);
+  const largura = PROG_W - PROG_MARGIN * 2;
+  const colunas = [
+    { titulo: 'MÓDULO', largura: largura * 0.19, campo: 'modulo' as const },
+    { titulo: 'ASSUNTO', largura: largura * 0.22, campo: 'assunto' as const },
+    { titulo: 'OBJETIVOS PARTE TEÓRICA', largura: largura * 0.34, campo: 'teorica' as const },
+    { titulo: 'OBJETIVOS PARTE PRÁTICA', largura: largura * 0.25, campo: 'pratica' as const },
+  ];
+  const corpo = 6.6;
+  const alturaLinhaTexto = 8;
+  const padding = 4;
+
+  let page = pdf.addPage([PROG_W, PROG_H]);
+  let y = PROG_H - PROG_MARGIN;
+
+  function titulo() {
+    const t1 = 'CONTEÚDO PROGRAMÁTICO';
+    const t2 = `CARGA HORÁRIA: ${options.duration.toUpperCase()}`;
+    page.drawText(t1, {
+      x: PROG_MARGIN + (largura - options.bold.widthOfTextAtSize(t1, 12)) / 2,
+      y, size: 12, font: options.bold, color: preto,
+    });
+    y -= 16;
+    page.drawText(t2, {
+      x: PROG_MARGIN + (largura - options.bold.widthOfTextAtSize(t2, 10)) / 2,
+      y, size: 10, font: options.bold, color: preto,
+    });
+    y -= 22;
+  }
+
+  function cabecalho() {
+    const altura = 22;
+    page.drawRectangle({
+      x: PROG_MARGIN, y: y - altura, width: largura, height: altura, color: cabecalhoFundo,
+    });
+    let x = PROG_MARGIN;
+    for (const coluna of colunas) {
+      const linhas = wrap(coluna.titulo, options.bold, corpo, coluna.largura - padding * 2);
+      let ty = y - 9;
+      for (const palavras of linhas) {
+        page.drawText(palavras.join(' '), { x: x + padding, y: ty, size: corpo, font: options.bold, color: preto });
+        ty -= alturaLinhaTexto;
+      }
+      page.drawLine({ start: { x, y }, end: { x, y: y - altura }, thickness: 0.4, color: linhaCor });
+      x += coluna.largura;
+    }
+    page.drawLine({ start: { x: PROG_MARGIN, y }, end: { x: PROG_MARGIN + largura, y }, thickness: 0.4, color: linhaCor });
+    page.drawLine({ start: { x, y }, end: { x, y: y - altura }, thickness: 0.4, color: linhaCor });
+    page.drawLine({ start: { x: PROG_MARGIN, y: y - altura }, end: { x: PROG_MARGIN + largura, y: y - altura }, thickness: 0.4, color: linhaCor });
+    y -= altura;
+  }
+
+  titulo();
+  cabecalho();
+
+  for (const item of grade) {
+    // Mede antes de desenhar: a linha inteira precisa caber na página.
+    const celulas = colunas.map((coluna) => wrap(item[coluna.campo] || '', options.regular, corpo, coluna.largura - padding * 2));
+    const alturaLinha = Math.max(...celulas.map((c) => c.length)) * alturaLinhaTexto + padding * 2;
+
+    if (y - alturaLinha < PROG_MARGIN + 20) {
+      page = pdf.addPage([PROG_W, PROG_H]);
+      y = PROG_H - PROG_MARGIN;
+      cabecalho();
+    }
+
+    let x = PROG_MARGIN;
+    celulas.forEach((linhas, indice) => {
+      let ty = y - padding - 5;
+      for (const palavras of linhas) {
+        page.drawText(palavras.join(' '), { x: x + padding, y: ty, size: corpo, font: options.regular, color: preto });
+        ty -= alturaLinhaTexto;
+      }
+      page.drawLine({ start: { x, y }, end: { x, y: y - alturaLinha }, thickness: 0.4, color: linhaCor });
+      x += colunas[indice].largura;
+    });
+    page.drawLine({ start: { x, y }, end: { x, y: y - alturaLinha }, thickness: 0.4, color: linhaCor });
+    page.drawLine({
+      start: { x: PROG_MARGIN, y: y - alturaLinha },
+      end: { x: PROG_MARGIN + largura, y: y - alturaLinha },
+      thickness: 0.4, color: linhaCor,
+    });
+    y -= alturaLinha;
+  }
 }
 
 export type CertificatePdfInput = {
@@ -253,7 +401,126 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     });
   }
 
+  appendProgramPages(pdf, { nr: data.training.nr, duration: data.training.duration, regular, bold });
+
   return pdf.save();
+}
+
+/**
+ * Certificado da empresa: um por turma, nomeando a razão social em vez do
+ * participante. Só duas assinaturas — não há aluno para assinar.
+ */
+export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Promise<Uint8Array> {
+  const { data } = input;
+  const setup = certificateSetup(data.training.nr);
+  if (!setup) {
+    throw new Error(`A base legal da ${data.training.nr} ainda não foi cadastrada.`);
+  }
+
+  const pdf = await PDFDocument.create();
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+  const fundo = await embedImage(pdf, setup.background);
+  const faixa = await embedImage(pdf, '/images/certificado/faixa-lateral.png');
+  const selo = setup.seal ? await embedImage(pdf, setup.seal) : null;
+  const logo = await embedImage(pdf, '/images/certificado/logo-space.png');
+  const assinaturaResponsavel = await embedImage(pdf, TECHNICAL_LEAD.signature);
+
+  let assinaturaInstrutor: PDFImage | null = null;
+  if (input.instructorSignature) {
+    try {
+      assinaturaInstrutor = input.instructorSignature.contentType.includes('png')
+        ? await pdf.embedPng(input.instructorSignature.bytes)
+        : await pdf.embedJpg(input.instructorSignature.bytes);
+    } catch { assinaturaInstrutor = null; }
+  }
+
+  const preto = rgb(0, 0, 0);
+  const page = pdf.addPage([PAGE_W, PAGE_H]);
+
+  if (fundo) page.drawImage(fundo, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+  if (faixa) {
+    const largura = (faixa.width / faixa.height) * PAGE_H;
+    page.drawImage(faixa, { x: PAGE_W - largura, y: 0, width: largura, height: PAGE_H });
+  }
+
+  let y = PAGE_H - 30;
+  if (selo) {
+    const altura = 66;
+    page.drawImage(selo, { x: LEFT, y: y - altura, width: (selo.width / selo.height) * altura, height: altura });
+  }
+  if (logo) {
+    const altura = 54;
+    const largura = (logo.width / logo.height) * altura;
+    page.drawImage(logo, { x: PAGE_W - RIGHT_SAFE - largura, y: y - altura, width: largura, height: altura });
+  }
+
+  y -= 96;
+  const tituloSize = 36;
+  const centro = LEFT + (PAGE_W - RIGHT_SAFE - LEFT) / 2;
+  page.drawText('CERTIFICADO', {
+    x: centro - bold.widthOfTextAtSize('CERTIFICADO', tituloSize) / 2,
+    y, size: tituloSize, font: bold, color: preto,
+  });
+
+  y -= 52;
+  const corpo = 14;
+  const larguraTexto = PAGE_W - RIGHT_SAFE - LEFT;
+  const razao = data.client.legalName.toUpperCase();
+
+  const prefixo = 'Certificamos que os colaboradores da ';
+  const larguraNome = Math.max(bold.widthOfTextAtSize(razao, corpo) + 24, 280);
+  const larguraLinha = regular.widthOfTextAtSize(prefixo, corpo) + larguraNome;
+  let x = centro - larguraLinha / 2;
+  page.drawText(prefixo, { x, y, size: corpo, font: regular, color: preto });
+  x += regular.widthOfTextAtSize(prefixo, corpo);
+  page.drawText(razao, {
+    x: x + (larguraNome - bold.widthOfTextAtSize(razao, corpo)) / 2,
+    y, size: corpo, font: bold, color: preto,
+  });
+  page.drawLine({ start: { x, y: y - 3 }, end: { x: x + larguraNome, y: y - 3 }, thickness: 0.8, color: preto });
+
+  y -= 26;
+  const fecho = 'ministrado pela SPACE LIGHT ENGENHARIA.';
+  const abertura = `concluíram com aproveitamento o "${data.training.title.toUpperCase()}", ${setup.legalBasis}`;
+  y = drawJustified(page, [...wrap(abertura, regular, corpo, larguraTexto), fecho.split(' ')], {
+    x: LEFT, y, size: corpo, font: regular, color: preto, maxWidth: larguraTexto, leading: 26,
+  });
+
+  y -= 14;
+  page.drawText(razao, { x: centro - bold.widthOfTextAtSize(razao, corpo) / 2, y, size: corpo, font: bold, color: preto });
+
+  y -= 26;
+  const linhaData = `${ISSUING_CITY}, ${formatCertificateDates(data.training.dates)}.`;
+  page.drawText(linhaData, {
+    x: PAGE_W - RIGHT_SAFE - bold.widthOfTextAtSize(linhaData, corpo),
+    y, size: corpo, font: bold, color: preto,
+  });
+
+  // Duas assinaturas: técnico (o instrutor da turma) e responsável técnica.
+  drawSignatureRow(page, {
+    baseY: 66, left: LEFT, width: PAGE_W - RIGHT_SAFE - LEFT, font: regular, color: preto,
+    blocks: [
+      {
+        assinatura: assinaturaInstrutor,
+        linhas: ['Técnico de Segurança', data.instructor.name, data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
+      },
+      {
+        assinatura: assinaturaResponsavel,
+        destaque: true,
+        linhas: [TECHNICAL_LEAD.role, TECHNICAL_LEAD.name, `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
+      },
+    ],
+  });
+
+  appendProgramPages(pdf, { nr: data.training.nr, duration: data.training.duration, regular, bold });
+
+  return pdf.save();
+}
+
+export function companyCertificateFileName(data: CertificateData) {
+  return certificateFileName(data).replace('certificados-', 'certificado-empresa-');
 }
 
 export function certificateFileName(data: CertificateData) {

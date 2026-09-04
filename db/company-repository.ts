@@ -1413,13 +1413,20 @@ export type CertificateData = {
     duration: string;
     dates: string[];
   };
-  client: { legalName: string };
+  client: {
+    legalName: string;
+    document: string;
+    address: string;
+    district: string;
+    city: string;
+    state: string;
+  };
   instructor: {
     name: string;
     registry: string;
     signatureDocumentId: string | null;
   };
-  participants: { fullName: string; rg: string; documentId: string }[];
+  participants: { fullName: string; rg: string; documentId: string; birthDate: string }[];
 };
 
 /**
@@ -1433,7 +1440,8 @@ export async function getCertificateData(input: {
   const d1 = getD1();
   const training = await d1
     .prepare(`SELECT t.id, t.nr, t.title, t.duration, t.training_date, t.training_dates,
-      t.instructor_id, t.client_id, c.legal_name,
+      t.instructor_id, t.client_id, c.legal_name, c.document AS client_document,
+      c.address, c.district, c.city, c.state,
       COALESCE(i.name, t.instructor) AS instructor_name,
       COALESCE(i.professional_registry, '') AS instructor_registry
       FROM trainings t
@@ -1444,7 +1452,9 @@ export async function getCertificateData(input: {
     .first<{
       id: string; nr: string; title: string; duration: string;
       training_date: string; training_dates: string; instructor_id: string | null;
-      client_id: string; legal_name: string; instructor_name: string; instructor_registry: string;
+      client_id: string; legal_name: string; client_document: string;
+      address: string; district: string; city: string; state: string;
+      instructor_name: string; instructor_registry: string;
     }>();
   if (!training) return null;
 
@@ -1468,10 +1478,10 @@ export async function getCertificateData(input: {
   }
 
   const participantsResult = await d1
-    .prepare(`SELECT full_name, rg, document_id FROM participants
+    .prepare(`SELECT full_name, rg, document_id, birth_date FROM participants
       WHERE training_id = ? ORDER BY full_name COLLATE NOCASE ASC`)
     .bind(input.trainingId)
-    .all<{ full_name: string; rg: string; document_id: string }>();
+    .all<{ full_name: string; rg: string; document_id: string; birth_date: string }>();
 
   return {
     training: {
@@ -1481,7 +1491,14 @@ export async function getCertificateData(input: {
       duration: training.duration,
       dates,
     },
-    client: { legalName: training.legal_name },
+    client: {
+      legalName: training.legal_name,
+      document: training.client_document ?? '',
+      address: training.address ?? '',
+      district: training.district ?? '',
+      city: training.city ?? '',
+      state: training.state ?? '',
+    },
     instructor: {
       name: training.instructor_name,
       registry: training.instructor_registry,
@@ -1491,6 +1508,7 @@ export async function getCertificateData(input: {
       fullName: item.full_name,
       rg: item.rg,
       documentId: item.document_id,
+      birthDate: item.birth_date ?? '',
     })),
   };
 }

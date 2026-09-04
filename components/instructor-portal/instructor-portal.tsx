@@ -278,7 +278,7 @@ function TrainingRoom({ data, selectedId, selectTraining, reload, notify }: { da
       notify(!resultado.certificates
         ? 'Treinamento encerrado. A lista de presença foi congelada.'
         : resultado.certificatePublished
-          ? `Treinamento encerrado. ${resultado.certificates} certificado(s) gerados e arquivados nos documentos da turma.`
+          ? `Treinamento encerrado. ${resultado.certificates} certificado(s) emitidos; certificado da empresa e atestado ficaram nos documentos da turma.`
           : `Treinamento encerrado, mas o PDF dos certificados não foi gerado: ${resultado.certificateProblem ?? 'motivo desconhecido'}. Avise a Space Light.`);
       await reload();
     } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao encerrar o treinamento.'); }

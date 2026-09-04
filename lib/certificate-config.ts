@@ -10,6 +10,10 @@ export type CertificateSetup = {
   background: string;
   seal?: string;
   sealAlt?: string;
+  /** Nome curto do treinamento como aparece no atestado. */
+  attestationSubject: string;
+  /** O atestado cita normas que o certificado não cita (NBR, por exemplo). */
+  attestationLegalBasis: string;
 };
 
 export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
@@ -19,6 +23,9 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
     background: '/images/certificado/fundo-nr23.jpg',
     seal: '/images/certificado/selo-nr23.png',
     sealAlt: 'Selo Brigada de Incêndio',
+    attestationSubject: 'Brigada de Incêndio',
+    attestationLegalBasis:
+      'de acordo com o Decreto 69.118, de 09 de dezembro de 2024, IT 17 de 2025 do Corpo de Bombeiros do Estado de São Paulo, e NBR 14276 e 14277,',
   },
 };
 

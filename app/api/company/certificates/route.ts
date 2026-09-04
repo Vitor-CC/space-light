@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     if (!resultado.ok) {
       return NextResponse.json({ error: resultado.reason }, { status: 400 });
     }
-    return NextResponse.json({ ok: true, fileId: resultado.fileId });
+    return NextResponse.json({ ok: true, documents: resultado.documents });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erro ao gerar os certificados.' },
