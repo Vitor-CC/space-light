@@ -1776,7 +1776,13 @@ async function writeAudit(
 }
 
 function formatDate(value: string) {
-  const date = new Date(value.includes('T') ? value : `${value}T12:00:00Z`);
+  // Datas puras vêm como 2026-09-04; carimbos do banco, como 2026-09-04 00:59:32.
+  const normalized = value.includes('T')
+    ? value
+    : value.includes(' ')
+      ? `${value.replace(' ', 'T')}Z`
+      : `${value}T12:00:00Z`;
+  const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',

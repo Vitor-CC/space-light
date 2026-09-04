@@ -76,9 +76,20 @@ function isoFromDate(value: Date) {
 }
 
 function formatDate(value: string) {
+  const date = dateFromIso(value);
+  if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('pt-BR', {
     weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
-  }).format(dateFromIso(value)).replace('.', '');
+  }).format(date).replace('.', '');
+}
+
+/** Carimbos do banco vêm como "2026-09-04 00:59:32" (UTC), não como data pura. */
+function formatMoment(value: string) {
+  const date = new Date(value.includes('T') ? value : `${value.replace(' ', 'T')}Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).format(date);
 }
 
 function statusLabel(status: string) {
@@ -176,7 +187,7 @@ function AttendancePhotos({ trainingId, notify }: { trainingId: string; notify: 
       : files.length === 0 ? <p className="mt-6 border border-dashed border-black/20 p-5 text-center text-xs text-[#777]">Nenhum arquivo enviado ainda. Aceita JPG, PNG, WEBP, HEIC ou PDF, até 12 MB.</p>
       : <ul className="mt-6 divide-y divide-black/8 border border-black/10">{files.map((file) => <li key={file.id} className="flex items-center gap-4 p-4">
           <span className="flex size-10 shrink-0 items-center justify-center bg-black text-[#f2ad19]">{file.kind === 'photo' ? <ImageIcon className="size-4" /> : <FileText className="size-4" />}</span>
-          <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{file.name}</strong><span className="mt-1 block text-[10px] font-bold uppercase tracking-[.08em] text-[#999]">{Math.max(1, Math.round(file.size / 1024))} KB · {formatDate(file.createdAt)}</span></span>
+          <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{file.name}</strong><span className="mt-1 block text-[10px] font-bold uppercase tracking-[.08em] text-[#999]">{Math.max(1, Math.round(file.size / 1024))} KB · {formatMoment(file.createdAt)}</span></span>
           {file.stored ? <a href={`/api/files/${file.id}`} target="_blank" rel="noopener" className="inline-flex h-10 shrink-0 items-center gap-2 border border-black/15 px-3 text-[9px] font-extrabold uppercase hover:bg-black hover:text-white">Abrir</a> : <span className="text-[9px] font-extrabold uppercase text-[#b62525]">Sem conteúdo</span>}
         </li>)}</ul>}
   </section>;
