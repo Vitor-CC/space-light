@@ -294,6 +294,17 @@ export function ensurePortalSchema(): Promise<void> {
       "ALTER TABLE trainings ADD COLUMN training_dates TEXT NOT NULL DEFAULT ''");
     await ensureColumn(d1, 'trainings', 'content_program',
       "ALTER TABLE trainings ADD COLUMN content_program TEXT NOT NULL DEFAULT ''");
+    // Endereço da edificação: sai impresso no atestado de treinamento.
+    await ensureColumn(d1, 'clients', 'address',
+      "ALTER TABLE clients ADD COLUMN address TEXT NOT NULL DEFAULT ''");
+    await ensureColumn(d1, 'clients', 'district',
+      "ALTER TABLE clients ADD COLUMN district TEXT NOT NULL DEFAULT ''");
+    await ensureColumn(d1, 'clients', 'city',
+      "ALTER TABLE clients ADD COLUMN city TEXT NOT NULL DEFAULT ''");
+    await ensureColumn(d1, 'clients', 'state',
+      "ALTER TABLE clients ADD COLUMN state TEXT NOT NULL DEFAULT ''");
+    await ensureColumn(d1, 'clients', 'postal_code',
+      "ALTER TABLE clients ADD COLUMN postal_code TEXT NOT NULL DEFAULT ''");
 
     await d1.batch([
       d1.prepare(
@@ -1485,6 +1496,61 @@ export async function getCertificateData(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Endereço da edificação (usado no atestado de treinamento)
+// ---------------------------------------------------------------------------
+
+export type ClientAddress = {
+  address: string;
+  district: string;
+  city: string;
+  state: string;
+  postalCode: string;
+};
+
+export const EMPTY_CLIENT_ADDRESS: ClientAddress = {
+  address: '', district: '', city: '', state: '', postalCode: '',
+};
+
+export async function updateClientAddress(input: {
+  clientId: string;
+  byUserId: string;
+  address: ClientAddress;
+}) {
+  await ensurePortalSchema();
+  await getD1()
+    .prepare(`UPDATE clients
+      SET address = ?, district = ?, city = ?, state = ?, postal_code = ?,
+          updated_at = datetime('now')
+      WHERE id = ?`)
+    .bind(
+      input.address.address.trim(),
+      input.address.district.trim(),
+      input.address.city.trim(),
+      input.address.state.trim().toUpperCase().slice(0, 2),
+      input.address.postalCode.trim(),
+      input.clientId,
+    )
+    .run();
+  await writeAudit(input.byUserId, 'client.address_updated', 'client', input.clientId, {});
+}
+
+export async function getClientAddress(clientId: string): Promise<ClientAddress> {
+  await ensurePortalSchema();
+  const row = await getD1()
+    .prepare('SELECT address, district, city, state, postal_code FROM clients WHERE id = ? LIMIT 1')
+    .bind(clientId)
+    .first<{ address: string; district: string; city: string; state: string; postal_code: string }>();
+  if (!row) return EMPTY_CLIENT_ADDRESS;
+  return {
+    address: row.address ?? '',
+    district: row.district ?? '',
+    city: row.city ?? '',
+    state: row.state ?? '',
+    postalCode: row.postal_code ?? '',
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Exclusões
 // ---------------------------------------------------------------------------
 
@@ -1618,7 +1684,8 @@ export async function getCompanyDashboardData(
       d1
         .prepare(
           `SELECT id, name, legal_name, document, unit, contact_name,
-           contact_email, contact_phone, status, created_at
+           contact_email, contact_phone, address, district, city, state,
+           postal_code, status, created_at
            FROM clients ORDER BY created_at DESC`,
         )
         .all<CompanyClient>(),

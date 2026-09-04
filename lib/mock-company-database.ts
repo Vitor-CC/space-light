@@ -134,3 +134,7 @@ export function reviewInstructorDocument(documentId: string, status: 'approved' 
 export function generateCertificates(trainingId: string) {
   return requestJson<{ ok: true; fileId: string }>('/api/company/certificates', { method: 'POST', body: JSON.stringify({ trainingId }) });
 }
+
+export function saveClientAddress(input: { clientId: string; address: string; district: string; city: string; state: string; postalCode: string }) {
+  return requestJson<{ ok: true }>('/api/company/clients/address', { method: 'POST', body: JSON.stringify(input) });
+}

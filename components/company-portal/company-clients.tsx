@@ -1,17 +1,75 @@
 'use client';
 
-import { Building2, Check, KeyRound, Plus, Search, Trash2, X } from 'lucide-react';
+import { Building2, Check, KeyRound, Loader2, MapPin, Plus, Search, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import type { SyntheticEvent } from 'react';
 
 import { AccessCredentials, EmptyState, fieldClass } from '@/components/company-portal/company-ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { CompanyDashboardData } from '@/lib/company-types';
-import { approveClient, createMockClient, deleteClient, resetUserPassword } from '@/lib/mock-company-database';
+import type { CompanyClient, CompanyDashboardData } from '@/lib/company-types';
+import { approveClient, createMockClient, deleteClient, resetUserPassword, saveClientAddress } from '@/lib/mock-company-database';
 
 type Draft = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string };
 const emptyDraft: Draft = { name: '', legalName: '', document: '', unit: '', contactName: '', contactEmail: '', contactPhone: '' };
+
+type EnderecoDraft = { address: string; district: string; city: string; state: string; postalCode: string };
+
+function ClientAddress({ client, notify, reload }: { client: CompanyClient; notify: (message: string) => void; reload: () => Promise<void> }) {
+  const [aberto, setAberto] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [draft, setDraft] = useState<EnderecoDraft>({
+    address: client.address ?? '',
+    district: client.district ?? '',
+    city: client.city ?? '',
+    state: client.state ?? '',
+    postalCode: client.postal_code ?? '',
+  });
+
+  const completo = Boolean(client.address && client.city && client.state);
+  const resumo = completo
+    ? `${client.address}${client.district ? ` - ${client.district}` : ''} · ${client.city}/${client.state}`
+    : 'Endereço não preenchido';
+
+  async function salvar(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSalvando(true);
+    try {
+      await saveClientAddress({ clientId: client.id, ...draft });
+      notify('Endereço salvo.');
+      setAberto(false);
+      await reload();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao salvar o endereço.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return <div className="mt-5 border-t border-black/8 pt-4">
+    <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="min-w-0">
+        <span className="text-[9px] font-extrabold uppercase tracking-[.11em] text-[#8a6107]">Endereço da edificação</span>
+        <p className={`mt-1 text-xs ${completo ? 'text-[#555]' : 'font-bold text-[#b62525]'}`}>{resumo}</p>
+        {!completo ? <p className="mt-1 text-[10px] leading-relaxed text-[#888]">Necessário para emitir o atestado de treinamento.</p> : null}
+      </div>
+      <button type="button" onClick={() => setAberto((v) => !v)} className="inline-flex h-9 shrink-0 items-center gap-2 border border-black/15 px-3 text-[8px] font-extrabold uppercase hover:bg-black hover:text-white">
+        <MapPin className="size-3.5" />{aberto ? 'Fechar' : completo ? 'Editar' : 'Preencher'}
+      </button>
+    </div>
+
+    {aberto ? <form onSubmit={salvar} className="mt-4 grid gap-3 border border-black/10 bg-[#f7f7f4] p-4 sm:grid-cols-2">
+      <label className="sm:col-span-2"><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[.11em]">Logradouro e número</span><Input value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} placeholder="Rua São Severo, 408" className={fieldClass} /></label>
+      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[.11em]">Bairro</span><Input value={draft.district} onChange={(e) => setDraft({ ...draft, district: e.target.value })} placeholder="Vila Ré" className={fieldClass} /></label>
+      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[.11em]">CEP</span><Input value={draft.postalCode} onChange={(e) => setDraft({ ...draft, postalCode: e.target.value })} placeholder="03670-000" className={fieldClass} /></label>
+      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[.11em]">Município</span><Input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="São Paulo" className={fieldClass} /></label>
+      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[.11em]">UF</span><Input value={draft.state} onChange={(e) => setDraft({ ...draft, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="SP" maxLength={2} className={fieldClass} /></label>
+      <Button type="submit" disabled={salvando} className="mt-1 h-11 rounded-none bg-[#f2ad19] text-[9px] font-extrabold uppercase tracking-[.12em] text-black hover:bg-[#ff9900] sm:col-span-2">
+        {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar endereço
+      </Button>
+    </form> : null}
+  </div>;
+}
 
 export function CompanyClients({ data, reload, notify }: { data: CompanyDashboardData; reload: () => Promise<void>; notify: (message: string) => void }) {
   const [query, setQuery] = useState('');
@@ -60,7 +118,7 @@ export function CompanyClients({ data, reload, notify }: { data: CompanyDashboar
       const files = data.files.filter((item) => item.client_id === client.id).length;
       const statusClass = client.status === 'pending' ? 'bg-[#fff0d2] text-[#8a6107]' : client.status === 'invited' ? 'bg-[#e7eef9] text-[#31598e]' : 'bg-[#daf2df] text-[#17642d]';
       const statusLabel = client.status === 'pending' ? 'Aguardando aprovação' : client.status === 'invited' ? 'Convite criado' : 'Ativo';
-      return <article key={client.id} className="border border-black/10 bg-white p-6"><div className="flex items-start gap-4"><span className="flex size-12 shrink-0 items-center justify-center bg-black text-[#f2ad19]"><Building2 className="size-5" /></span><div className="min-w-0"><span className={`px-2 py-1 text-[9px] font-extrabold uppercase ${statusClass}`}>{statusLabel}</span><h2 className="mt-3 text-xl font-extrabold uppercase tracking-[-0.035em]">{client.name}</h2><p className="mt-1 text-xs text-[#777]">{client.legal_name} · {client.document}</p></div></div><div className="mt-6 grid grid-cols-3 gap-px bg-black/8 text-center"><div className="bg-[#f7f7f4] p-3"><strong className="block text-lg">{trainings.length}</strong><span className="text-[8px] font-bold uppercase text-[#888]">Treinos</span></div><div className="bg-[#f7f7f4] p-3"><strong className="block text-lg">{files}</strong><span className="text-[8px] font-bold uppercase text-[#888]">Arquivos</span></div><div className="bg-[#f7f7f4] p-3"><strong className="block text-lg">{trainings.reduce((sum, item) => sum + item.participant_count, 0)}</strong><span className="text-[8px] font-bold uppercase text-[#888]">Inscritos</span></div></div><dl className="mt-5 grid gap-2 text-xs"><div className="flex justify-between gap-4"><dt className="text-[#777]">Unidade</dt><dd className="text-right font-bold">{client.unit}</dd></div><div className="flex justify-between gap-4"><dt className="text-[#777]">Responsável</dt><dd className="text-right font-bold">{client.contact_name}</dd></div><div className="flex justify-between gap-4"><dt className="text-[#777]">E-mail</dt><dd className="break-all text-right font-bold">{client.contact_email}</dd></div></dl><div className="mt-5 flex flex-wrap gap-2">{client.status === 'pending' ? <Button type="button" onClick={() => void approve(client.id)} className="h-11 rounded-none bg-[#f2ad19] px-4 text-[9px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900]"><Check className="size-4" /> Aprovar acesso</Button> : null}<button type="button" onClick={() => void resetPassword({ id: client.id, name: client.name })} className="inline-flex h-11 items-center gap-2 border border-black/15 px-3 text-[9px] font-extrabold uppercase tracking-[.1em] text-[#555] hover:border-black hover:bg-black hover:text-white"><KeyRound className="size-3.5" />Redefinir senha</button><button type="button" onClick={() => void remove({ id: client.id, name: client.name })} className="inline-flex h-11 items-center gap-2 border border-[#b62525]/40 px-3 text-[9px] font-extrabold uppercase tracking-[.1em] text-[#b62525] hover:bg-[#b62525] hover:text-white"><Trash2 className="size-3.5" />Excluir</button></div></article>;
+      return <article key={client.id} className="border border-black/10 bg-white p-6"><div className="flex items-start gap-4"><span className="flex size-12 shrink-0 items-center justify-center bg-black text-[#f2ad19]"><Building2 className="size-5" /></span><div className="min-w-0"><span className={`px-2 py-1 text-[9px] font-extrabold uppercase ${statusClass}`}>{statusLabel}</span><h2 className="mt-3 text-xl font-extrabold uppercase tracking-[-0.035em]">{client.name}</h2><p className="mt-1 text-xs text-[#777]">{client.legal_name} · {client.document}</p></div></div><div className="mt-6 grid grid-cols-3 gap-px bg-black/8 text-center"><div className="bg-[#f7f7f4] p-3"><strong className="block text-lg">{trainings.length}</strong><span className="text-[8px] font-bold uppercase text-[#888]">Treinos</span></div><div className="bg-[#f7f7f4] p-3"><strong className="block text-lg">{files}</strong><span className="text-[8px] font-bold uppercase text-[#888]">Arquivos</span></div><div className="bg-[#f7f7f4] p-3"><strong className="block text-lg">{trainings.reduce((sum, item) => sum + item.participant_count, 0)}</strong><span className="text-[8px] font-bold uppercase text-[#888]">Inscritos</span></div></div><dl className="mt-5 grid gap-2 text-xs"><div className="flex justify-between gap-4"><dt className="text-[#777]">Unidade</dt><dd className="text-right font-bold">{client.unit}</dd></div><div className="flex justify-between gap-4"><dt className="text-[#777]">Responsável</dt><dd className="text-right font-bold">{client.contact_name}</dd></div><div className="flex justify-between gap-4"><dt className="text-[#777]">E-mail</dt><dd className="break-all text-right font-bold">{client.contact_email}</dd></div></dl><ClientAddress client={client} notify={notify} reload={reload} /><div className="mt-5 flex flex-wrap gap-2">{client.status === 'pending' ? <Button type="button" onClick={() => void approve(client.id)} className="h-11 rounded-none bg-[#f2ad19] px-4 text-[9px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900]"><Check className="size-4" /> Aprovar acesso</Button> : null}<button type="button" onClick={() => void resetPassword({ id: client.id, name: client.name })} className="inline-flex h-11 items-center gap-2 border border-black/15 px-3 text-[9px] font-extrabold uppercase tracking-[.1em] text-[#555] hover:border-black hover:bg-black hover:text-white"><KeyRound className="size-3.5" />Redefinir senha</button><button type="button" onClick={() => void remove({ id: client.id, name: client.name })} className="inline-flex h-11 items-center gap-2 border border-[#b62525]/40 px-3 text-[9px] font-extrabold uppercase tracking-[.1em] text-[#b62525] hover:bg-[#b62525] hover:text-white"><Trash2 className="size-3.5" />Excluir</button></div></article>;
     })}</div>
     {filtered.length === 0 ? <EmptyState icon={Building2} title="Nenhum cliente encontrado" text="Ajuste a busca ou cadastre uma nova empresa." /> : null}
   </div>;

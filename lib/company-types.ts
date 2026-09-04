@@ -7,6 +7,11 @@ export type CompanyClient = {
   contact_name: string;
   contact_email: string;
   contact_phone: string;
+  address: string;
+  district: string;
+  city: string;
+  state: string;
+  postal_code: string;
   status: string;
   created_at: string;
 };
