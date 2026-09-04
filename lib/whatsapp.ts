@@ -24,15 +24,17 @@ export function trainingScheduleMessage(input: {
   location: string;
 }): string {
   const firstName = input.instructorName.trim().split(/\s+/)[0] || '';
+  // Sem emoji de propósito: dependem da fonte do aparelho e viram "?" em
+  // alguns aparelhos e no WhatsApp Web.
   return [
     `Olá${firstName ? `, ${firstName}` : ''}! Aqui é da Space Light Engenharia.`,
     '',
-    `Você foi escalado para o treinamento *${input.nr} — ${input.title}*.`,
+    `Você foi escalado para o treinamento *${input.nr} - ${input.title}*.`,
     '',
-    `📅 Data: ${input.dateLabel}`,
-    `⏱️ Carga horária: ${input.duration}`,
-    `📍 Local: ${input.location}`,
-    `🏢 Cliente: ${input.clientName}`,
+    `Data: ${input.dateLabel}`,
+    `Carga horária: ${input.duration}`,
+    `Local: ${input.location}`,
+    `Cliente: ${input.clientName}`,
     '',
     'Pode confirmar a sua disponibilidade?',
   ].join('\n');
