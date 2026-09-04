@@ -190,6 +190,17 @@ export function ensurePortalSchema(): Promise<void> {
         metadata TEXT NOT NULL DEFAULT '{}',
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       )`),
+      d1.prepare(`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`),
+      d1.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens(token_hash)',
+      ),
       d1.prepare(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_document ON clients(document)',
       ),
@@ -1524,6 +1535,86 @@ export async function findFileForUser(input: {
   return null;
 }
 
+
+// ---------------------------------------------------------------------------
+// Redefinição de senha por e-mail (token de uso único)
+// ---------------------------------------------------------------------------
+
+/**
+ * Emite um token novo e invalida os anteriores do mesmo usuário.
+ * Devolve null se o usuário já pediu demais nos últimos minutos, para que
+ * a rota não vire uma máquina de disparar e-mail.
+ */
+export async function createPasswordResetToken(input: {
+  userId: string;
+  tokenHash: string;
+  ttlMinutes: number;
+}): Promise<{ expiresAt: string } | null> {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const recent = await d1
+    .prepare(`SELECT count(*) AS total FROM password_reset_tokens
+      WHERE user_id = ? AND created_at > datetime('now', '-15 minutes')`)
+    .bind(input.userId)
+    .first<{ total: number }>();
+  if ((recent?.total ?? 0) >= 3) return null;
+
+  await d1
+    .prepare(`UPDATE password_reset_tokens SET used_at = datetime('now')
+      WHERE user_id = ? AND used_at IS NULL`)
+    .bind(input.userId)
+    .run();
+  await d1
+    .prepare(`INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
+      VALUES (?, ?, ?, datetime('now', ?))`)
+    .bind(makeId('reset'), input.userId, input.tokenHash, `+${input.ttlMinutes} minutes`)
+    .run();
+  const created = await d1
+    .prepare(`SELECT expires_at FROM password_reset_tokens
+      WHERE user_id = ? AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`)
+    .bind(input.userId)
+    .first<{ expires_at: string }>();
+  return { expiresAt: created?.expires_at ?? '' };
+}
+
+/** Só diz se o token serve; não consome. Usado para desenhar a tela. */
+export async function findValidResetToken(tokenHash: string) {
+  await ensurePortalSchema();
+  return getD1()
+    .prepare(`SELECT t.id, t.user_id, u.name, u.email
+      FROM password_reset_tokens t
+      JOIN users u ON u.id = t.user_id
+      WHERE t.token_hash = ? AND t.used_at IS NULL
+        AND t.expires_at > datetime('now') AND u.active = 1
+      LIMIT 1`)
+    .bind(tokenHash)
+    .first<{ id: string; user_id: string; name: string; email: string }>();
+}
+
+/** Troca a senha e queima o token, em uma coisa só. */
+export async function consumePasswordResetToken(input: {
+  tokenHash: string;
+  passwordHash: string;
+  passwordSalt: string;
+}) {
+  await ensurePortalSchema();
+  const token = await findValidResetToken(input.tokenHash);
+  if (!token) throw new Error('Este link expirou ou já foi usado. Peça um novo.');
+  const d1 = getD1();
+  await d1
+    .prepare(`UPDATE users SET password_hash = ?, password_salt = ?, must_reset = 0
+      WHERE id = ?`)
+    .bind(input.passwordHash, input.passwordSalt, token.user_id)
+    .run();
+  await d1
+    .prepare(`UPDATE password_reset_tokens SET used_at = datetime('now') WHERE id = ?`)
+    .bind(token.id)
+    .run();
+  await writeAudit(token.user_id, 'user.password_self_reset', 'user', token.user_id, {
+    email: token.email,
+  });
+  return { userId: token.user_id, email: token.email };
+}
 
 export async function findTrainingByToken(token: string) {
   await ensurePortalSchema();

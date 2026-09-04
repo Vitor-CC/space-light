@@ -142,3 +142,20 @@ export const sessionCookieOptions = {
   path: '/',
   maxAge: SESSION_DURATION_SECONDS,
 };
+
+// --- Redefinição de senha por e-mail ---
+
+export const RESET_TOKEN_TTL_MINUTES = 60;
+
+/** O token vai no link do e-mail; no banco guardamos apenas o hash dele. */
+export function generateResetToken() {
+  return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+export async function hashResetToken(token: string) {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(token),
+  );
+  return bytesToBase64Url(new Uint8Array(digest));
+}

@@ -22,6 +22,8 @@ const actionLabels: Record<string, string> = {
   'employee.activated': 'reativou um funcionário',
   'employee.deactivated': 'desativou um funcionário',
   'user.password_reset': 'redefiniu a senha de um acesso',
+  'user.password_self_reset': 'criou uma senha nova pelo link enviado por e-mail',
+  'file.uploaded': 'enviou um arquivo de treinamento',
   'client.deleted': 'excluiu um cliente',
   'instructor.deleted': 'excluiu um instrutor',
   'training.deleted': 'excluiu um treinamento',

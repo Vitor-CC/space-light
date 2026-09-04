@@ -33,7 +33,8 @@ const areas = [
   },
 ];
 
-export default function ChooseAreaPage() {
+export default async function ChooseAreaPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+  const { status } = await searchParams;
   return <main className="flex min-h-screen flex-col bg-[#0a0a0a] text-white">
     <header className="flex h-[76px] items-center justify-between border-b border-white/10 px-5 sm:px-8">
       <Link href="/" aria-label="Space Light Engenharia — início"><Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={232} height={84} className="h-11 w-auto brightness-0 invert" /></Link>
@@ -45,6 +46,7 @@ export default function ChooseAreaPage() {
         <span className="eyebrow block text-[#f2ad19]">Portal Space Light</span>
         <h1 className="mt-4 text-[clamp(2.6rem,6vw,4.5rem)] font-black uppercase leading-[0.88] tracking-[-0.06em]">Por onde você entra?</h1>
         <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/58 sm:text-base">Escolha a sua área para ir direto ao login certo.</p>
+        {status === 'password-updated' ? <p role="status" className="mt-6 border-l-4 border-[#f2ad19] bg-[#f2ad19]/12 p-4 text-sm leading-relaxed text-white/85">Senha alterada. Entre com a nova senha pela sua área.</p> : null}
 
         <nav aria-label="Áreas de acesso" className="mt-9 space-y-px bg-white/10">{areas.map((area) => <Link key={area.href} href={area.href} className="group flex items-center gap-5 bg-[#171716] p-6 transition hover:bg-[#f2ad19] hover:text-black sm:p-7">
           <span className="flex size-13 shrink-0 items-center justify-center bg-[#f2ad19] text-black transition group-hover:bg-black group-hover:text-[#f2ad19]"><area.icon className="size-6" /></span>
