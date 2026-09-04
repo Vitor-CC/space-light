@@ -8,7 +8,7 @@ const links = [
   { href: '#treinamentos', label: 'Treinamentos' },
   { href: '#metodo', label: 'Como fazemos' },
   { href: '#contato', label: 'Contato' },
-  { href: '/cliente/login', label: 'Área do Cliente' },
+  { href: '/entrar', label: 'Entrar no portal' },
 ];
 
 export function MobileNav() {

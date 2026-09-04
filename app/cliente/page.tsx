@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function ClientPortalPage() {
   const user = await requireUser();
-  if (user.must_reset) redirect('/cliente/definir-senha');
+  if (user.must_reset) redirect('/definir-senha');
   if (user.role === 'admin') redirect('/empresa');
   if (user.role === 'instructor') redirect('/instrutor');
   if (!user.client_id) redirect('/cliente/login?status=pending');

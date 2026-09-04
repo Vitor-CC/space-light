@@ -7,6 +7,6 @@ export const dynamic = 'force-dynamic';
 
 export default async function CompanyPortalPage() {
   const user = await requireAdmin();
-  if (user.must_reset) redirect('/cliente/definir-senha');
+  if (user.must_reset) redirect('/definir-senha');
   return <CompanyPortal initialData={await getCompanyDashboardData(user)} />;
 }

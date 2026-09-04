@@ -22,8 +22,9 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const email = String(form.get('email') ?? '').trim().toLowerCase();
   const password = String(form.get('password') ?? '');
-  const loginPath = form.get('loginPath') === '/instrutor/login'
-    ? '/instrutor/login'
+  const requestedPath = String(form.get('loginPath') ?? '');
+  const loginPath = requestedPath === '/instrutor/login' || requestedPath === '/empresa/login'
+    ? requestedPath
     : '/cliente/login';
   const back = (status: string) => `${loginPath}?status=${status}`;
   if (!email || !password) return destination(request, back('invalid'));
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
 
   await recordLogin(user.id);
   const path = user.must_reset
-    ? '/cliente/definir-senha'
+    ? '/definir-senha'
     : portalPathForRole(user.role);
   const response = destination(request, path);
   response.cookies.set(

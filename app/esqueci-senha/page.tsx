@@ -17,9 +17,15 @@ const steps = [
   { number: '03', title: 'Você cria a sua nova senha', text: 'Entre com a senha temporária: o portal pede uma nova senha antes de liberar o acesso.' },
 ];
 
+const loginPaths: Record<string, string> = {
+  instrutor: '/instrutor/login',
+  empresa: '/empresa/login',
+  cliente: '/cliente/login',
+};
+
 export default async function ForgotPasswordPage({ searchParams }: { searchParams: Promise<{ portal?: string }> }) {
   const { portal } = await searchParams;
-  const loginPath = portal === 'instrutor' ? '/instrutor/login' : '/cliente/login';
+  const loginPath = loginPaths[portal ?? ''] ?? '/cliente/login';
 
   return <main className="flex min-h-screen items-center justify-center bg-[#0a0a0a] px-5 py-12 text-white">
     <section className="w-full max-w-xl border border-white/12 bg-[#171716] p-7 sm:p-10">

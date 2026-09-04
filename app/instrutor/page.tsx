@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function InstructorPortalPage() {
   const user = await requireInstructor();
-  if (user.must_reset) redirect('/cliente/definir-senha');
+  if (user.must_reset) redirect('/definir-senha');
   const data = await getInstructorDashboardData(user);
   if (!data) redirect('/instrutor/login?status=pending');
   return <InstructorPortal initialData={data} />;

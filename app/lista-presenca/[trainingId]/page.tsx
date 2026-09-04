@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function AttendanceListPage({ params }: { params: Promise<{ trainingId: string }> }) {
   const user = await requireUser();
-  if (user.must_reset) redirect('/cliente/definir-senha');
+  if (user.must_reset) redirect('/definir-senha');
   if (user.role !== 'admin' && user.role !== 'instructor') redirect('/cliente');
   const { trainingId } = await params;
   const data = await getAttendanceListData({

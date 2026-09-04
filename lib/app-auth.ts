@@ -10,20 +10,20 @@ export async function getCurrentUser() {
   return user?.active ? user : null;
 }
 
-export async function requireUser() {
+export async function requireUser(loginPath = '/cliente/login') {
   const user = await getCurrentUser();
-  if (!user) redirect('/cliente/login?status=session');
+  if (!user) redirect(`${loginPath}?status=login`);
   return user;
 }
 
 export async function requireAdmin() {
-  const user = await requireUser();
+  const user = await requireUser('/empresa/login');
   if (user.role !== 'admin') redirect(portalPathForRole(user.role));
   return user;
 }
 
 export async function requireInstructor() {
-  const user = await requireUser();
+  const user = await requireUser('/instrutor/login');
   if (user.role !== 'instructor') redirect(portalPathForRole(user.role));
   return user;
 }
