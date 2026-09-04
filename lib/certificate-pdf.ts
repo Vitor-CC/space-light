@@ -163,7 +163,10 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     const prefixo = 'Certificamos que ';
     const sufixo = ' concluiu';
     const larguraNome = Math.max(bold.widthOfTextAtSize(nome, corpo) + 24, 300);
-    let x = LEFT;
+    // A linha do nome fica centralizada; o parágrafo abaixo é que é justificado.
+    const larguraLinhaNome =
+      regular.widthOfTextAtSize(prefixo, corpo) + larguraNome + regular.widthOfTextAtSize(sufixo, corpo);
+    let x = centro - larguraLinhaNome / 2;
     page.drawText(prefixo, { x, y, size: corpo, font: regular, color: preto });
     x += regular.widthOfTextAtSize(prefixo, corpo);
     page.drawText(nome, {
