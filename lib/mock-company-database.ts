@@ -34,8 +34,21 @@ export function createMockTraining(input: { clientId: string; instructorId: stri
   return requestJson<{ id: string; code: string; qrToken: string }>('/api/company/trainings', { method: 'POST', body: JSON.stringify(input) });
 }
 
-export function publishMockFiles(clientId: string, trainingId: string, selectedFiles: File[]) {
-  return requestJson<{ count: number }>('/api/company/files', { method: 'POST', body: JSON.stringify({ clientId, trainingId, files: selectedFiles.map((file) => ({ name: file.name, contentType: file.type, size: file.size })) }) });
+export function uploadCompanyFiles(input: { clientId: string; trainingId: string; kind: 'photo' | 'document'; files: File[] }) {
+  const body = new FormData();
+  body.append('clientId', input.clientId);
+  body.append('trainingId', input.trainingId);
+  body.append('kind', input.kind);
+  for (const file of input.files) body.append('files', file);
+  return fetch('/api/company/files', { method: 'POST', body }).then(async (response) => {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string; saved?: number; rejected?: string[] };
+    if (!response.ok) throw new Error(payload.error || 'Não foi possível enviar os arquivos.');
+    return { saved: payload.saved ?? 0, rejected: payload.rejected ?? [] };
+  });
+}
+
+export function deleteCompanyFile(fileId: string) {
+  return requestJson<{ ok: true }>('/api/company/files', { method: 'DELETE', body: JSON.stringify({ fileId }) });
 }
 
 export function findMockTrainingByToken(token: string) {

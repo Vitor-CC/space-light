@@ -1493,6 +1493,32 @@ export async function registerStoredFile(input: {
   });
 }
 
+/** Devolve o arquivo cru para o admin poder apagá-lo do Blob antes da linha. */
+/** Confere que o treinamento é mesmo daquele cliente antes de anexar arquivo. */
+export async function findTrainingForClient(input: { clientId: string; trainingId: string }) {
+  await ensurePortalSchema();
+  return getD1()
+    .prepare('SELECT id, client_id FROM trainings WHERE id = ? AND client_id = ? LIMIT 1')
+    .bind(input.trainingId, input.clientId)
+    .first<{ id: string; client_id: string }>();
+}
+
+export async function findFileById(fileId: string): Promise<StoredFileRow | null> {
+  await ensurePortalSchema();
+  return getD1()
+    .prepare(`SELECT id, client_id, training_id, name, object_key, content_type,
+      size, kind, status, created_at
+      FROM files WHERE id = ? LIMIT 1`)
+    .bind(fileId)
+    .first<StoredFileRow>();
+}
+
+export async function deleteFileRow(input: { fileId: string; byUserId: string }) {
+  await ensurePortalSchema();
+  await getD1().prepare('DELETE FROM files WHERE id = ?').bind(input.fileId).run();
+  await writeAudit(input.byUserId, 'file.deleted', 'file', input.fileId, {});
+}
+
 export async function listTrainingFiles(trainingId: string): Promise<StoredFileRow[]> {
   await ensurePortalSchema();
   const result = await getD1()
@@ -1800,7 +1826,7 @@ export async function getClientPortalData(
     }));
 
   const documents: ClientDocument[] = rows(fileResult)
-    .filter((item) => item.kind === 'document')
+    .filter((item) => item.kind === 'document' && item.status === 'stored')
     .map((item) => ({
       id: item.id,
       clientId,

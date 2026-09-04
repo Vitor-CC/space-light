@@ -8,6 +8,7 @@ import {
 } from '@/db/company-repository';
 import { getCurrentUser } from '@/lib/app-auth';
 import {
+  ACCEPTED_DOCUMENT_TYPES,
   ACCEPTED_PHOTO_TYPES,
   MAX_UPLOAD_BYTES,
   isStorageConfigured,
@@ -64,8 +65,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const form = await request.formData();
   const file = form.get('file');
+  const kind = String(form.get('kind') ?? 'photo') === 'document' ? 'document' : 'photo';
   if (!(file instanceof File) || file.size === 0) {
-    return NextResponse.json({ error: 'Escolha a foto da lista assinada.' }, { status: 400 });
+    return NextResponse.json(
+      { error: kind === 'photo' ? 'Escolha a foto da lista assinada.' : 'Escolha o documento.' },
+      { status: 400 },
+    );
   }
   if (file.size > MAX_UPLOAD_BYTES) {
     return NextResponse.json(
@@ -74,9 +79,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
   }
   const contentType = file.type || 'application/octet-stream';
-  if (!ACCEPTED_PHOTO_TYPES.includes(contentType)) {
+  const accepted = kind === 'photo' ? ACCEPTED_PHOTO_TYPES : ACCEPTED_DOCUMENT_TYPES;
+  if (!accepted.includes(contentType)) {
     return NextResponse.json(
-      { error: 'Envie uma foto (JPG, PNG, WEBP ou HEIC) ou um PDF.' },
+      {
+        error: kind === 'photo'
+          ? 'Envie uma imagem: JPG, PNG, WEBP ou HEIC.'
+          : 'Envie um documento: PDF, Word, Excel, CSV ou TXT.',
+      },
       { status: 400 },
     );
   }
@@ -87,7 +97,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       clientId: context.training.client_id,
       trainingId: id,
       fileId,
-      name: file.name || 'lista-assinada',
+      name: file.name || (kind === 'photo' ? 'lista-assinada' : 'documento'),
       contentType,
       body: await file.arrayBuffer(),
     });
@@ -95,11 +105,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       fileId,
       clientId: context.training.client_id,
       trainingId: id,
-      name: file.name || 'lista-assinada',
+      name: file.name || (kind === 'photo' ? 'lista-assinada' : 'documento'),
       objectKey,
       contentType,
       size: file.size,
-      kind: contentType === 'application/pdf' ? 'document' : 'photo',
+      kind,
       createdByUserId: context.user.id,
     });
     return NextResponse.json({ id: fileId, name: file.name, size: file.size }, { status: 201 });

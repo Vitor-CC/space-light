@@ -1,4 +1,4 @@
-import { get, put } from '@vercel/blob';
+import { del, get, put } from '@vercel/blob';
 
 export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
@@ -8,7 +8,16 @@ export const ACCEPTED_PHOTO_TYPES = [
   'image/webp',
   'image/heic',
   'image/heif',
+];
+
+export const ACCEPTED_DOCUMENT_TYPES = [
   'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
+  'text/plain',
 ];
 
 export function isStorageConfigured() {
@@ -57,4 +66,8 @@ export async function uploadTrainingFile(input: {
 
 export async function readStoredFile(objectKey: string) {
   return get(objectKey, { access: 'private', token: requireToken() });
+}
+
+export async function deleteStoredFile(objectKey: string) {
+  await del(objectKey, { token: requireToken() });
 }

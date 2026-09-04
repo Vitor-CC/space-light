@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock3,
   Download,
+  Eye,
   FileCheck2,
   FileText,
   GraduationCap,
@@ -75,30 +76,6 @@ const sectionCopy: Record<PortalSection, { title: string; description: string }>
     description: 'Dados cadastrais vinculados a este acesso corporativo.',
   },
 };
-
-function slugify(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
-
-function demoFileHref(title: string, type: string, legalName: string) {
-  const body = [
-    'SPACE LIGHT ENGENHARIA',
-    type.toUpperCase(),
-    '',
-    title,
-    `Cliente: ${legalName}`,
-    '',
-    'Documento gerado pela Área do Cliente da Space Light Engenharia.',
-    'O arquivo oficial será disponibilizado pela equipe Space Light.',
-  ].join('\n');
-
-  return `data:text/plain;charset=utf-8,${encodeURIComponent(body)}`;
-}
 
 function StatusTag({ status }: { status: ClientTraining['status'] }) {
   const isCompleted = status === 'Concluído';
@@ -292,21 +269,25 @@ function Photos({ data }: { data: ClientPortalData }) {
     <div>
       <div className="mb-6 flex items-start gap-3 border-l-4 border-[#f2ad19] bg-white p-4 text-sm text-[#666]">
         <ImageIcon className="mt-0.5 size-5 shrink-0 text-[#8a6107]" />
-        <p>As fotos liberadas pela equipe Space Light aparecem aqui, separadas por treinamento.</p>
+        <p>Registros visuais dos treinamentos da sua equipe. Clique para ver em tamanho cheio ou baixe o arquivo original.</p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {data.photos.map((photo) => {
           const training = trainingById.get(photo.trainingId);
           return (
-            <a key={photo.id} href={photo.src} target="_blank" rel="noreferrer" className="group relative min-h-[300px] overflow-hidden bg-black">
-              <Image src={photo.src} alt={photo.alt} fill sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover opacity-85 transition duration-500 group-hover:scale-[1.025] group-hover:opacity-100" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/5 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                <span className="eyebrow text-[#f2ad19]">{training?.nr} · {photo.dateLabel}</span>
-                <strong className="mt-2 block text-base uppercase leading-tight">{training?.title}</strong>
-                <span className="mt-3 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white/65">Abrir foto <ChevronRight className="size-3.5" /></span>
-              </div>
-            </a>
+            <figure key={photo.id} className="group border border-black/10 bg-white">
+              <a href={photo.src} target="_blank" rel="noreferrer" className="relative block aspect-[4/3] overflow-hidden bg-black" aria-label={`Ver ${photo.alt} em tamanho cheio`}>
+                <Image src={photo.src} alt={photo.alt} fill unoptimized sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition duration-500 group-hover:scale-[1.03]" />
+              </a>
+              <figcaption className="p-4">
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training?.nr ?? 'Treinamento'} · {photo.dateLabel}</span>
+                <strong className="mt-1 block truncate text-sm font-extrabold uppercase tracking-[-0.02em]" title={training?.title}>{training?.title ?? 'Registro do treinamento'}</strong>
+                <div className="mt-4 flex gap-2">
+                  <a href={photo.src} target="_blank" rel="noreferrer" className="inline-flex h-10 flex-1 items-center justify-center gap-2 border border-black/16 text-[9px] font-extrabold uppercase tracking-[0.1em] transition hover:border-black hover:bg-black hover:text-white"><Eye className="size-4" />Ver</a>
+                  <a href={`${photo.src}?download=1`} className="inline-flex h-10 flex-1 items-center justify-center gap-2 bg-[#f2ad19] text-[9px] font-extrabold uppercase tracking-[0.1em] text-black transition hover:bg-[#ff9900]"><Download className="size-4" />Baixar</a>
+                </div>
+              </figcaption>
+            </figure>
           );
         })}
       </div>
@@ -320,18 +301,15 @@ function DocumentRow({ document, data }: { document: ClientDocument; data: Clien
   return (
     <article className="grid gap-5 border border-black/10 bg-white p-5 md:grid-cols-[auto_1fr_auto] md:items-center md:p-6">
       <span className="flex size-12 items-center justify-center bg-black text-[#f2ad19]"><FileText className="size-5" /></span>
-      <div>
+      <div className="min-w-0">
         <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{document.category}</span>
-        <h2 className="mt-1 text-base font-extrabold uppercase tracking-[-0.02em]">{document.title}</h2>
-        <p className="mt-2 text-xs text-[#777]">{training ? `${training.nr} · ${training.dateLabel}` : 'Documento geral da empresa'} · {document.format} · {document.size} · Atualizado em {document.updatedAt}</p>
+        <h2 className="mt-1 truncate text-base font-extrabold uppercase tracking-[-0.02em]" title={document.title}>{document.title}</h2>
+        <p className="mt-2 text-xs text-[#777]">{training ? `${training.nr} · ${training.dateLabel}` : 'Documento geral da empresa'} · {document.format} · {document.size} · Enviado em {document.updatedAt}</p>
       </div>
-      <a
-        href={demoFileHref(document.title, 'Documento', data.organization.legalName)}
-        download={`${slugify(document.title)}.txt`}
-        className="inline-flex h-11 items-center justify-center gap-2 border border-black/16 px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] transition hover:border-black hover:bg-black hover:text-white"
-      >
-        <Download className="size-4" /> Baixar arquivo
-      </a>
+      <div className="flex gap-2">
+        <a href={`/api/files/${document.id}`} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center justify-center gap-2 border border-black/16 px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] transition hover:border-black hover:bg-black hover:text-white"><Eye className="size-4" />Abrir</a>
+        <a href={`/api/files/${document.id}?download=1`} className="inline-flex h-11 items-center justify-center gap-2 bg-[#f2ad19] px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black transition hover:bg-[#ff9900]"><Download className="size-4" />Baixar</a>
+      </div>
     </article>
   );
 }
@@ -356,13 +334,10 @@ function CertificateCard({ certificate, data }: { certificate: ClientCertificate
         <div className="flex justify-between gap-4"><dt className="text-[#777]">Validade</dt><dd className="font-bold text-right">{certificate.expiresAt}</dd></div>
         <div className="flex justify-between gap-4"><dt className="text-[#777]">Quantidade</dt><dd className="font-bold text-right">{certificate.quantity}</dd></div>
       </dl>
-      <a
-        href={demoFileHref(certificate.title, 'Certificado', data.organization.legalName)}
-        download={`${slugify(certificate.title)}.txt`}
-        className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 bg-black px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white transition hover:bg-[#f2ad19] hover:text-black"
-      >
-        <Download className="size-4" /> Baixar lote
-      </a>
+      <p className="mt-6 flex items-start gap-2.5 border-l-4 border-[#f2ad19] bg-[#fff8e8] p-4 text-[11px] leading-relaxed text-[#6d5116]">
+        <FileCheck2 className="mt-0.5 size-4 shrink-0" />
+        <span>Os certificados deste lote são emitidos pela Space Light e publicados em <strong className="font-bold">Documentos</strong>, de onde você pode baixá-los.</span>
+      </p>
     </article>
   );
 }

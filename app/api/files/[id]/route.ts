@@ -9,7 +9,7 @@ import { readStoredFile } from '@/lib/blob-storage';
  * o Blob nunca é exposto por URL direta, porque as fotos das listas têm
  * nome, CPF, RG e assinatura dos participantes.
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user || user.must_reset) {
     return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
@@ -31,10 +31,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     if (!stored) {
       return NextResponse.json({ error: 'Arquivo não encontrado.' }, { status: 404 });
     }
+    // ?download=1 força o "salvar como"; sem ele, abre no navegador.
+    const download = new URL(request.url).searchParams.get('download') === '1';
     return new Response(stored.stream, {
       headers: {
         'Content-Type': file.content_type,
-        'Content-Disposition': `inline; filename="${encodeURIComponent(file.name)}"`,
+        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
         'Cache-Control': 'private, max-age=300',
       },
     });
