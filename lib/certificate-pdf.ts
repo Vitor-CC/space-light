@@ -156,7 +156,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
 
     // Bloco de texto: a primeira linha tem o nome sublinhado no meio.
     y -= 52;
-    const corpo = 10.5;
+    const corpo = 12;
     const larguraTexto = PAGE_W - RIGHT_SAFE - LEFT;
     const nome = `${participante.fullName}${participante.rg ? ` RG - ${participante.rg}` : ''}`;
 
@@ -177,12 +177,15 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     x += larguraNome;
     page.drawText(sufixo, { x, y, size: corpo, font: regular, color: preto });
 
-    // Restante do parágrafo, justificado na largura útil.
+    // Como no modelo impresso, "ministrado pela..." fica sozinho na última
+    // linha: as linhas de cima são justificadas de ponta a ponta.
     y -= 26;
-    const restante = `com aproveitamento o "${data.training.title.toUpperCase()}", ${setup.legalBasis} ministrado pela SPACE LIGHT ENGENHARIA.`;
-    y = drawJustified(page, wrap(restante, regular, corpo, larguraTexto), {
+    const fecho = 'ministrado pela SPACE LIGHT ENGENHARIA.';
+    const abertura = `com aproveitamento o "${data.training.title.toUpperCase()}", ${setup.legalBasis}`;
+    const linhas = [...wrap(abertura, regular, corpo, larguraTexto), fecho.split(' ')];
+    y = drawJustified(page, linhas, {
       x: LEFT, y, size: corpo, font: regular, color: preto,
-      maxWidth: larguraTexto, leading: 22,
+      maxWidth: larguraTexto, leading: 24,
     });
 
     y -= 14;
@@ -203,9 +206,10 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     const baseY = 66;
     const colunas = 3;
     const vao = (PAGE_W - RIGHT_SAFE - LEFT) / colunas;
-    const blocos: { assinatura: PDFImage | null; linhas: string[] }[] = [
+    const blocos: { assinatura: PDFImage | null; linhas: string[]; destaque?: boolean }[] = [
       {
         assinatura: assinaturaResponsavel,
+        destaque: true,
         linhas: [TECHNICAL_LEAD.role, TECHNICAL_LEAD.name, `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
       },
       {
@@ -222,10 +226,11 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
       const meio = LEFT + vao * indice + vao / 2;
       const larguraLinha = Math.min(vao - 26, 170);
       if (bloco.assinatura) {
-        const altura = 34;
-        const largura = Math.min((bloco.assinatura.width / bloco.assinatura.height) * altura, larguraLinha);
+        // A da responsável técnica é maior: é a assinatura que valida o documento.
+        const altura = bloco.destaque ? 52 : 34;
+        const largura = Math.min((bloco.assinatura.width / bloco.assinatura.height) * altura, larguraLinha + 30);
         page.drawImage(bloco.assinatura, {
-          x: meio - largura / 2, y: baseY + 4, width: largura, height: altura,
+          x: meio - largura / 2, y: baseY + 3, width: largura, height: altura,
         });
       }
       page.drawLine({

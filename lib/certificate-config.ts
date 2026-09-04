@@ -28,11 +28,11 @@ export function certificateSetup(nr: string) {
 
 /** Responsável técnica que assina os certificados. */
 export const TECHNICAL_LEAD = {
-  role: 'Engenheira de Segurança do Trabalho.',
+  role: 'Engenheira Eletricista / Segurança do Trabalho',
   name: 'Ana Paula Sobrinho',
   registryLabel: 'CREA',
   registry: '5070910783',
-  signature: '/images/certificado/assinatura-ana-paula.jpg',
+  signature: '/images/certificado/assinatura-ana-paula.png',
 };
 
 /** Cidade de emissão que aparece antes das datas. */
