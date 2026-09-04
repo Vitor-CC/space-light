@@ -119,13 +119,20 @@ function drawSignatureRow(
       thickness: 0.8, color: options.color,
     });
     let linhaY = options.baseY - 13;
+    const limite = vao - 12;
     for (const texto of bloco.linhas.filter(Boolean)) {
-      const size = 9.5;
-      page.drawText(texto, {
-        x: meio - options.font.widthOfTextAtSize(texto, size) / 2,
-        y: linhaY, size, font: options.font, color: options.color,
-      });
-      linhaY -= 12;
+      // Razão social costuma ser longa: quebra em duas linhas antes de encolher.
+      const partes = options.font.widthOfTextAtSize(texto, 9.5) <= limite
+        ? [texto]
+        : wrap(texto, options.font, 8.5, limite).map((palavras) => palavras.join(' ')).slice(0, 2);
+      const size = partes.length > 1 || options.font.widthOfTextAtSize(texto, 9.5) > limite ? 8.5 : 9.5;
+      for (const parte of partes) {
+        page.drawText(parte, {
+          x: meio - options.font.widthOfTextAtSize(parte, size) / 2,
+          y: linhaY, size, font: options.font, color: options.color,
+        });
+        linhaY -= size + 2;
+      }
     }
   });
 }
@@ -501,13 +508,18 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
     y, size: corpo, font: bold, color: preto,
   });
 
-  // Duas assinaturas: técnico (o instrutor da turma) e responsável técnica.
+  // Técnico, empresa e responsável técnica. A do meio fica em branco: quem
+  // assina é a contratante, à mão, ao receber o documento.
   drawSignatureRow(page, {
     baseY: 66, left: LEFT, width: PAGE_W - RIGHT_SAFE - LEFT, font: regular, color: preto,
     blocks: [
       {
         assinatura: assinaturaInstrutor,
         linhas: ['Técnico de Segurança', data.instructor.name, data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
+      },
+      {
+        assinatura: null,
+        linhas: ['Empresa contratante', razao, data.client.document ? `CNPJ: ${data.client.document}` : ''],
       },
       {
         assinatura: assinaturaResponsavel,
