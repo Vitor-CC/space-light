@@ -22,15 +22,7 @@ export async function publishCertificateDocument(input: {
     return { ok: false, reason: 'O armazenamento de arquivos não está configurado.' };
   }
 
-  const data = await getCertificateData({
-    trainingId: input.trainingId,
-    user: {
-      id: input.user.id,
-      role: input.user.role,
-      instructor_id: input.user.instructor_id,
-      client_id: input.user.client_id,
-    },
-  });
+  const data = await getCertificateData({ trainingId: input.trainingId });
   if (!data) return { ok: false, reason: 'Treinamento não encontrado.' };
   if (data.participants.length === 0) {
     return { ok: false, reason: 'A turma não tem participantes na lista de presença.' };

@@ -1411,9 +1411,12 @@ export type CertificateData = {
   participants: { fullName: string; rg: string; documentId: string }[];
 };
 
+/**
+ * Só monta os dados. Quem chama é que decide se pode: a página restringe ao
+ * admin e a publicação é disparada por quem já foi autorizado antes.
+ */
 export async function getCertificateData(input: {
   trainingId: string;
-  user: { id: string; role: string; instructor_id: string | null; client_id?: string | null };
 }): Promise<CertificateData | null> {
   await ensurePortalSchema();
   const d1 = getD1();
@@ -1433,14 +1436,7 @@ export async function getCertificateData(input: {
       client_id: string; legal_name: string; instructor_name: string; instructor_registry: string;
     }>();
   if (!training) return null;
-  if (input.user.role === 'instructor') {
-    if (!input.user.instructor_id || training.instructor_id !== input.user.instructor_id) return null;
-  } else if (input.user.role === 'client') {
-    // O cliente baixa o certificado da própria turma, e só depois de concluída.
-    if (!input.user.client_id || training.client_id !== input.user.client_id) return null;
-  } else if (input.user.role !== 'admin') {
-    return null;
-  }
+
 
   let dates: string[] = [];
   try {

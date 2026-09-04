@@ -35,19 +35,52 @@ async function embedImage(pdf: PDFDocument, relative: string): Promise<PDFImage 
 /** Quebra o texto respeitando a largura, medindo com a própria fonte. */
 function wrap(text: string, font: PDFFont, size: number, maxWidth: number) {
   const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let current = '';
+  const lines: string[][] = [];
+  let current: string[] = [];
   for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (font.widthOfTextAtSize(candidate, size) <= maxWidth || !current) {
-      current = candidate;
+    const candidate = [...current, word].join(' ');
+    if (font.widthOfTextAtSize(candidate, size) <= maxWidth || current.length === 0) {
+      current.push(word);
     } else {
       lines.push(current);
-      current = word;
+      current = [word];
     }
   }
-  if (current) lines.push(current);
+  if (current.length) lines.push(current);
   return lines;
+}
+
+type Desenho = {
+  drawText: (text: string, options: { x: number; y: number; size: number; font: PDFFont; color: ReturnType<typeof rgb> }) => void;
+};
+
+/**
+ * Justifica distribuindo a sobra entre os espaços da linha. A última linha do
+ * parágrafo fica alinhada à esquerda, como manda a convenção tipográfica.
+ */
+function drawJustified(
+  page: Desenho,
+  lines: string[][],
+  options: { x: number; y: number; size: number; font: PDFFont; color: ReturnType<typeof rgb>; maxWidth: number; leading: number },
+) {
+  let y = options.y;
+  lines.forEach((words, indice) => {
+    const ultima = indice === lines.length - 1;
+    const texto = words.join(' ');
+    if (ultima || words.length === 1) {
+      page.drawText(texto, { x: options.x, y, size: options.size, font: options.font, color: options.color });
+    } else {
+      const larguraPalavras = words.reduce((soma, w) => soma + options.font.widthOfTextAtSize(w, options.size), 0);
+      const espaco = (options.maxWidth - larguraPalavras) / (words.length - 1);
+      let x = options.x;
+      for (const palavra of words) {
+        page.drawText(palavra, { x, y, size: options.size, font: options.font, color: options.color });
+        x += options.font.widthOfTextAtSize(palavra, options.size) + espaco;
+      }
+    }
+    y -= options.leading;
+  });
+  return y;
 }
 
 export type CertificatePdfInput = {
@@ -144,13 +177,13 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     x += larguraNome;
     page.drawText(sufixo, { x, y, size: corpo, font: regular, color: preto });
 
-    // Restante do parágrafo, quebrado na largura útil.
+    // Restante do parágrafo, justificado na largura útil.
     y -= 26;
     const restante = `com aproveitamento o "${data.training.title.toUpperCase()}", ${setup.legalBasis} ministrado pela SPACE LIGHT ENGENHARIA.`;
-    for (const linha of wrap(restante, regular, corpo, larguraTexto)) {
-      page.drawText(linha, { x: LEFT, y, size: corpo, font: regular, color: preto });
-      y -= 22;
-    }
+    y = drawJustified(page, wrap(restante, regular, corpo, larguraTexto), {
+      x: LEFT, y, size: corpo, font: regular, color: preto,
+      maxWidth: larguraTexto, leading: 22,
+    });
 
     y -= 14;
     const cliente = data.client.legalName.toUpperCase();

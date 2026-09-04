@@ -19,13 +19,11 @@ export const metadata: Metadata = {
 export default async function CertificatePage({ params }: { params: Promise<{ trainingId: string }> }) {
   const user = await requireUser();
   if (user.must_reset) redirect('/definir-senha');
-  if (user.role !== 'admin' && user.role !== 'instructor') redirect('/cliente');
+  // Certificado é assunto da equipe Space: instrutor e cliente não entram aqui.
+  if (user.role !== 'admin') redirect(user.role === 'instructor' ? '/instrutor' : '/cliente');
   const { trainingId } = await params;
-  const data = await getCertificateData({
-    trainingId,
-    user: { id: user.id, role: user.role, instructor_id: user.instructor_id },
-  });
-  if (!data) redirect(user.role === 'admin' ? '/empresa' : '/instrutor');
+  const data = await getCertificateData({ trainingId });
+  if (!data) redirect('/empresa');
 
   if (data.participants.length === 0) {
     return (

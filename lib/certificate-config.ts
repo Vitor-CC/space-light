@@ -32,7 +32,7 @@ export const TECHNICAL_LEAD = {
   name: 'Ana Paula Sobrinho',
   registryLabel: 'CREA',
   registry: '5070910783',
-  signature: '/images/certificado/assinatura-ana-paula.png',
+  signature: '/images/certificado/assinatura-ana-paula.jpg',
 };
 
 /** Cidade de emissão que aparece antes das datas. */
