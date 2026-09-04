@@ -10,12 +10,14 @@ import {
   Clock3,
   Download,
   Eye,
+  FileArchive,
   FolderOpen,
   FileCheck2,
   FileText,
   GraduationCap,
   Home,
   ImageIcon,
+  Loader2,
   Images,
   LayoutDashboard,
   LogOut,
@@ -28,6 +30,7 @@ import Image from 'next/image';
 import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { downloadFilesAsZip, type ZipEntry } from '@/lib/download-zip';
 import type { ClientCertificate, ClientDocument, ClientPortalData, ClientTraining } from '@/lib/client-portal-data';
 
 type PortalSection =
@@ -283,16 +286,48 @@ function DocumentRow({ document, data }: { document: ClientDocument; data: Clien
   );
 }
 
-function BackToFolders({ onBack, training }: { onBack: () => void; training?: ClientTraining }) {
+function DownloadAllButton({ entries, zipName }: { entries: ZipEntry[]; zipName: string }) {
+  const [status, setStatus] = useState('');
+  if (!entries.length) return null;
+
+  async function run() {
+    setStatus('Preparando…');
+    try {
+      const result = await downloadFilesAsZip({
+        entries,
+        zipName,
+        onProgress: (done, total) => setStatus(done >= total ? 'Compactando…' : `Baixando ${done + 1} de ${total}`),
+      });
+      if (result.failed.length) window.alert(`${result.zipped} arquivo(s) baixados. Não deu para incluir: ${result.failed.join(', ')}.`);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Não foi possível montar o arquivo zip.');
+    } finally {
+      setStatus('');
+    }
+  }
+
+  return (
+    <button type="button" onClick={() => void run()} disabled={Boolean(status)} className="inline-flex h-11 items-center justify-center gap-2 bg-[#f2ad19] px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black transition hover:bg-[#ff9900] disabled:opacity-60">
+      {status ? <Loader2 className="size-4 animate-spin" /> : <FileArchive className="size-4" />}
+      {status || `Baixar ${entries.length === 1 ? 'o arquivo' : `os ${entries.length}`} em zip`}
+    </button>
+  );
+}
+
+function BackToFolders({ onBack, training, download }: { onBack: () => void; training?: ClientTraining; download?: ZipEntry[] }) {
+  const slug = `${training?.nr ?? 'turma'}-${training?.title ?? ''}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/(^-|-$)/g, '').toLowerCase();
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-4">
       <div>
         <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training ? `${training.nr} · ${training.dateLabel}` : 'Turma'}</span>
         <h2 className="mt-1 text-xl font-extrabold uppercase tracking-[-0.035em]">{training?.title ?? 'Treinamento'}</h2>
       </div>
-      <button type="button" onClick={onBack} className="inline-flex h-11 items-center gap-2 border border-black/16 px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] transition hover:border-black hover:bg-black hover:text-white">
-        <ArrowLeft className="size-4" /> Todas as turmas
-      </button>
+      <div className="flex flex-wrap gap-2">
+        {download ? <DownloadAllButton entries={download} zipName={slug || 'arquivos'} /> : null}
+        <button type="button" onClick={onBack} className="inline-flex h-11 items-center gap-2 border border-black/16 px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] transition hover:border-black hover:bg-black hover:text-white">
+          <ArrowLeft className="size-4" /> Todas as turmas
+        </button>
+      </div>
     </div>
   );
 }
@@ -345,7 +380,7 @@ function Photos({ data }: { data: ClientPortalData }) {
   if (openId) {
     return (
       <div>
-        <BackToFolders onBack={() => setOpenId(null)} training={training} />
+        <BackToFolders onBack={() => setOpenId(null)} training={training} download={shown.map((photo) => ({ id: photo.id, name: photo.alt }))} />
         {shown.length ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {shown.map((photo) => (
@@ -395,7 +430,7 @@ function Documents({ data }: { data: ClientPortalData }) {
   if (openId) {
     return (
       <div>
-        <BackToFolders onBack={() => setOpenId(null)} training={training} />
+        <BackToFolders onBack={() => setOpenId(null)} training={training} download={shown.map((document) => ({ id: document.id, name: document.title }))} />
         {shown.length
           ? <div className="space-y-3">{shown.map((document) => <DocumentRow key={document.id} document={document} data={data} />)}</div>
           : <EmptyState text="Nenhum documento foi publicado para esta turma ainda." />}
