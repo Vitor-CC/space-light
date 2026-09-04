@@ -343,13 +343,31 @@ function CertificateCard({ certificate, data }: { certificate: ClientCertificate
 }
 
 function Certificates({ data }: { data: ClientPortalData }) {
+  const completed = data.trainings.filter((training) => training.status === 'Concluído');
   return (
     <div>
       <div className="mb-6 border-l-4 border-[#f2ad19] bg-white p-5">
-        <strong className="text-sm uppercase">Acesso corporativo</strong>
-        <p className="mt-2 text-sm leading-relaxed text-[#666]">Os certificados são organizados em lotes para a empresa contratante. Participantes não possuem conta nem acesso individual ao portal.</p>
+        <strong className="text-sm uppercase">Como funciona</strong>
+        <p className="mt-2 text-sm leading-relaxed text-[#666]">Os certificados são emitidos pela Space Light por turma, para a empresa contratante — participantes não têm conta individual. Quando o lote fica pronto, o arquivo é publicado em <strong className="font-bold text-black">Documentos</strong>, de onde você baixa.</p>
       </div>
-      {data.certificates.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.certificates.map((certificate) => <CertificateCard key={certificate.id} certificate={certificate} data={data} />)}</div> : <EmptyState text="Nenhum lote de certificados foi publicado ainda." />}
+
+      {data.certificates.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.certificates.map((certificate) => <CertificateCard key={certificate.id} certificate={certificate} data={data} />)}</div> : null}
+
+      {completed.length ? <div className="mt-6">
+        <span className="eyebrow text-[#8a6107]">Turmas concluídas</span>
+        <h2 className="mt-2 text-xl font-extrabold uppercase tracking-[-0.035em]">Elegíveis para certificado</h2>
+        <div className="mt-4 space-y-3">{completed.map((training) => <article key={training.id} className="flex flex-wrap items-center gap-4 border border-black/10 bg-white p-5">
+          <span className="flex size-12 shrink-0 items-center justify-center bg-[#daf2df] text-[#17642d]"><FileCheck2 className="size-5" /></span>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">{training.nr} · {training.dateLabel}</span>
+            <h3 className="mt-1 text-sm font-extrabold uppercase tracking-[-0.02em]">{training.title}</h3>
+            <p className="mt-1 text-xs text-[#777]">{training.participantCount} participante(s) concluíram</p>
+          </div>
+          <span className="w-fit bg-[#f2ad19]/18 px-3 py-2 text-[9px] font-extrabold uppercase tracking-[0.1em] text-[#785303]">Certificado em preparação</span>
+        </article>)}</div>
+      </div> : null}
+
+      {!data.certificates.length && !completed.length ? <EmptyState text="Assim que a primeira turma for concluída, ela aparece aqui aguardando a emissão dos certificados." /> : null}
     </div>
   );
 }
