@@ -147,7 +147,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
 
     y -= 96;
     const titulo = 'CERTIFICADO';
-    const tituloSize = 30;
+    const tituloSize = 36;
     const centro = LEFT + (PAGE_W - RIGHT_SAFE - LEFT) / 2;
     page.drawText(titulo, {
       x: centro - bold.widthOfTextAtSize(titulo, tituloSize) / 2,
@@ -156,7 +156,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
 
     // Bloco de texto: a primeira linha tem o nome sublinhado no meio.
     y -= 52;
-    const corpo = 12;
+    const corpo = 14;
     const larguraTexto = PAGE_W - RIGHT_SAFE - LEFT;
     const nome = `${participante.fullName}${participante.rg ? ` RG - ${participante.rg}` : ''}`;
 
@@ -185,7 +185,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     const linhas = [...wrap(abertura, regular, corpo, larguraTexto), fecho.split(' ')];
     y = drawJustified(page, linhas, {
       x: LEFT, y, size: corpo, font: regular, color: preto,
-      maxWidth: larguraTexto, leading: 24,
+      maxWidth: larguraTexto, leading: 26,
     });
 
     y -= 14;
@@ -227,7 +227,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
       const larguraLinha = Math.min(vao - 26, 170);
       if (bloco.assinatura) {
         // A da responsável técnica é maior: é a assinatura que valida o documento.
-        const altura = bloco.destaque ? 52 : 34;
+        const altura = bloco.destaque ? 74 : 50;
         const largura = Math.min((bloco.assinatura.width / bloco.assinatura.height) * altura, larguraLinha + 30);
         page.drawImage(bloco.assinatura, {
           x: meio - largura / 2, y: baseY + 3, width: largura, height: altura,
@@ -238,14 +238,14 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
         end: { x: meio + larguraLinha / 2, y: baseY },
         thickness: 0.8, color: preto,
       });
-      let linhaY = baseY - 11;
+      let linhaY = baseY - 13;
       for (const texto of bloco.linhas.filter(Boolean)) {
-        const size = 8;
+        const size = 9.5;
         page.drawText(texto, {
           x: meio - regular.widthOfTextAtSize(texto, size) / 2,
           y: linhaY, size, font: regular, color: preto,
         });
-        linhaY -= 10;
+        linhaY -= 12;
       }
     });
   }
