@@ -1381,49 +1381,6 @@ export async function createTraining(input: {
   return { id, code, qrToken };
 }
 
-export async function registerFileMetadata(input: {
-  clientId: string;
-  trainingId: string;
-  files: Array<{ name: string; contentType: string; size: number }>;
-  createdByUserId: string;
-}) {
-  await ensurePortalSchema();
-  const d1 = getD1();
-  const training = await d1
-    .prepare(
-      'SELECT id FROM trainings WHERE id = ? AND client_id = ? LIMIT 1',
-    )
-    .bind(input.trainingId, input.clientId)
-    .first<{ id: string }>();
-  if (!training) throw new Error('Selecione um cliente e treinamento válidos.');
-  const statements = input.files.map((file) => {
-    const id = makeId('file');
-    return d1
-      .prepare(`INSERT INTO files (
-        id, client_id, training_id, name, object_key, content_type,
-        size, kind, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'registered')`)
-      .bind(
-        id,
-        input.clientId,
-        input.trainingId,
-        file.name,
-        `registered/${input.clientId}/${input.trainingId}/${id}`,
-        file.contentType || 'application/octet-stream',
-        file.size,
-        file.contentType.startsWith('image/') ? 'photo' : 'document',
-      );
-  });
-  if (statements.length) await d1.batch(statements);
-  await writeAudit(
-    input.createdByUserId,
-    'files.metadata_registered',
-    'training',
-    input.trainingId,
-    { count: statements.length },
-  );
-  return { count: statements.length };
-}
 
 // ---------------------------------------------------------------------------
 // Arquivos com conteúdo real (Vercel Blob)
