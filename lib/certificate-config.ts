@@ -42,8 +42,17 @@ export const TECHNICAL_LEAD = {
   signature: '/images/certificado/assinatura-ana-paula.png',
 };
 
-/** Cidade de emissão que aparece antes das datas. */
+/** Reserva: só vale quando o cliente ainda não tem município cadastrado. */
 export const ISSUING_CITY = 'São Paulo';
+
+/**
+ * Cidade que aparece antes das datas nos três documentos. Sai do endereço da
+ * edificação, que é onde o treinamento aconteceu — deixar fixo fazia todo
+ * documento sair como São Paulo por mais que o endereço do cliente mudasse.
+ */
+export function issuingCity(client: { city?: string }) {
+  return client.city?.trim() || ISSUING_CITY;
+}
 
 const MESES = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',

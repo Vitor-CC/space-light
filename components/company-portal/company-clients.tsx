@@ -59,11 +59,11 @@ function ClientAddress({ client, notify, reload }: { client: CompanyClient; noti
     </div>
 
     {aberto ? <form onSubmit={salvar} className="mt-4 grid gap-3 border border-black/10 bg-[#f7f7f4] p-4 sm:grid-cols-2">
-      <label className="sm:col-span-2"><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Logradouro e número</span><Input value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} placeholder="Rua São Severo, 408" className={fieldClass} /></label>
-      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Bairro</span><Input value={draft.district} onChange={(e) => setDraft({ ...draft, district: e.target.value })} placeholder="Vila Ré" className={fieldClass} /></label>
-      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">CEP</span><Input value={draft.postalCode} onChange={(e) => setDraft({ ...draft, postalCode: e.target.value })} placeholder="03670-000" className={fieldClass} /></label>
-      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Município</span><Input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="São Paulo" className={fieldClass} /></label>
-      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">UF</span><Input value={draft.state} onChange={(e) => setDraft({ ...draft, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="SP" maxLength={2} className={fieldClass} /></label>
+      <label className="sm:col-span-2"><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Logradouro e número</span><Input value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} placeholder="Ex.: Rua das Palmeiras, 120" className={fieldClass} /></label>
+      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Bairro</span><Input value={draft.district} onChange={(e) => setDraft({ ...draft, district: e.target.value })} placeholder="Ex.: Centro" className={fieldClass} /></label>
+      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">CEP</span><Input value={draft.postalCode} onChange={(e) => setDraft({ ...draft, postalCode: e.target.value })} placeholder="Ex.: 01000-000" className={fieldClass} /></label>
+      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Município</span><Input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="Ex.: São Paulo" className={fieldClass} /></label>
+      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">UF</span><Input value={draft.state} onChange={(e) => setDraft({ ...draft, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="Ex.: SP" maxLength={2} className={fieldClass} /></label>
       <Button type="submit" disabled={salvando} className="mt-1 h-11 rounded-none bg-[#f2ad19] text-[9px] font-extrabold uppercase tracking-[.12em] text-black hover:bg-[#ff9900] sm:col-span-2">
         {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar endereço
       </Button>

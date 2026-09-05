@@ -6,7 +6,7 @@ import type { PDFFont, PDFImage, PDFPage } from 'pdf-lib';
 
 import type { CertificateData } from '@/db/company-repository';
 import {
-  ISSUING_CITY,
+  issuingCity,
   TECHNICAL_LEAD,
   certificateSetup,
   formatCertificateDates,
@@ -232,7 +232,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   // Data e assinaturas: se não couberem, vão para a página seguinte.
   if (y < 235) novaPagina();
   y -= 32;
-  const linhaData = `${ISSUING_CITY}, ${formatCertificateDates(data.training.dates)}.`;
+  const linhaData = `${issuingCity(data.client)}, ${formatCertificateDates(data.training.dates)}.`;
   page.drawText(linhaData, {
     x: PAGE_W - MARGIN - regular.widthOfTextAtSize(linhaData, corpo),
     y, size: corpo, font: regular, color: PRETO,
