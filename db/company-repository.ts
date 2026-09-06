@@ -54,10 +54,46 @@ function rows<T>(result: DatabaseResult<T>): T[] {
   return result.results ?? [];
 }
 
+/**
+ * Versão do schema abaixo. AUMENTE ESTE NÚMERO ao acrescentar qualquer tabela,
+ * índice ou coluna nova — o banco que já estiver nesta versão pula a migração
+ * inteira, então sem o incremento a mudança não chega a quem já tem dados.
+ *
+ * Existe porque a migração custa uma ida ao banco por verificação de coluna, e
+ * em produção (Turso, pela rede) isso somava ~15 idas em sequência a cada
+ * arranque frio da função, antes de qualquer trabalho útil.
+ */
+const SCHEMA_VERSION = 1;
+
+/** Lê os marcadores de controle criando a tabela deles na mesma ida. */
+async function lerMarcadores(d1: DatabaseBinding) {
+  const [, gravados] = await d1.batch([
+    d1.prepare(`CREATE TABLE IF NOT EXISTS schema_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )`),
+    d1.prepare('SELECT key, value FROM schema_meta'),
+  ]);
+  const mapa = new Map<string, string>();
+  for (const linha of rows<{ key: string; value: string }>(gravados as DatabaseResult<{ key: string; value: string }>)) {
+    mapa.set(linha.key, linha.value);
+  }
+  return mapa;
+}
+
 export function ensurePortalSchema(): Promise<void> {
   if (schemaPromise) return schemaPromise;
   const d1 = getD1();
   schemaPromise = (async () => {
+    const ownerEmailAtual = (process.env.SPACE_ADMIN_EMAIL ?? '').trim().toLowerCase();
+    const marcadores = await lerMarcadores(d1);
+    // Banco já na versão corrente e com o mesmo dono configurado: nada a fazer.
+    if (
+      Number(marcadores.get('version') ?? 0) >= SCHEMA_VERSION &&
+      (marcadores.get('owner_email') ?? '') === ownerEmailAtual
+    ) {
+      return;
+    }
     await d1.batch([
       d1.prepare(`CREATE TABLE IF NOT EXISTS clients (
         id TEXT PRIMARY KEY,
@@ -273,38 +309,47 @@ export function ensurePortalSchema(): Promise<void> {
       ),
     ]);
 
-    await ensureColumn(d1, 'users', 'instructor_id',
-      'ALTER TABLE users ADD COLUMN instructor_id TEXT');
-    await ensureColumn(d1, 'trainings', 'instructor_id',
-      'ALTER TABLE trainings ADD COLUMN instructor_id TEXT');
-    await ensureColumn(d1, 'users', 'is_owner',
-      'ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0');
-    const ownerEmail = (process.env.SPACE_ADMIN_EMAIL ?? '').trim().toLowerCase();
-    if (ownerEmail) {
+    // Colunas acrescentadas depois da criação original das tabelas.
+    // Antes cada uma custava um PRAGMA próprio, em sequência, repetindo a mesma
+    // tabela até cinco vezes; agora é uma leitura por tabela, em paralelo.
+    const COLUNAS_EXTRAS: { tabela: string; coluna: string; alter: string }[] = [
+      { tabela: 'users', coluna: 'instructor_id', alter: 'ALTER TABLE users ADD COLUMN instructor_id TEXT' },
+      { tabela: 'users', coluna: 'is_owner', alter: 'ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0' },
+      { tabela: 'trainings', coluna: 'instructor_id', alter: 'ALTER TABLE trainings ADD COLUMN instructor_id TEXT' },
+      { tabela: 'trainings', coluna: 'training_dates', alter: "ALTER TABLE trainings ADD COLUMN training_dates TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'trainings', coluna: 'content_program', alter: "ALTER TABLE trainings ADD COLUMN content_program TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'participants', coluna: 'rg', alter: "ALTER TABLE participants ADD COLUMN rg TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'participants', coluna: 'birth_date', alter: "ALTER TABLE participants ADD COLUMN birth_date TEXT NOT NULL DEFAULT ''" },
+      // Endereço da edificação: sai impresso no atestado de treinamento.
+      { tabela: 'clients', coluna: 'address', alter: "ALTER TABLE clients ADD COLUMN address TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'clients', coluna: 'district', alter: "ALTER TABLE clients ADD COLUMN district TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'clients', coluna: 'city', alter: "ALTER TABLE clients ADD COLUMN city TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'clients', coluna: 'state', alter: "ALTER TABLE clients ADD COLUMN state TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'clients', coluna: 'postal_code', alter: "ALTER TABLE clients ADD COLUMN postal_code TEXT NOT NULL DEFAULT ''" },
+    ];
+    const tabelas = [...new Set(COLUNAS_EXTRAS.map((item) => item.tabela))];
+    const existentes = new Map(
+      await Promise.all(
+        tabelas.map(async (tabela) => {
+          const info = await d1.prepare(`PRAGMA table_info(${tabela})`).all<{ name: string }>();
+          return [tabela, new Set(rows(info).map((coluna) => coluna.name))] as const;
+        }),
+      ),
+    );
+    const faltando = COLUNAS_EXTRAS.filter(
+      (item) => !existentes.get(item.tabela)?.has(item.coluna),
+    );
+    // ALTER TABLE não aceita "IF NOT EXISTS", por isso a checagem acima.
+    if (faltando.length > 0) {
+      await d1.batch(faltando.map((item) => d1.prepare(item.alter)));
+    }
+
+    if (ownerEmailAtual) {
       await d1
         .prepare(`UPDATE users SET is_owner = 1 WHERE lower(email) = ? AND role = 'admin'`)
-        .bind(ownerEmail)
+        .bind(ownerEmailAtual)
         .run();
     }
-    await ensureColumn(d1, 'participants', 'rg',
-      "ALTER TABLE participants ADD COLUMN rg TEXT NOT NULL DEFAULT ''");
-    await ensureColumn(d1, 'participants', 'birth_date',
-      "ALTER TABLE participants ADD COLUMN birth_date TEXT NOT NULL DEFAULT ''");
-    await ensureColumn(d1, 'trainings', 'training_dates',
-      "ALTER TABLE trainings ADD COLUMN training_dates TEXT NOT NULL DEFAULT ''");
-    await ensureColumn(d1, 'trainings', 'content_program',
-      "ALTER TABLE trainings ADD COLUMN content_program TEXT NOT NULL DEFAULT ''");
-    // Endereço da edificação: sai impresso no atestado de treinamento.
-    await ensureColumn(d1, 'clients', 'address',
-      "ALTER TABLE clients ADD COLUMN address TEXT NOT NULL DEFAULT ''");
-    await ensureColumn(d1, 'clients', 'district',
-      "ALTER TABLE clients ADD COLUMN district TEXT NOT NULL DEFAULT ''");
-    await ensureColumn(d1, 'clients', 'city',
-      "ALTER TABLE clients ADD COLUMN city TEXT NOT NULL DEFAULT ''");
-    await ensureColumn(d1, 'clients', 'state',
-      "ALTER TABLE clients ADD COLUMN state TEXT NOT NULL DEFAULT ''");
-    await ensureColumn(d1, 'clients', 'postal_code',
-      "ALTER TABLE clients ADD COLUMN postal_code TEXT NOT NULL DEFAULT ''");
 
     await d1.batch([
       d1.prepare(
@@ -325,6 +370,19 @@ export function ensurePortalSchema(): Promise<void> {
     if (!process.env.TURSO_DATABASE_URL) {
       await d1.prepare('PRAGMA optimize').run();
     }
+
+    // Só no fim: se algo acima falhar, a versão não é gravada e o próximo
+    // arranque refaz a migração inteira em vez de pular por engano.
+    await d1.batch([
+      d1
+        .prepare(`INSERT INTO schema_meta (key, value) VALUES ('version', ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+        .bind(String(SCHEMA_VERSION)),
+      d1
+        .prepare(`INSERT INTO schema_meta (key, value) VALUES ('owner_email', ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+        .bind(ownerEmailAtual),
+    ]);
   })().catch((error) => {
       schemaPromise = null;
       throw error;
@@ -332,17 +390,6 @@ export function ensurePortalSchema(): Promise<void> {
   return schemaPromise;
 }
 
-async function ensureColumn(
-  d1: DatabaseBinding,
-  table: string,
-  column: string,
-  alterSql: string,
-) {
-  const result = await d1.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
-  if (!rows(result).some((item) => item.name === column)) {
-    await d1.prepare(alterSql).run();
-  }
-}
 
 export async function findUserByEmail(
   email: string,
