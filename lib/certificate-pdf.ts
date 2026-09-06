@@ -6,7 +6,7 @@ import type { PDFFont, PDFImage, PDFPage } from 'pdf-lib';
 
 import type { CertificateData } from '@/db/company-repository';
 import {
-  issuingCity,
+  ISSUING_CITY,
   TECHNICAL_LEAD,
   certificateSetup,
   formatCertificateDates,
@@ -357,7 +357,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     });
 
     y -= 26;
-    const linhaData = `${issuingCity(data.client)}, ${dataLinha}.`;
+    const linhaData = `${ISSUING_CITY}, ${dataLinha}.`;
     page.drawText(linhaData, {
       x: PAGE_W - RIGHT_SAFE - bold.widthOfTextAtSize(linhaData, corpo),
       y, size: corpo, font: bold, color: preto,
@@ -502,7 +502,7 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
   page.drawText(razao, { x: centro - bold.widthOfTextAtSize(razao, corpo) / 2, y, size: corpo, font: bold, color: preto });
 
   y -= 26;
-  const linhaData = `${issuingCity(data.client)}, ${formatCertificateDates(data.training.dates)}.`;
+  const linhaData = `${ISSUING_CITY}, ${formatCertificateDates(data.training.dates)}.`;
   page.drawText(linhaData, {
     x: PAGE_W - RIGHT_SAFE - bold.widthOfTextAtSize(linhaData, corpo),
     y, size: corpo, font: bold, color: preto,

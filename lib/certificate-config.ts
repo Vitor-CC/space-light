@@ -42,13 +42,16 @@ export const TECHNICAL_LEAD = {
   signature: '/images/certificado/assinatura-ana-paula.png',
 };
 
-/** Reserva: só vale quando o cliente ainda não tem município cadastrado. */
+/**
+ * Cidade dos CERTIFICADOS (aluno e empresa): quem emite é a Space Light, de
+ * São Paulo, então aqui é fixo mesmo — não acompanha o endereço do cliente.
+ */
 export const ISSUING_CITY = 'São Paulo';
 
 /**
- * Cidade que aparece antes das datas nos três documentos. Sai do endereço da
- * edificação, que é onde o treinamento aconteceu — deixar fixo fazia todo
- * documento sair como São Paulo por mais que o endereço do cliente mudasse.
+ * Cidade do ATESTADO, que é diferente de propósito: o atestado descreve a
+ * edificação do cliente, então a linha de local e data sai do município
+ * cadastrado. São Paulo só entra como reserva, para cliente sem endereço.
  */
 export function issuingCity(client: { city?: string }) {
   return client.city?.trim() || ISSUING_CITY;
