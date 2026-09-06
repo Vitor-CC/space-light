@@ -15,6 +15,7 @@ import Image from 'next/image';
 
 import { buttonVariants } from '@/components/ui/button';
 import { MobileNav } from '@/components/site/mobile-nav';
+import { SITE_URL } from '@/lib/site-url';
 import { cn } from '@/lib/utils';
 
 const trainings = [
@@ -120,9 +121,32 @@ const fieldImages = [
   },
 ];
 
+/**
+ * Ficha da empresa para o Google. Sem isto ele monta o resultado adivinhando a
+ * partir do texto da página — foi assim que virou "Space Light Engenharia -
+ * Home". Só entram dados conferíveis: nada de endereço ou CNPJ chutado.
+ */
+const dadosDaEmpresa = {
+  '@context': 'https://schema.org',
+  '@type': 'ProfessionalService',
+  name: 'Space Light Engenharia',
+  url: SITE_URL,
+  logo: `${SITE_URL}/images/branding/space-light-logo-oficial.png`,
+  image: `${SITE_URL}/og.png`,
+  description:
+    'Treinamentos de Normas Regulamentadoras com teoria aplicada, prática supervisionada e conteúdo adaptado à realidade da sua empresa.',
+  telephone: '+5511941318646',
+  inLanguage: 'pt-BR',
+  knowsAbout: trainings.map((item) => `${item.nr} — ${item.title}`),
+};
+
 export default function Home() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5f5f2] text-[#0b0b0b]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(dadosDaEmpresa) }}
+      />
       <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-black/85 text-white backdrop-blur-xl">
         <div className="page-shell flex h-[76px] items-center justify-between gap-8">
           <a
