@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
 
+import { redirectInterno } from '@/lib/safe-redirect';
+
 import { selfRegisterClient } from '@/db/company-repository';
 import { hashPassword } from '@/lib/password-auth';
 
 function back(request: Request, status: string) {
-  return NextResponse.redirect(
-    new URL(`/cliente/cadastro?status=${encodeURIComponent(status)}`, request.url),
-    303,
-  );
+  return redirectInterno(request, `/cliente/cadastro?status=${encodeURIComponent(status)}`);
 }
 
 export async function POST(request: Request) {

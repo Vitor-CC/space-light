@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { redirectInterno } from '@/lib/safe-redirect';
 
 import { createPasswordResetToken, findUserByEmail } from '@/db/company-repository';
 import { isMailerConfigured, sendPasswordResetEmail } from '@/lib/mailer';
@@ -21,15 +21,15 @@ export async function POST(request: Request) {
   const back = `/esqueci-senha${portal ? `?portal=${encodeURIComponent(portal)}&` : '?'}status=`;
 
   if (!email) {
-    return NextResponse.redirect(new URL(`${back}invalid`, request.url), 303);
+    return redirectInterno(request, `${back}invalid`);
   }
   if (!isMailerConfigured()) {
-    return NextResponse.redirect(new URL(`${back}unavailable`, request.url), 303);
+    return redirectInterno(request, `${back}unavailable`);
   }
 
   // A resposta é sempre a mesma, exista ou não a conta: dizer "este e-mail não
   // existe" entregaria a estranhos quem é cliente da Space.
-  const done = NextResponse.redirect(new URL(`${back}sent`, request.url), 303);
+  const done = redirectInterno(request, `${back}sent`);
 
   try {
     const user = await findUserByEmail(email);

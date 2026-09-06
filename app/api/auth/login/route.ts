@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { redirectInterno } from '@/lib/safe-redirect';
 
 import { getAuthEnvironment } from '@/db';
 import {
@@ -15,7 +15,7 @@ import {
 import { portalPathForRole } from '@/lib/app-auth';
 
 function destination(request: Request, path: string) {
-  return NextResponse.redirect(new URL(path, request.url), 303);
+  return redirectInterno(request, path);
 }
 
 export async function POST(request: Request) {
