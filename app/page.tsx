@@ -191,7 +191,7 @@ export default function Home() {
               'h-11 max-lg:hidden rounded-none bg-[#f2ad19] px-5 text-xs font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]',
             )}
           >
-            Solicitar proposta <ArrowUpRight className="size-4" />
+            Solicitar proposta
           </a>
 
           <MobileNav />
@@ -279,9 +279,6 @@ export default function Home() {
         <div className="page-shell">
           <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
             <div>
-              <span className="eyebrow text-[#8a6107]">
-                Treinamentos regulamentares
-              </span>
               <h2 className="section-title mt-4">
                 Conhecimento técnico. Aplicação imediata.
               </h2>
@@ -312,9 +309,6 @@ export default function Home() {
                   <span className="font-heading text-3xl font-black tracking-[-0.01em] text-[#f2ad19]">
                     {training.nr}
                   </span>
-                  <span className="text-[10px] font-bold tracking-[0.16em] text-white/50">
-                    0{index + 1}
-                  </span>
                 </div>
                 <div className="absolute inset-x-0 bottom-0 p-6 md:p-7">
                   <h3 className="max-w-sm text-2xl font-extrabold uppercase tracking-[0.03em] leading-tight">
@@ -336,7 +330,7 @@ export default function Home() {
             <div className="flex items-center gap-4">
               <ShieldCheck className="size-8 text-[#f2ad19]" />
               <div>
-                <span className="block text-xs font-bold uppercase tracking-[0.1em] text-[#f2ad19]">
+                <span className="block text-sm text-white/60">
                   Também oferecemos
                 </span>
                 <strong className="mt-1 block text-xl uppercase tracking-[0.04em]">
@@ -348,7 +342,7 @@ export default function Home() {
               href="#contato"
               className="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.1em] hover:text-[#f2ad19]"
             >
-              Consultar programa <ArrowUpRight className="size-4" />
+              Consultar programa
             </a>
           </div>
         </div>
@@ -368,7 +362,6 @@ export default function Home() {
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(0,0,0,.98),rgba(0,0,0,.78)_58%,rgba(0,0,0,.48))]" />
         <div className="page-shell grid gap-16 lg:grid-cols-[1.35fr_.65fr] lg:items-end">
           <div>
-            <span className="eyebrow text-[#f2ad19]">Nosso ponto de vista</span>
             <h2 className="mt-7 max-w-[1040px] text-[clamp(3rem,7.7vw,8.8rem)] font-black uppercase leading-[0.84] tracking-normal md:tracking-[-0.01em] xl:tracking-[-0.02em]">
               Segurança não se aprende só na teoria.
             </h2>
@@ -401,7 +394,6 @@ export default function Home() {
           </div>
 
           <div className="lg:pl-12">
-            <span className="eyebrow text-[#8a6107]">Sobre a Space Light</span>
             <h2 className="section-title mt-5">
               Treinar pessoas é cuidar da operação inteira.
             </h2>
@@ -432,7 +424,7 @@ export default function Home() {
               href="#contato"
               className="mt-9 inline-flex items-center gap-3 border-b-2 border-[#f2ad19] pb-2 text-xs font-extrabold uppercase tracking-[0.1em] transition hover:gap-5"
             >
-              Conversar sobre sua equipe <ArrowUpRight className="size-4" />
+              Conversar sobre sua equipe
             </a>
           </div>
         </div>
@@ -442,7 +434,6 @@ export default function Home() {
         <div className="page-shell">
           <div className="grid gap-10 lg:grid-cols-[1fr_.8fr] lg:items-end">
             <div>
-              <span className="eyebrow text-[#f2ad19]">Como fazemos</span>
               <h2 className="section-title mt-5">
                 Um processo que transforma conteúdo em conduta.
               </h2>
@@ -481,7 +472,6 @@ export default function Home() {
         <div className="page-shell">
           <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
             <div>
-              <span className="eyebrow text-[#8a6107]">Treinamento em campo</span>
               <h2 className="section-title mt-5">Onde a prática muda a percepção.</h2>
             </div>
             <p className="max-w-sm text-base leading-relaxed text-[#666]">
@@ -511,7 +501,7 @@ export default function Home() {
                   <span className="font-heading text-xl font-extrabold uppercase tracking-[0.04em]">
                     {item.label}
                   </span>
-                  <span className="eyebrow text-[#f2ad19]">0{index + 1}</span>
+                  <span className="font-heading text-sm font-extrabold text-[#f2ad19]">0{index + 1}</span>
                 </figcaption>
               </figure>
             ))}
@@ -522,7 +512,6 @@ export default function Home() {
       <section className="bg-white py-24 md:py-32">
         <div className="page-shell">
           <div className="mx-auto max-w-4xl text-center">
-            <span className="eyebrow text-[#8a6107]">Por que a Space Light</span>
             <h2 className="section-title mx-auto mt-5">
               Técnica para proteger. Proximidade para engajar.
             </h2>
@@ -580,7 +569,6 @@ export default function Home() {
         <div className="hero-grid absolute inset-0 -z-10 opacity-20" />
         <div className="page-shell grid gap-14 lg:grid-cols-[1.25fr_.75fr] lg:items-end">
           <div>
-            <span className="eyebrow text-[#f2ad19]">Vamos conversar</span>
             <h2 className="mt-6 max-w-[900px] text-[clamp(3.2rem,7vw,8rem)] font-black uppercase leading-[0.84] tracking-normal md:tracking-[-0.01em] xl:tracking-[-0.02em]">
               Sua equipe pronta para trabalhar com mais segurança.
             </h2>
