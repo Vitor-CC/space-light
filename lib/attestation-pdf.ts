@@ -11,6 +11,7 @@ import {
   certificateSetup,
   formatCertificateDates,
 } from '@/lib/certificate-config';
+import { signatureBox } from '@/lib/certificate-pdf';
 
 /** O atestado é A4 retrato: é um documento de texto com tabela. */
 const PAGE_W = 595.28;
@@ -244,21 +245,18 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
     {
       assinatura: assinaturaInstrutor,
       linhas: ['Técnico de Segurança', data.instructor.name, data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
-      destaque: false,
     },
     {
       assinatura: assinaturaResponsavel,
       linhas: [TECHNICAL_LEAD.role, TECHNICAL_LEAD.name, `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
-      destaque: true,
     },
   ];
   assinaturas.forEach((bloco, indice) => {
     const meio = MARGIN + vao * indice + vao / 2;
     const larguraLinha = Math.min(vao - 30, 200);
     if (bloco.assinatura) {
-      const altura = bloco.destaque ? 88 : 62;
-      const largura = Math.min((bloco.assinatura.width / bloco.assinatura.height) * altura, larguraLinha + 20);
-      page.drawImage(bloco.assinatura, { x: meio - largura / 2, y: baseY + 3, width: largura, height: altura });
+      const { width, height } = signatureBox(bloco.assinatura, vao);
+      page.drawImage(bloco.assinatura, { x: meio - width / 2, y: baseY + 3, width, height });
     }
     page.drawLine({
       start: { x: meio - larguraLinha / 2, y: baseY },

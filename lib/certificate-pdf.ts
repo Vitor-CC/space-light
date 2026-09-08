@@ -87,7 +87,27 @@ function drawJustified(
   return y;
 }
 
-type SignatureBlock = { assinatura: PDFImage | null; linhas: string[]; destaque?: boolean };
+type SignatureBlock = { assinatura: PDFImage | null; linhas: string[] };
+
+/** Altura máxima de qualquer assinatura, seja da responsável técnica ou do instrutor. */
+const ASSINATURA_ALTURA_MAX = 96;
+
+/**
+ * Encaixa a assinatura na coluna preservando a proporção.
+ *
+ * A da responsável técnica é um arquivo conhecido; a do instrutor é enviada por
+ * ele e chega em proporção imprevisível. Limitar só a largura, como era antes,
+ * achatava assinatura larga (a altura ficava fixa) e ainda a desenhava menor
+ * que a da engenheira, porque as duas usavam alturas diferentes.
+ */
+export function signatureBox(assinatura: PDFImage, vao: number) {
+  const larguraMax = vao - 16;
+  const escala = Math.min(
+    ASSINATURA_ALTURA_MAX / assinatura.height,
+    larguraMax / assinatura.width,
+  );
+  return { width: assinatura.width * escala, height: assinatura.height * escala };
+}
 
 /** Fila de assinaturas na base da página, distribuídas na largura útil. */
 function drawSignatureRow(
@@ -106,11 +126,9 @@ function drawSignatureRow(
     const meio = options.left + vao * indice + vao / 2;
     const larguraLinha = Math.min(vao - 26, 170);
     if (bloco.assinatura) {
-      // A da responsável técnica é maior: é a assinatura que valida o documento.
-      const altura = bloco.destaque ? 96 : 68;
-      const largura = Math.min((bloco.assinatura.width / bloco.assinatura.height) * altura, larguraLinha + 30);
+      const { width, height } = signatureBox(bloco.assinatura, vao);
       page.drawImage(bloco.assinatura, {
-        x: meio - largura / 2, y: options.baseY + 3, width: largura, height: altura,
+        x: meio - width / 2, y: options.baseY + 3, width, height,
       });
     }
     page.drawLine({
@@ -367,47 +385,28 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     const baseY = 66;
     const colunas = 3;
     const vao = (PAGE_W - RIGHT_SAFE - LEFT) / colunas;
-    const blocos: { assinatura: PDFImage | null; linhas: string[]; destaque?: boolean }[] = [
-      {
-        assinatura: assinaturaResponsavel,
-        destaque: true,
-        linhas: [TECHNICAL_LEAD.role, TECHNICAL_LEAD.name, `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
-      },
-      {
-        assinatura: null,
-        linhas: [participante.fullName, participante.rg ? `RG - ${participante.rg}` : ''],
-      },
-      {
-        assinatura: assinaturaInstrutor,
-        linhas: ['Técnico de Segurança', data.instructor.name, data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
-      },
-    ];
-
-    blocos.forEach((bloco, indice) => {
-      const meio = LEFT + vao * indice + vao / 2;
-      const larguraLinha = Math.min(vao - 26, 170);
-      if (bloco.assinatura) {
-        // A da responsável técnica é maior: é a assinatura que valida o documento.
-        const altura = bloco.destaque ? 96 : 68;
-        const largura = Math.min((bloco.assinatura.width / bloco.assinatura.height) * altura, larguraLinha + 30);
-        page.drawImage(bloco.assinatura, {
-          x: meio - largura / 2, y: baseY + 3, width: largura, height: altura,
-        });
-      }
-      page.drawLine({
-        start: { x: meio - larguraLinha / 2, y: baseY },
-        end: { x: meio + larguraLinha / 2, y: baseY },
-        thickness: 0.8, color: preto,
-      });
-      let linhaY = baseY - 13;
-      for (const texto of bloco.linhas.filter(Boolean)) {
-        const size = 9.5;
-        page.drawText(texto, {
-          x: meio - regular.widthOfTextAtSize(texto, size) / 2,
-          y: linhaY, size, font: regular, color: preto,
-        });
-        linhaY -= 12;
-      }
+    // Mesma função das outras páginas: antes havia uma cópia desta fila aqui,
+    // e uma correção de assinatura podia valer num documento e não no outro.
+    drawSignatureRow(page, {
+      baseY,
+      left: LEFT,
+      width: vao * colunas,
+      font: regular,
+      color: preto,
+      blocks: [
+        {
+          assinatura: assinaturaResponsavel,
+          linhas: [TECHNICAL_LEAD.role, TECHNICAL_LEAD.name, `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
+        },
+        {
+          assinatura: null,
+          linhas: [participante.fullName, participante.rg ? `RG - ${participante.rg}` : ''],
+        },
+        {
+          assinatura: assinaturaInstrutor,
+          linhas: ['Técnico de Segurança', data.instructor.name, data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
+        },
+      ],
     });
   }
 
@@ -523,7 +522,6 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
       },
       {
         assinatura: assinaturaResponsavel,
-        destaque: true,
         linhas: [TECHNICAL_LEAD.role, TECHNICAL_LEAD.name, `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
       },
     ],
