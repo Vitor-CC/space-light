@@ -1,6 +1,8 @@
 import {
   findInstructorDocumentForUser,
+  deleteFileRow,
   findTrainingClientId,
+  listTrainingFiles,
   getCertificateData,
   replaceCertificateDocument,
 } from '@/db/company-repository';
@@ -10,6 +12,7 @@ import { attestationFileName, buildAttestationPdf } from '@/lib/attestation-pdf'
 import {
   buildCertificatePdf,
   buildCompanyCertificatePdf,
+  PREFIXO_CERTIFICADO_ALUNO,
   certificateFileName,
   companyCertificateFileName,
 } from '@/lib/certificate-pdf';
@@ -68,11 +71,22 @@ export async function publishCertificateDocument(input: {
 
   const instructorSignature = await lerAssinaturaDoInstrutor(data, input.user);
 
-  const documentos: { nome: string; bytes: Uint8Array }[] = [
-    { nome: certificateFileName(data), bytes: await buildCertificatePdf({ data, instructorSignature }) },
+  // Um certificado por aluno. Cada PDF leva só a página daquela pessoa, mais o
+  // conteúdo programático — é o documento que ela recebe na mão.
+  const documentos: { nome: string; bytes: Uint8Array }[] = [];
+  for (const participante of data.participants) {
+    documentos.push({
+      nome: certificateFileName(data, participante),
+      bytes: await buildCertificatePdf({
+        data: { ...data, participants: [participante] },
+        instructorSignature,
+      }),
+    });
+  }
+  documentos.push(
     { nome: companyCertificateFileName(data), bytes: await buildCompanyCertificatePdf({ data, instructorSignature }) },
     { nome: attestationFileName(data), bytes: await buildAttestationPdf({ data, instructorSignature }) },
-  ];
+  );
 
   const publicados: PublishedDocument[] = [];
   for (const [indice, documento] of documentos.entries()) {
@@ -97,6 +111,20 @@ export async function publishCertificateDocument(input: {
       try { await deleteStoredFile(antigo); } catch { /* órfão é melhor que perder o novo */ }
     }
     publicados.push({ name: documento.nome, fileId: id });
+  }
+
+  // Quem saiu da lista de presença não pode continuar com certificado guardado
+  // na turma. Também recolhe o arquivo único do formato antigo, de quando todos
+  // os alunos vinham num PDF só.
+  const emitidos = new Set(publicados.map((item) => item.name));
+  for (const arquivo of await listTrainingFiles(input.trainingId)) {
+    const ehCertificadoDeAluno =
+      arquivo.name.startsWith(PREFIXO_CERTIFICADO_ALUNO) || arquivo.name.startsWith('certificados-');
+    if (arquivo.kind !== 'document' || !ehCertificadoDeAluno || emitidos.has(arquivo.name)) continue;
+    try {
+      await deleteFileRow({ fileId: arquivo.id, byUserId: input.user.id });
+      await deleteStoredFile(arquivo.object_key);
+    } catch { /* deixar sobrando é melhor que derrubar a emissão inteira */ }
   }
 
   return { ok: true, documents: publicados };

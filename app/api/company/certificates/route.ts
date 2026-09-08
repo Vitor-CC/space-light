@@ -3,6 +3,12 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/app-auth';
 import { publishCertificateDocument } from '@/lib/certificate-publish';
 
+/**
+ * Cada aluno vira um PDF, e cada PDF embute ~574 KB de imagens do modelo:
+ * uma turma de 30 leva perto de 25s. O padrão da Vercel corta antes disso.
+ */
+export const maxDuration = 60;
+
 /** A Space gera (ou regera) o PDF de certificados de uma turma. */
 export async function POST(request: Request) {
   const user = await getCurrentUser();

@@ -534,15 +534,34 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
   return pdf.save();
 }
 
-export function companyCertificateFileName(data: CertificateData) {
-  return certificateFileName(data).replace('certificados-', 'certificado-empresa-');
-}
-
-export function certificateFileName(data: CertificateData) {
-  const limpo = `${data.training.nr}-${data.training.title}`
+/** Tira acento e pontuação: nome de arquivo tem que sobreviver a qualquer sistema. */
+function semAcento(texto: string) {
+  return texto
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-  return `certificados-${limpo.toLowerCase()}.pdf`;
+    .replace(/(^-|-$)/g, '')
+    .toLowerCase();
+}
+
+/** Prefixo de cada papel. São disjuntos de propósito: a aba Certificados
+ *  encontra os documentos pelo começo do nome, e "certificado-" sozinho pegaria
+ *  também o da empresa. */
+export const PREFIXO_CERTIFICADO_ALUNO = 'certificado-aluno-';
+export const PREFIXO_CERTIFICADO_EMPRESA = 'certificado-empresa-';
+
+export function companyCertificateFileName(data: CertificateData) {
+  return `${PREFIXO_CERTIFICADO_EMPRESA}${semAcento(`${data.training.nr}-${data.training.title}`)}.pdf`;
+}
+
+/**
+ * Um arquivo por aluno, com o nome dele no nome do arquivo — é assim que a
+ * equipe acha o certificado certo sem abrir um por um, e é assim que o cliente
+ * recebe já separado.
+ */
+export function certificateFileName(
+  data: CertificateData,
+  participante: { fullName: string },
+) {
+  return `${PREFIXO_CERTIFICADO_ALUNO}${semAcento(participante.fullName)}-${semAcento(data.training.nr)}.pdf`;
 }
