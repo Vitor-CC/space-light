@@ -8,7 +8,6 @@ import {
 } from '@/db/company-repository';
 import { getCurrentUser } from '@/lib/app-auth';
 import {
-  ACCEPTED_DOCUMENT_TYPES,
   ACCEPTED_PHOTO_TYPES,
   MAX_UPLOAD_BYTES,
   isStorageConfigured,
@@ -36,9 +35,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if ('error' in context) {
     return NextResponse.json({ error: context.error }, { status: context.status });
   }
-  // O instrutor só enxerga as fotos que ele mesmo usa para comprovar a lista.
-  // Documento do cliente é assunto da Space Light, não dele.
-  const files = (await listTrainingFiles(id)).filter((file) => file.kind === 'photo');
+  // O instrutor enxerga só a lista assinada que ele mesmo enviou. Documento do
+  // cliente é assunto da Space Light, não dele. 'photo' entra por causa das
+  // listas enviadas antes de a lista virar documento.
+  const files = (await listTrainingFiles(id)).filter(
+    (file) => file.kind === 'attendance' || file.kind === 'photo',
+  );
   return NextResponse.json({
     files: files.map((file) => ({
       id: file.id,
@@ -67,12 +69,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const form = await request.formData();
   const file = form.get('file');
-  const kind = String(form.get('kind') ?? 'photo') === 'document' ? 'document' : 'photo';
+  // Esta rota existe só para a lista de presença assinada. Ela é arquivada como
+  // documento do treinamento, não na galeria de fotos: é comprovante, não
+  // registro da aula.
   if (!(file instanceof File) || file.size === 0) {
-    return NextResponse.json(
-      { error: kind === 'photo' ? 'Escolha a foto da lista assinada.' : 'Escolha o documento.' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Escolha a foto da lista assinada.' }, { status: 400 });
   }
   if (file.size > MAX_UPLOAD_BYTES) {
     return NextResponse.json(
@@ -81,14 +82,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
   }
   const contentType = file.type || 'application/octet-stream';
-  const accepted = kind === 'photo' ? ACCEPTED_PHOTO_TYPES : ACCEPTED_DOCUMENT_TYPES;
-  if (!accepted.includes(contentType)) {
+  if (!ACCEPTED_PHOTO_TYPES.includes(contentType)) {
     return NextResponse.json(
-      {
-        error: kind === 'photo'
-          ? 'Envie uma imagem: JPG, PNG, WEBP ou HEIC.'
-          : 'Envie um documento: PDF, Word, Excel, CSV ou TXT.',
-      },
+      { error: 'Envie uma imagem: JPG, PNG, WEBP ou HEIC.' },
       { status: 400 },
     );
   }
@@ -99,7 +95,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       clientId: context.training.client_id,
       trainingId: id,
       fileId,
-      name: file.name || (kind === 'photo' ? 'lista-assinada' : 'documento'),
+      name: file.name || 'lista-assinada',
       contentType,
       body: await file.arrayBuffer(),
     });
@@ -107,11 +103,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       fileId,
       clientId: context.training.client_id,
       trainingId: id,
-      name: file.name || (kind === 'photo' ? 'lista-assinada' : 'documento'),
+      name: file.name || 'lista-assinada',
       objectKey,
       contentType,
       size: file.size,
-      kind,
+      kind: 'attendance',
       createdByUserId: context.user.id,
     });
     return NextResponse.json({ id: fileId, name: file.name, size: file.size }, { status: 201 });

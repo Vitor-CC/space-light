@@ -92,12 +92,17 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
     [data.files, clientId, trainingId],
   );
 
-  const visible = useMemo(() => scoped.filter((file) => file.kind === kind), [scoped, kind]);
+  // A lista de presença assinada é comprovante, então mora em Documentos —
+  // misturá-la com as fotos da aula era o que atrapalhava achar as coisas.
+  const pertence = (file: CompanyFile, aba: Kind) =>
+    aba === 'document' ? file.kind === 'document' || file.kind === 'attendance' : file.kind === 'photo';
+
+  const visible = useMemo(() => scoped.filter((file) => pertence(file, kind)), [scoped, kind]);
   const downloadable = useMemo(() => visible.filter((file) => file.status === 'stored'), [visible]);
 
   const counts = useMemo(() => ({
-    photo: scoped.filter((file) => file.kind === 'photo').length,
-    document: scoped.filter((file) => file.kind === 'document').length,
+    photo: scoped.filter((file) => pertence(file, 'photo')).length,
+    document: scoped.filter((file) => pertence(file, 'document')).length,
   }), [scoped]);
 
   const selectedTraining = clientTrainings.find((training) => training.id === trainingId);

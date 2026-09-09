@@ -41,7 +41,7 @@ export function createMockTraining(input: { clientId: string; instructorId: stri
 export async function uploadCompanyFiles(input: {
   clientId: string;
   trainingId: string;
-  kind: 'photo' | 'document';
+  kind: 'photo' | 'document' | 'attendance';
   files: File[];
   onProgress?: (done: number, total: number, name: string) => void;
 }) {

@@ -85,7 +85,7 @@ export type CompanyFile = {
   object_key: string;
   content_type: string;
   size: number;
-  kind: 'photo' | 'document';
+  kind: 'photo' | 'document' | 'attendance';
   status: string;
   created_at: string;
 };

@@ -1965,7 +1965,7 @@ export async function registerStoredFile(input: {
   objectKey: string;
   contentType: string;
   size: number;
-  kind: 'photo' | 'document';
+  kind: 'photo' | 'document' | 'attendance';
   createdByUserId: string;
 }) {
   await ensurePortalSchema();
@@ -2051,7 +2051,9 @@ export async function findFileForUser(input: {
   }
   if (user.role === 'instructor' && user.instructor_id) {
     // Documento do cliente não é do escopo do instrutor, mesmo na turma dele.
-    if (file.kind !== 'photo') return null;
+    // A lista assinada é exceção: foi ele quem enviou, e é o comprovante do
+    // trabalho dele. Fica arquivada como documento, mas continua acessível.
+    if (file.kind !== 'photo' && file.kind !== 'attendance') return null;
     const owned = await getD1()
       .prepare('SELECT id FROM trainings WHERE id = ? AND instructor_id = ? LIMIT 1')
       .bind(file.training_id, user.instructor_id)
@@ -2231,7 +2233,7 @@ export async function getClientPortalData(
          t.duration, t.location, t.instructor, t.status,
          (SELECT count(*) FROM participants p WHERE p.training_id = t.id) AS participant_count,
          (SELECT count(*) FROM files f WHERE f.training_id = t.id AND f.kind = 'photo') AS photo_count,
-         (SELECT count(*) FROM files f WHERE f.training_id = t.id AND f.kind = 'document') AS document_count,
+         (SELECT count(*) FROM files f WHERE f.training_id = t.id AND f.kind IN ('document', 'attendance')) AS document_count,
          (SELECT count(*) FROM certificates ce
           JOIN certificate_batches cb ON cb.id = ce.batch_id
           WHERE cb.training_id = t.id) AS certificate_count
@@ -2326,7 +2328,7 @@ export async function getClientPortalData(
     }));
 
   const documents: ClientDocument[] = rows(fileResult)
-    .filter((item) => item.kind === 'document' && item.status === 'stored')
+    .filter((item) => (item.kind === 'document' || item.kind === 'attendance') && item.status === 'stored')
     .map((item) => ({
       id: item.id,
       clientId,
