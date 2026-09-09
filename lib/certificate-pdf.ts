@@ -382,13 +382,12 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     x += larguraNome;
     page.drawText(sufixo, { x, y, size: corpo, font: regular, color: preto });
 
-    // Como no modelo impresso, "ministrado pela..." fica sozinho na última
-    // linha: as linhas de cima são justificadas de ponta a ponta.
+    // "ministrado pela..." entra no fluxo do parágrafo. Isolado numa linha só,
+    // ele deixava a linha anterior terminando curta e abria um vão no meio do
+    // texto — a quebra tem que cair onde a medida pedir.
     y -= 26;
-    const fecho = 'ministrado pela SPACE LIGHT ENGENHARIA.';
-    const abertura = `com aproveitamento o "${data.training.title.toUpperCase()}", ${setup.legalBasis}`;
-    const linhas = [...wrap(abertura, regular, corpo, larguraTexto), fecho.split(' ')];
-    y = drawJustified(page, linhas, {
+    const paragrafo = `com aproveitamento o "${data.training.title.toUpperCase()}", ${setup.legalBasis} ministrado pela SPACE LIGHT ENGENHARIA.`;
+    y = drawJustified(page, wrap(paragrafo, regular, corpo, larguraTexto), {
       x: LEFT, y, size: corpo, font: regular, color: preto,
       maxWidth: larguraTexto, leading: 26,
     });
@@ -539,9 +538,9 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
     page.drawLine({ start: { x: inicio, y: y - 3 }, end: { x: inicio + larguraNome, y: y - 3 }, thickness: 0.8, color: preto });
     y -= 26;
   }
-  const fecho = 'ministrado pela SPACE LIGHT ENGENHARIA.';
-  const abertura = `concluíram com aproveitamento o "${data.training.title.toUpperCase()}", ${setup.legalBasis}`;
-  y = drawJustified(page, [...wrap(abertura, regular, corpo, larguraTexto), fecho.split(' ')], {
+  // Igual ao certificado do aluno: o fecho corre junto com o resto do parágrafo.
+  const paragrafo = `concluíram com aproveitamento o "${data.training.title.toUpperCase()}", ${setup.legalBasis} ministrado pela SPACE LIGHT ENGENHARIA.`;
+  y = drawJustified(page, wrap(paragrafo, regular, corpo, larguraTexto), {
     x: LEFT, y, size: corpo, font: regular, color: preto, maxWidth: larguraTexto, leading: 26,
   });
 
