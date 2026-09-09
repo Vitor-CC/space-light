@@ -63,7 +63,24 @@ function rows<T>(result: DatabaseResult<T>): T[] {
  * em produção (Turso, pela rede) isso somava ~15 idas em sequência a cada
  * arranque frio da função, antes de qualquer trabalho útil.
  */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
+
+/**
+ * Colunas criadas depois da versão 1 do schema.
+ *
+ * O endereço da edificação foi adicionado por ensureColumn e se perdeu quando a
+ * migração virou marcador de versão: as colunas saíram do ALTER mas não entraram
+ * no CREATE TABLE, então o atestado ficou sem endereço para imprimir. Estão nos
+ * dois lugares agora — aqui, para quem já tem dados, e no CREATE TABLE acima,
+ * para banco novo.
+ */
+const ALTERACOES_APOS_V1 = [
+  "ALTER TABLE clients ADD COLUMN address TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE clients ADD COLUMN district TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE clients ADD COLUMN city TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE clients ADD COLUMN state TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE clients ADD COLUMN postal_code TEXT NOT NULL DEFAULT ''",
+];
 
 /** Lê os marcadores de controle criando a tabela deles na mesma ida. */
 async function lerMarcadores(d1: DatabaseBinding) {
@@ -104,6 +121,11 @@ export function ensurePortalSchema(): Promise<void> {
         contact_name TEXT NOT NULL,
         contact_email TEXT NOT NULL,
         contact_phone TEXT NOT NULL DEFAULT '',
+        address TEXT NOT NULL DEFAULT '',
+        district TEXT NOT NULL DEFAULT '',
+        city TEXT NOT NULL DEFAULT '',
+        state TEXT NOT NULL DEFAULT '',
+        postal_code TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'invited',
         source TEXT NOT NULL DEFAULT 'admin',
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -365,6 +387,16 @@ export function ensurePortalSchema(): Promise<void> {
         'CREATE INDEX IF NOT EXISTS idx_instructor_availability_status_date ON instructor_availability(status, available_date)',
       ),
     ]);
+    // CREATE TABLE IF NOT EXISTS não mexe em tabela que já existe, então banco
+    // com dados só recebe coluna nova por ALTER. Roda apenas quando o marcador
+    // de versão está atrasado, e o erro de coluna repetida é esperado em quem
+    // já foi migrado — por isso cada uma vai sozinha, não em lote.
+    for (const alteracao of ALTERACOES_APOS_V1) {
+      try {
+        await d1.prepare(alteracao).run();
+      } catch { /* coluna já existe */ }
+    }
+
     // PRAGMA optimize não é permitido no Turso (ele gerencia isso sozinho);
     // executa apenas no SQLite local.
     if (!process.env.TURSO_DATABASE_URL) {
