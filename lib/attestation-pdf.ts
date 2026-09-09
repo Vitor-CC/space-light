@@ -11,7 +11,7 @@ import {
   certificateSetup,
   formatCertificateDates,
 } from '@/lib/certificate-config';
-import { signatureBox } from '@/lib/certificate-pdf';
+import { caixaAlta, signatureBox } from '@/lib/certificate-pdf';
 
 /** O atestado é A4 retrato: é um documento de texto com tabela. */
 const PAGE_W = 595.28;
@@ -160,7 +160,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   // Caixa com os dados da edificação.
   y -= 18;
   const campos: [string, string][] = [
-    ['EMPRESA', data.client.legalName.toUpperCase()],
+    ['EMPRESA', caixaAlta(data.client.legalName)],
     ['CNPJ', data.client.document || '—'],
     ['ENDEREÇO', [data.client.address, data.client.district].filter(Boolean).join(' - ') || '—'],
     ['MUNICÍPIO / UF', [data.client.city, data.client.state].filter(Boolean).join(' / ') || '—'],
@@ -185,7 +185,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   y -= 14;
 
   const colunas: { titulo: string; largura: number; valor: (p: CertificateData['participants'][number]) => string }[] = [
-    { titulo: 'NOME', largura: CONTENT * 0.38, valor: (p) => p.fullName },
+    { titulo: 'NOME', largura: CONTENT * 0.38, valor: (p) => caixaAlta(p.fullName) },
     { titulo: 'RG', largura: CONTENT * 0.15, valor: (p) => p.rg },
     { titulo: 'CPF', largura: CONTENT * 0.18, valor: (p) => p.documentId },
     { titulo: 'DATA NASC.', largura: CONTENT * 0.14, valor: (p) => formatBirthDate(p.birthDate) },
@@ -241,14 +241,15 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
 
   const baseY = Math.max(y - 112, 104);
   const vao = CONTENT / 2;
+  // Mesma ordem dos certificados: responsável técnica à esquerda, instrutor à direita.
   const assinaturas = [
     {
-      assinatura: assinaturaInstrutor,
-      linhas: ['Técnico de Segurança', data.instructor.name, data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
+      assinatura: assinaturaResponsavel,
+      linhas: [TECHNICAL_LEAD.role, caixaAlta(TECHNICAL_LEAD.name), `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
     },
     {
-      assinatura: assinaturaResponsavel,
-      linhas: [TECHNICAL_LEAD.role, TECHNICAL_LEAD.name, `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
+      assinatura: assinaturaInstrutor,
+      linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
     },
   ];
   assinaturas.forEach((bloco, indice) => {

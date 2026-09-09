@@ -87,6 +87,32 @@ function drawJustified(
   return y;
 }
 
+/**
+ * Nome de pessoa ou empresa sai sempre em caixa alta no documento, não importa
+ * como foi digitado no cadastro ou na lista de presença.
+ */
+export function caixaAlta(texto: string) {
+  return (texto ?? '').toLocaleUpperCase('pt-BR');
+}
+
+/**
+ * Reduz o corpo do texto até ele caber na largura, com um piso.
+ * Devolve null quando nem no piso cabe — aí quem chama decide o que fazer.
+ */
+export function tamanhoQueCabe(
+  texto: string,
+  font: PDFFont,
+  inicial: number,
+  larguraMax: number,
+  piso = 9,
+) {
+  let tamanho = inicial;
+  while (tamanho > piso && font.widthOfTextAtSize(texto, tamanho) > larguraMax) {
+    tamanho -= 0.5;
+  }
+  return font.widthOfTextAtSize(texto, tamanho) <= larguraMax ? tamanho : null;
+}
+
 type SignatureBlock = { assinatura: PDFImage | null; linhas: string[] };
 
 /** Altura máxima de qualquer assinatura, seja da responsável técnica ou do instrutor. */
@@ -334,7 +360,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     y -= 52;
     const corpo = 14;
     const larguraTexto = PAGE_W - RIGHT_SAFE - LEFT;
-    const nome = `${participante.fullName}${participante.rg ? ` RG - ${participante.rg}` : ''}`;
+    const nome = `${caixaAlta(participante.fullName)}${participante.rg ? ` RG - ${participante.rg}` : ''}`;
 
     const prefixo = 'Certificamos que ';
     const sufixo = ' concluiu';
@@ -396,15 +422,15 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
       blocks: [
         {
           assinatura: assinaturaResponsavel,
-          linhas: [TECHNICAL_LEAD.role, TECHNICAL_LEAD.name, `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
+          linhas: [TECHNICAL_LEAD.role, caixaAlta(TECHNICAL_LEAD.name), `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
         },
         {
           assinatura: null,
-          linhas: [participante.fullName, participante.rg ? `RG - ${participante.rg}` : ''],
+          linhas: [caixaAlta(participante.fullName), participante.rg ? `RG - ${participante.rg}` : ''],
         },
         {
           assinatura: assinaturaInstrutor,
-          linhas: ['Técnico de Segurança', data.instructor.name, data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
+          linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
         },
       ],
     });
@@ -478,19 +504,41 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
   const larguraTexto = PAGE_W - RIGHT_SAFE - LEFT;
   const razao = data.client.legalName.toUpperCase();
 
+  // Razão social longa estourava a margem e invadia a faixa decorativa da
+  // direita. Agora o nome encolhe até caber ao lado do prefixo; se nem no
+  // menor corpo couber, ele desce para uma linha própria, centralizado.
   const prefixo = 'Certificamos que os colaboradores da ';
-  const larguraNome = Math.max(bold.widthOfTextAtSize(razao, corpo) + 24, 280);
-  const larguraLinha = regular.widthOfTextAtSize(prefixo, corpo) + larguraNome;
-  let x = centro - larguraLinha / 2;
-  page.drawText(prefixo, { x, y, size: corpo, font: regular, color: preto });
-  x += regular.widthOfTextAtSize(prefixo, corpo);
-  page.drawText(razao, {
-    x: x + (larguraNome - bold.widthOfTextAtSize(razao, corpo)) / 2,
-    y, size: corpo, font: bold, color: preto,
-  });
-  page.drawLine({ start: { x, y: y - 3 }, end: { x: x + larguraNome, y: y - 3 }, thickness: 0.8, color: preto });
+  const larguraPrefixo = regular.widthOfTextAtSize(prefixo, corpo);
+  const sobraNaLinha = larguraTexto - larguraPrefixo - 24;
+  const corpoNomeInline = tamanhoQueCabe(razao, bold, corpo, sobraNaLinha, 10);
 
-  y -= 26;
+  if (corpoNomeInline) {
+    const larguraNome = Math.max(bold.widthOfTextAtSize(razao, corpoNomeInline) + 24, 280);
+    let x = centro - (larguraPrefixo + larguraNome) / 2;
+    page.drawText(prefixo, { x, y, size: corpo, font: regular, color: preto });
+    x += larguraPrefixo;
+    page.drawText(razao, {
+      x: x + (larguraNome - bold.widthOfTextAtSize(razao, corpoNomeInline)) / 2,
+      y, size: corpoNomeInline, font: bold, color: preto,
+    });
+    page.drawLine({ start: { x, y: y - 3 }, end: { x: x + larguraNome, y: y - 3 }, thickness: 0.8, color: preto });
+    y -= 26;
+  } else {
+    page.drawText(prefixo.trimEnd(), {
+      x: centro - regular.widthOfTextAtSize(prefixo.trimEnd(), corpo) / 2,
+      y, size: corpo, font: regular, color: preto,
+    });
+    y -= 24;
+    const corpoNome = tamanhoQueCabe(razao, bold, corpo, larguraTexto - 24, 7) ?? 7;
+    const larguraNome = Math.min(bold.widthOfTextAtSize(razao, corpoNome) + 24, larguraTexto);
+    const inicio = centro - larguraNome / 2;
+    page.drawText(razao, {
+      x: centro - bold.widthOfTextAtSize(razao, corpoNome) / 2,
+      y, size: corpoNome, font: bold, color: preto,
+    });
+    page.drawLine({ start: { x: inicio, y: y - 3 }, end: { x: inicio + larguraNome, y: y - 3 }, thickness: 0.8, color: preto });
+    y -= 26;
+  }
   const fecho = 'ministrado pela SPACE LIGHT ENGENHARIA.';
   const abertura = `concluíram com aproveitamento o "${data.training.title.toUpperCase()}", ${setup.legalBasis}`;
   y = drawJustified(page, [...wrap(abertura, regular, corpo, larguraTexto), fecho.split(' ')], {
@@ -498,7 +546,11 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
   });
 
   y -= 14;
-  page.drawText(razao, { x: centro - bold.widthOfTextAtSize(razao, corpo) / 2, y, size: corpo, font: bold, color: preto });
+  const corpoRazaoCentral = tamanhoQueCabe(razao, bold, corpo, larguraTexto, 7) ?? 7;
+  page.drawText(razao, {
+    x: centro - bold.widthOfTextAtSize(razao, corpoRazaoCentral) / 2,
+    y, size: corpoRazaoCentral, font: bold, color: preto,
+  });
 
   y -= 26;
   const linhaData = `${ISSUING_CITY}, ${formatCertificateDates(data.training.dates)}.`;
@@ -507,22 +559,23 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
     y, size: corpo, font: bold, color: preto,
   });
 
-  // Técnico, empresa e responsável técnica. A do meio fica em branco: quem
-  // assina é a contratante, à mão, ao receber o documento.
+  // Ordem fixa em todos os documentos: responsável técnica à esquerda,
+  // instrutor à direita. A do meio fica em branco: quem assina é a contratante,
+  // à mão, ao receber o documento.
   drawSignatureRow(page, {
     baseY: 66, left: LEFT, width: PAGE_W - RIGHT_SAFE - LEFT, font: regular, color: preto,
     blocks: [
       {
-        assinatura: assinaturaInstrutor,
-        linhas: ['Técnico de Segurança', data.instructor.name, data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
+        assinatura: assinaturaResponsavel,
+        linhas: [TECHNICAL_LEAD.role, caixaAlta(TECHNICAL_LEAD.name), `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
       },
       {
         assinatura: null,
         linhas: ['Empresa contratante', razao, data.client.document ? `CNPJ: ${data.client.document}` : ''],
       },
       {
-        assinatura: assinaturaResponsavel,
-        linhas: [TECHNICAL_LEAD.role, TECHNICAL_LEAD.name, `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
+        assinatura: assinaturaInstrutor,
+        linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
       },
     ],
   });
