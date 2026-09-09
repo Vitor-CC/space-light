@@ -17,6 +17,7 @@ import {
   companyCertificateFileName,
 } from '@/lib/certificate-pdf';
 import { certificateSetup } from '@/lib/certificate-config';
+import { prepararAssinatura } from '@/lib/signature-image';
 
 type Assinatura = { bytes: Uint8Array; contentType: string } | null;
 
@@ -32,7 +33,9 @@ async function lerAssinaturaDoInstrutor(data: CertificateData, user: StoredUser)
     const guardado = await readStoredFile(documento.object_key);
     if (!guardado) return null;
     const buffer = await new Response(guardado.stream).arrayBuffer();
-    return { bytes: new Uint8Array(buffer), contentType: documento.content_type };
+    // Recorta a margem e normaliza para PNG uma vez só: os três documentos
+    // reaproveitam o mesmo resultado.
+    return prepararAssinatura(new Uint8Array(buffer), documento.content_type);
   } catch {
     return null;
   }
