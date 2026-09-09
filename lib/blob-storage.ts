@@ -61,6 +61,9 @@ export async function uploadTrainingFile(input: {
     access: 'private',
     contentType: input.contentType,
     addRandomSuffix: false,
+    // O caminho é determinístico de propósito. Sem isto, "Gerar de novo" quebra
+    // na segunda emissão: o Blob recusa gravar por cima de um caminho existente.
+    allowOverwrite: true,
     token: requireToken(),
   });
   return { objectKey: result.pathname };
@@ -88,6 +91,9 @@ export async function uploadInstructorFile(input: {
     access: 'private',
     contentType: input.contentType,
     addRandomSuffix: false,
+    // O caminho é determinístico de propósito. Sem isto, "Gerar de novo" quebra
+    // na segunda emissão: o Blob recusa gravar por cima de um caminho existente.
+    allowOverwrite: true,
     token: requireToken(),
   });
   return { objectKey: result.pathname };
