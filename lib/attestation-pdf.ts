@@ -9,6 +9,7 @@ import {
   issuingCity,
   TECHNICAL_LEAD,
   certificateSetup,
+  registroValido,
   formatCertificateDates,
 } from '@/lib/certificate-config';
 import { caixaAlta, signatureBox } from '@/lib/certificate-pdf';
@@ -240,18 +241,21 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   });
 
   const baseY = Math.max(y - 112, 104);
-  const vao = CONTENT / 2;
-  // Mesma ordem dos certificados: responsável técnica à esquerda, instrutor à direita.
+  // Mesma ordem dos certificados: responsável técnica à esquerda, instrutor à
+  // direita — e o instrutor sem registro válido simplesmente não entra na fila.
   const assinaturas = [
     {
       assinatura: assinaturaResponsavel,
       linhas: [TECHNICAL_LEAD.role, caixaAlta(TECHNICAL_LEAD.name), `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
     },
-    {
-      assinatura: assinaturaInstrutor,
-      linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
-    },
+    ...(registroValido(data.instructor.registry)
+      ? [{
+          assinatura: assinaturaInstrutor,
+          linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), `MTE: ${data.instructor.registry}`],
+        }]
+      : []),
   ];
+  const vao = CONTENT / assinaturas.length;
   assinaturas.forEach((bloco, indice) => {
     const meio = MARGIN + vao * indice + vao / 2;
     const larguraLinha = Math.min(vao - 30, 200);

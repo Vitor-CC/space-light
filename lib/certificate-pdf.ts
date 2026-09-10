@@ -9,6 +9,7 @@ import {
   ISSUING_CITY,
   TECHNICAL_LEAD,
   certificateSetup,
+  registroValido,
   formatCertificateDates,
 } from '@/lib/certificate-config';
 import { programForNr } from '@/lib/nr23-program';
@@ -136,6 +137,22 @@ export function signatureBox(assinatura: PDFImage, vao: number) {
 }
 
 /** Fila de assinaturas na base da página, distribuídas na largura útil. */
+/**
+ * O bloco de assinatura do instrutor, ou nada quando ele não tem registro
+ * profissional válido. Devolver lista permite espalhar com `...`, e assim a
+ * fila de assinaturas encolhe de três colunas para duas sozinha.
+ */
+function blocoDoInstrutor(
+  data: CertificateData,
+  assinatura: PDFImage | null,
+): SignatureBlock[] {
+  if (!registroValido(data.instructor.registry)) return [];
+  return [{
+    assinatura,
+    linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), `MTE: ${data.instructor.registry}`],
+  }];
+}
+
 function drawSignatureRow(
   page: PDFPage,
   options: {
@@ -427,10 +444,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
           assinatura: null,
           linhas: [caixaAlta(participante.fullName), participante.rg ? `RG - ${participante.rg}` : ''],
         },
-        {
-          assinatura: assinaturaInstrutor,
-          linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
-        },
+        ...blocoDoInstrutor(data, assinaturaInstrutor),
       ],
     });
   }
@@ -572,10 +586,7 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
         assinatura: null,
         linhas: ['Empresa contratante', razao, data.client.document ? `CNPJ: ${data.client.document}` : ''],
       },
-      {
-        assinatura: assinaturaInstrutor,
-        linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), data.instructor.registry ? `MTE: ${data.instructor.registry}` : ''],
-      },
+      ...blocoDoInstrutor(data, assinaturaInstrutor),
     ],
   });
 

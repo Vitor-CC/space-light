@@ -53,6 +53,19 @@ export type CompanyInstructorAvailability = {
   created_at: string;
 };
 
+/** Um dia do treinamento: data, horário e o instrutor escalado para ele. */
+export type TrainingSession = {
+  id: string;
+  training_id: string;
+  day_number: number;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  instructor_id: string | null;
+  instructor_name: string | null;
+  status: string;
+};
+
 export type CompanyTraining = {
   id: string;
   client_id: string;
@@ -72,6 +85,7 @@ export type CompanyTraining = {
   created_at: string;
   file_count: number;
   participant_count: number;
+  sessions: TrainingSession[];
 };
 
 export type CompanyFile = {
@@ -86,6 +100,7 @@ export type CompanyFile = {
   content_type: string;
   size: number;
   kind: 'photo' | 'document' | 'attendance';
+  session_id: string | null;
   status: string;
   created_at: string;
 };

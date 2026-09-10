@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import {
   findTrainingForInstructor,
+  listTrainingSessions,
   listTrainingFiles,
   newFileId,
   registerStoredFile,
@@ -26,7 +27,14 @@ async function requireOwnTraining(trainingId: string) {
   if (!training) {
     return { error: 'Este treinamento não está atribuído a você.', status: 404 } as const;
   }
-  return { user, training } as const;
+  // instructorId sai daqui já estreitado: a checagem acima garante que existe.
+  return { user, training, instructorId: user.instructor_id } as const;
+}
+
+/** O dia deste instrutor que ainda está aberto — é a ele que a foto pertence. */
+async function diaEmCurso(trainingId: string, instructorId: string) {
+  const meus = (await listTrainingSessions(trainingId)).filter((dia) => dia.instructor_id === instructorId);
+  return (meus.find((dia) => dia.status !== 'completed') ?? meus[meus.length - 1])?.id ?? null;
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -108,6 +116,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       contentType,
       size: file.size,
       kind: 'attendance',
+      // Guarda o dia para saber a qual data a folha assinada corresponde.
+      sessionId: await diaEmCurso(id, context.instructorId),
       createdByUserId: context.user.id,
     });
     return NextResponse.json({ id: fileId, name: file.name, size: file.size }, { status: 201 });

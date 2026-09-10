@@ -1,4 +1,4 @@
-import type { AuditEntry, CompanyDashboardData, CompanyEmployee, CompanyTraining } from '@/lib/company-types';
+import type { AuditEntry, CompanyDashboardData, CompanyEmployee, CompanyTraining, TrainingSession } from '@/lib/company-types';
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -30,8 +30,34 @@ export function approveInstructor(instructorId: string) {
   return requestJson<{ ok: true }>(`/api/company/instructors/${encodeURIComponent(instructorId)}/approve`, { method: 'POST' });
 }
 
-export function createMockTraining(input: { clientId: string; instructorId: string; nr: string; title: string; dates: string[]; contentProgram: string; duration: string; location: string; participantLimit: number }) {
+export type NovoDia = { date: string; startTime: string; endTime: string; instructorId: string | null };
+
+export function createMockTraining(input: { clientId: string; nr: string; title: string; days: NovoDia[]; contentProgram: string; duration: string; location: string }) {
   return requestJson<{ id: string; code: string; qrToken: string }>('/api/company/trainings', { method: 'POST', body: JSON.stringify(input) });
+}
+
+/** A Space escala o instrutor, a data ou o horário de um dia do treinamento. */
+export function updateTrainingDay(trainingId: string, input: { sessionId: string; instructorId?: string | null; sessionDate?: string; startTime?: string; endTime?: string }) {
+  return requestJson<{ ok: true; sessions: TrainingSession[] }>(`/api/company/trainings/${encodeURIComponent(trainingId)}/sessions`, { method: 'PATCH', body: JSON.stringify(input) });
+}
+
+/**
+ * Encerra a turma pela Space. Sem a foto da lista, a primeira tentativa volta
+ * com 409 e `needsConfirmation` — quem insiste manda `semLista`.
+ */
+export async function completeTrainingByCompany(trainingId: string, semLista = false) {
+  const response = await fetch(`/api/company/trainings/${encodeURIComponent(trainingId)}/complete`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ semLista }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as { error?: string; needsConfirmation?: boolean; certificates?: number; certificatePublished?: boolean; certificateProblem?: string | null };
+  if (response.status === 409 && payload.needsConfirmation) return { needsConfirmation: true as const, message: payload.error ?? '' };
+  if (!response.ok) throw new Error(payload.error || 'Não foi possível encerrar o treinamento.');
+  return { needsConfirmation: false as const, ...payload };
+}
+
+/** Cobra o instrutor do dia em aberto: e-mail automático + WhatsApp pronto. */
+export function remindTrainingInstructor(trainingId: string) {
+  return requestJson<{ ok: true; enviados: string[]; falhas: string[]; links: { name: string; url: string }[]; faltaLista: boolean }>(`/api/company/trainings/${encodeURIComponent(trainingId)}/remind`, { method: 'POST' });
 }
 
 /**

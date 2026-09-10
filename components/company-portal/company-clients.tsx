@@ -1,19 +1,30 @@
 'use client';
 
-import { Building2, Check, KeyRound, Loader2, MapPin, Plus, Search, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { Building2, Check, ChevronDown, KeyRound, Loader2, MapPin, Plus, Search, Trash2, TriangleAlert } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 
-import { AccessCredentials, EmptyState, fieldClass } from '@/components/company-portal/company-ui';
+import { AccessCredentials, EmptyState, fieldClass, labelClass, selectClass, SubTabs } from '@/components/company-portal/company-ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { CompanyClient, CompanyDashboardData } from '@/lib/company-types';
 import { approveClient, createMockClient, deleteClient, resetUserPassword, saveClientAddress } from '@/lib/mock-company-database';
 
+type Aba = 'lista' | 'criar';
+
 type Draft = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string };
 const emptyDraft: Draft = { name: '', legalName: '', document: '', unit: '', contactName: '', contactEmail: '', contactPhone: '' };
 
 type EnderecoDraft = { address: string; district: string; city: string; state: string; postalCode: string };
+
+/** Só dígitos: o CNPJ é digitado com e sem pontuação, e as duas têm de achar. */
+function digitos(value: string) {
+  return (value ?? '').replace(/\D/g, '');
+}
+
+function enderecoCompleto(client: CompanyClient) {
+  return Boolean(client.address && client.city && client.state);
+}
 
 function ClientAddress({ client, notify, reload }: { client: CompanyClient; notify: (message: string) => void; reload: () => Promise<void> }) {
   const [aberto, setAberto] = useState(false);
@@ -26,7 +37,7 @@ function ClientAddress({ client, notify, reload }: { client: CompanyClient; noti
     postalCode: client.postal_code ?? '',
   });
 
-  const completo = Boolean(client.address && client.city && client.state);
+  const completo = enderecoCompleto(client);
   const resumo = completo
     ? `${client.address}${client.district ? ` - ${client.district}` : ''} · ${client.city}/${client.state}`
     : 'Endereço não preenchido';
@@ -46,38 +57,105 @@ function ClientAddress({ client, notify, reload }: { client: CompanyClient; noti
     }
   }
 
-  return <div className="mt-5 border-t border-black/8 pt-4">
+  return <div>
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div className="min-w-0">
-        <span className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">Endereço da edificação</span>
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">Endereço da edificação</span>
         <p className={`mt-1 text-xs ${completo ? 'text-[#555]' : 'font-bold text-[#b62525]'}`}>{resumo}</p>
-        {!completo ? <p className="mt-1 text-[10px] leading-relaxed text-[#888]">Necessário para emitir o atestado de treinamento.</p> : null}
+        {!completo ? <p className="mt-1 text-[11px] leading-relaxed text-[#888]">Necessário para emitir o atestado de treinamento.</p> : null}
       </div>
-      <button type="button" onClick={() => setAberto((v) => !v)} className="inline-flex h-9 shrink-0 items-center gap-2 border border-black/15 px-3 text-[8px] font-extrabold uppercase tracking-[0.14em] hover:bg-black hover:text-white">
+      <button type="button" onClick={() => setAberto((v) => !v)} className="inline-flex h-10 shrink-0 items-center gap-2 border border-black/15 bg-white px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">
         <MapPin className="size-3.5" />{aberto ? 'Fechar' : completo ? 'Editar' : 'Preencher'}
       </button>
     </div>
 
-    {aberto ? <form onSubmit={salvar} className="mt-4 grid gap-3 border border-black/10 bg-[#f7f7f4] p-4 sm:grid-cols-2">
-      <label className="sm:col-span-2"><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Logradouro e número</span><Input value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} placeholder="Ex.: Rua das Palmeiras, 120" className={fieldClass} /></label>
-      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Bairro</span><Input value={draft.district} onChange={(e) => setDraft({ ...draft, district: e.target.value })} placeholder="Ex.: Centro" className={fieldClass} /></label>
-      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">CEP</span><Input value={draft.postalCode} onChange={(e) => setDraft({ ...draft, postalCode: e.target.value })} placeholder="Ex.: 01000-000" className={fieldClass} /></label>
-      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Município</span><Input value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="Ex.: São Paulo" className={fieldClass} /></label>
-      <label><span className="mb-1.5 block text-[9px] font-extrabold uppercase tracking-[0.12em]">UF</span><Input value={draft.state} onChange={(e) => setDraft({ ...draft, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="Ex.: SP" maxLength={2} className={fieldClass} /></label>
-      <Button type="submit" disabled={salvando} className="mt-1 h-11 rounded-none bg-[#f2ad19] text-[9px] font-extrabold uppercase tracking-[.12em] text-black hover:bg-[#ff9900] sm:col-span-2">
+    {aberto ? <form onSubmit={salvar} className="mt-4 grid gap-3 border border-black/10 bg-white p-4 sm:grid-cols-2">
+      <label className="sm:col-span-2" htmlFor={`endereco-${client.id}-logradouro`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">Logradouro e número</span><Input id={`endereco-${client.id}-logradouro`} value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} placeholder="Ex.: Rua das Palmeiras, 120" className={fieldClass} /></label>
+      <label htmlFor={`endereco-${client.id}-bairro`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">Bairro</span><Input id={`endereco-${client.id}-bairro`} value={draft.district} onChange={(e) => setDraft({ ...draft, district: e.target.value })} placeholder="Ex.: Centro" className={fieldClass} /></label>
+      <label htmlFor={`endereco-${client.id}-cep`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">CEP</span><Input id={`endereco-${client.id}-cep`} value={draft.postalCode} onChange={(e) => setDraft({ ...draft, postalCode: e.target.value })} placeholder="Ex.: 01000-000" className={fieldClass} /></label>
+      <label htmlFor={`endereco-${client.id}-municipio`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">Município</span><Input id={`endereco-${client.id}-municipio`} value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="Ex.: São Paulo" className={fieldClass} /></label>
+      <label htmlFor={`endereco-${client.id}-uf`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">UF</span><Input id={`endereco-${client.id}-uf`} value={draft.state} onChange={(e) => setDraft({ ...draft, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="Ex.: SP" maxLength={2} className={fieldClass} /></label>
+      <Button type="submit" disabled={salvando} className="mt-1 h-11 rounded-none bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900] sm:col-span-2">
         {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar endereço
       </Button>
     </form> : null}
   </div>;
 }
 
+function ClientRow({ client, turmas, arquivos, inscritos, aberta, alternar, acoes, notify, reload }: {
+  client: CompanyClient;
+  turmas: number;
+  arquivos: number;
+  inscritos: number;
+  aberta: boolean;
+  alternar: () => void;
+  acoes: { approve: () => void; reset: () => void; remove: () => void };
+  notify: (message: string) => void;
+  reload: () => Promise<void>;
+}) {
+  const pendente = client.status === 'pending';
+  const tom = pendente ? 'bg-[#fff0d2] text-[#8a6107]' : client.status === 'invited' ? 'bg-[#e7eef9] text-[#31598e]' : 'bg-[#daf2df] text-[#17642d]';
+  const rotulo = pendente ? 'Aguardando' : client.status === 'invited' ? 'Convidado' : 'Ativo';
+  const semEndereco = !enderecoCompleto(client);
+
+  return <article className="border border-black/10 bg-white">
+    <button type="button" onClick={alternar} aria-expanded={aberta} className="flex w-full items-center gap-4 p-4 text-left hover:bg-[#fff8e8]">
+      <span className="flex size-11 shrink-0 items-center justify-center bg-black text-[#f2ad19]"><Building2 className="size-5" /></span>
+      <span className="min-w-0 flex-1">
+        <strong className="block truncate text-sm font-extrabold uppercase tracking-[0.04em]">{client.name}</strong>
+        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#777]">
+          <span className="truncate">{client.document}</span>
+          <span className="truncate">{client.unit}</span>
+          <span>{turmas === 1 ? '1 turma' : `${turmas} turmas`}</span>
+          <span>{inscritos} inscrito(s)</span>
+        </span>
+      </span>
+      {semEndereco ? <span className="hidden shrink-0 items-center gap-1.5 bg-[#fff5f5] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] md:inline-flex"><TriangleAlert className="size-3.5" />Sem endereço</span> : null}
+      <span className={`shrink-0 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] ${tom}`}>{rotulo}</span>
+      <ChevronDown className={`size-4 shrink-0 text-black/35 transition ${aberta ? 'rotate-180' : ''}`} />
+    </button>
+
+    {aberta ? <div className="space-y-5 border-t border-black/8 bg-[#f7f7f4] p-5">
+      <dl className="grid gap-2 text-xs sm:grid-cols-2">
+        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Razão social</dt><dd className="text-right font-bold">{client.legal_name}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Responsável</dt><dd className="text-right font-bold">{client.contact_name}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">E-mail</dt><dd className="break-all text-right font-bold">{client.contact_email}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Telefone</dt><dd className="text-right font-bold">{client.contact_phone || '—'}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Arquivos</dt><dd className="text-right font-bold">{arquivos}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Treinamentos</dt><dd className="text-right font-bold">{turmas}</dd></div>
+      </dl>
+      <ClientAddress client={client} notify={notify} reload={reload} />
+      <div className="flex flex-wrap gap-2">
+        {pendente ? <Button type="button" onClick={acoes.approve} className="h-11 rounded-none bg-[#f2ad19] px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#ff9900]"><Check className="size-4" />Aprovar acesso</Button> : null}
+        <button type="button" onClick={acoes.reset} className="inline-flex h-11 items-center gap-2 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#555] hover:border-black hover:bg-black hover:text-white"><KeyRound className="size-3.5" />Redefinir senha</button>
+        <button type="button" onClick={acoes.remove} className="ml-auto inline-flex h-11 items-center gap-2 border border-[#b62525]/40 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] hover:bg-[#b62525] hover:text-white"><Trash2 className="size-3.5" />Excluir</button>
+      </div>
+    </div> : null}
+  </article>;
+}
+
 export function CompanyClients({ data, reload, notify }: { data: CompanyDashboardData; reload: () => Promise<void>; notify: (message: string) => void }) {
+  const [aba, setAba] = useState<Aba>('lista');
   const [query, setQuery] = useState('');
-  const [showForm, setShowForm] = useState(false);
+  const [filtro, setFiltro] = useState<'todos' | 'pending' | 'active' | 'sem_endereco'>('todos');
+  const [aberta, setAberta] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [createdAccess, setCreatedAccess] = useState<{ email: string; temporaryPassword: string } | null>(null);
   const [resetAccess, setResetAccess] = useState<{ name: string; email: string; temporaryPassword: string; active: boolean } | null>(null);
-  const filtered = data.clients.filter((client) => `${client.name} ${client.legal_name} ${client.document}`.toLowerCase().includes(query.toLowerCase()));
+
+  const alvo = query.trim().toLowerCase();
+  const alvoDigitos = digitos(query);
+  const filtered = useMemo(() => data.clients.filter((client) => {
+    const casa = !alvo
+      || `${client.name} ${client.legal_name} ${client.contact_email}`.toLowerCase().includes(alvo)
+      || (alvoDigitos.length > 0 && digitos(client.document).includes(alvoDigitos));
+    if (!casa) return false;
+    if (filtro === 'sem_endereco') return !enderecoCompleto(client);
+    if (filtro === 'todos') return true;
+    return client.status === filtro;
+  }), [data.clients, alvo, alvoDigitos, filtro]);
+
+  const semEndereco = data.clients.filter((client) => !enderecoCompleto(client)).length;
 
   async function save(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -85,7 +163,7 @@ export function CompanyClients({ data, reload, notify }: { data: CompanyDashboar
       const access = await createMockClient(draft);
       setCreatedAccess(access);
       setDraft(emptyDraft);
-      setShowForm(false);
+      setAba('lista');
       notify('Cliente cadastrado e acesso temporário gerado.');
       await reload();
     } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao cadastrar cliente.'); }
@@ -109,17 +187,62 @@ export function CompanyClients({ data, reload, notify }: { data: CompanyDashboar
   }
 
   return <div className="space-y-6">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="relative max-w-md flex-1"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-black/35" /><Input aria-label="Buscar cliente ou CNPJ" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar cliente ou CNPJ" className={`${fieldClass} pl-11`} /></div><Button type="button" onClick={() => setShowForm((value) => !value)} className="h-12 rounded-none bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]">{showForm ? <X className="size-4" /> : <Plus className="size-4" />}{showForm ? 'Fechar cadastro' : 'Novo cliente'}</Button></div>
+    <SubTabs label="Seções de clientes" active={aba} onChange={setAba} tabs={[
+      { id: 'lista', label: 'Clientes', count: data.clients.length },
+      { id: 'criar', label: 'Cadastrar' },
+    ]} />
+
     {createdAccess ? <AccessCredentials eyebrow="Envie ao cliente" note="Esta senha temporária aparece somente agora. O cliente deverá trocá-la no primeiro acesso." email={createdAccess.email} password={createdAccess.temporaryPassword} onDismiss={() => setCreatedAccess(null)} /> : null}
     {resetAccess ? <AccessCredentials eyebrow={`Nova senha de ${resetAccess.name}`} note={resetAccess.active ? 'Anote agora: a senha aparece somente desta vez. A senha antiga já não funciona e, no próximo acesso, o cliente terá de criar uma nova.' : 'Anote agora: a senha aparece somente desta vez. Atenção: este acesso ainda está inativo — aprove o cliente para ele conseguir entrar.'} email={resetAccess.email} password={resetAccess.temporaryPassword} onDismiss={() => setResetAccess(null)} /> : null}
-    {showForm ? <form onSubmit={save} className="border border-black/10 bg-white p-6 md:p-7"><span className="eyebrow text-[#8a6107]">Cadastro corporativo</span><h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Novo cliente</h2><div className="mt-6 grid gap-4 md:grid-cols-2"><Input required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Nome de exibição" className={fieldClass} /><Input required value={draft.legalName} onChange={(e) => setDraft({ ...draft, legalName: e.target.value })} placeholder="Razão social" className={fieldClass} /><Input required value={draft.document} onChange={(e) => setDraft({ ...draft, document: e.target.value })} placeholder="CNPJ" className={fieldClass} /><Input required value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} placeholder="Unidade / cidade" className={fieldClass} /><Input required value={draft.contactName} onChange={(e) => setDraft({ ...draft, contactName: e.target.value })} placeholder="Responsável na empresa" className={fieldClass} /><Input required type="email" value={draft.contactEmail} onChange={(e) => setDraft({ ...draft, contactEmail: e.target.value })} placeholder="E-mail do responsável" className={fieldClass} /><Input value={draft.contactPhone} onChange={(e) => setDraft({ ...draft, contactPhone: e.target.value })} placeholder="Telefone" className={fieldClass} /></div><Button type="submit" className="mt-5 h-12 rounded-none bg-black px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white hover:bg-[#f2ad19] hover:text-black"><Check className="size-4" />Salvar e gerar acesso</Button></form> : null}
-    <div className="grid gap-4 xl:grid-cols-2">{filtered.map((client) => {
-      const trainings = data.trainings.filter((item) => item.client_id === client.id);
-      const files = data.files.filter((item) => item.client_id === client.id).length;
-      const statusClass = client.status === 'pending' ? 'bg-[#fff0d2] text-[#8a6107]' : client.status === 'invited' ? 'bg-[#e7eef9] text-[#31598e]' : 'bg-[#daf2df] text-[#17642d]';
-      const statusLabel = client.status === 'pending' ? 'Aguardando aprovação' : client.status === 'invited' ? 'Convite criado' : 'Ativo';
-      return <article key={client.id} className="border border-black/10 bg-white p-6"><div className="flex items-start gap-4"><span className="flex size-12 shrink-0 items-center justify-center bg-black text-[#f2ad19]"><Building2 className="size-5" /></span><div className="min-w-0"><span className={`px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.12em] ${statusClass}`}>{statusLabel}</span><h2 className="mt-3 text-xl font-extrabold uppercase tracking-[0.04em]">{client.name}</h2><p className="mt-1 text-xs text-[#777]">{client.legal_name} · {client.document}</p></div></div><div className="mt-6 grid grid-cols-3 gap-px bg-black/8 text-center"><div className="bg-[#f7f7f4] p-3"><strong className="block text-lg">{trainings.length}</strong><span className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#888]">Treinos</span></div><div className="bg-[#f7f7f4] p-3"><strong className="block text-lg">{files}</strong><span className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#888]">Arquivos</span></div><div className="bg-[#f7f7f4] p-3"><strong className="block text-lg">{trainings.reduce((sum, item) => sum + item.participant_count, 0)}</strong><span className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#888]">Inscritos</span></div></div><dl className="mt-5 grid gap-2 text-xs"><div className="flex justify-between gap-4"><dt className="text-[#777]">Unidade</dt><dd className="text-right font-bold">{client.unit}</dd></div><div className="flex justify-between gap-4"><dt className="text-[#777]">Responsável</dt><dd className="text-right font-bold">{client.contact_name}</dd></div><div className="flex justify-between gap-4"><dt className="text-[#777]">E-mail</dt><dd className="break-all text-right font-bold">{client.contact_email}</dd></div></dl><ClientAddress client={client} notify={notify} reload={reload} /><div className="mt-5 flex flex-wrap gap-2">{client.status === 'pending' ? <Button type="button" onClick={() => void approve(client.id)} className="h-11 rounded-none bg-[#f2ad19] px-4 text-[9px] font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]"><Check className="size-4" /> Aprovar acesso</Button> : null}<button type="button" onClick={() => void resetPassword({ id: client.id, name: client.name })} className="inline-flex h-11 items-center gap-2 border border-black/15 px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#555] hover:border-black hover:bg-black hover:text-white"><KeyRound className="size-3.5" />Redefinir senha</button><button type="button" onClick={() => void remove({ id: client.id, name: client.name })} className="inline-flex h-11 items-center gap-2 border border-[#b62525]/40 px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#b62525] hover:bg-[#b62525] hover:text-white"><Trash2 className="size-3.5" />Excluir</button></div></article>;
-    })}</div>
-    {filtered.length === 0 ? <EmptyState icon={Building2} title="Nenhum cliente encontrado" text="Ajuste a busca ou cadastre uma nova empresa." /> : null}
+
+    {aba === 'lista' ? <>
+      {semEndereco > 0 ? <button type="button" onClick={() => setFiltro('sem_endereco')} className="flex w-full items-center gap-3 border-l-4 border-[#b62525] bg-[#fff5f5] p-4 text-left hover:bg-[#ffecec]">
+        <TriangleAlert className="size-5 shrink-0 text-[#b62525]" />
+        <span className="text-xs font-bold text-[#b62525]">{semEndereco === 1 ? '1 cliente está sem endereço da edificação' : `${semEndereco} clientes estão sem endereço da edificação`} — sem ele o atestado sai incompleto. Ver quais →</span>
+      </button> : null}
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-black/35" /><Input aria-label="Buscar cliente ou CNPJ" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nome, CNPJ ou e-mail" className={`${fieldClass} pl-11`} /></div>
+        <label className="sm:w-60" htmlFor="clientes-filtro"><span className="sr-only">Filtrar clientes</span>
+          <select id="clientes-filtro" value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)} className={selectClass}>
+            <option value="todos">Todos</option>
+            <option value="active">Ativos</option>
+            <option value="pending">Aguardando aprovação</option>
+            <option value="sem_endereco">Sem endereço</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="space-y-3">{filtered.map((client) => {
+        const turmas = data.trainings.filter((item) => item.client_id === client.id);
+        return <ClientRow key={client.id} client={client} notify={notify} reload={reload}
+          turmas={turmas.length}
+          arquivos={data.files.filter((item) => item.client_id === client.id).length}
+          inscritos={turmas.reduce((soma, item) => soma + item.participant_count, 0)}
+          aberta={aberta === client.id} alternar={() => setAberta((atual) => (atual === client.id ? null : client.id))}
+          acoes={{
+            approve: () => void approve(client.id),
+            reset: () => void resetPassword({ id: client.id, name: client.name }),
+            remove: () => void remove({ id: client.id, name: client.name }),
+          }} />;
+      })}</div>
+      {filtered.length === 0 ? <EmptyState icon={Building2} title="Nenhum cliente encontrado" text="Ajuste a busca ou cadastre uma nova empresa na aba Cadastrar." /> : null}
+    </> : null}
+
+    {aba === 'criar' ? <form onSubmit={save} className="max-w-3xl border border-black/10 bg-white p-6 md:p-8">
+      <span className="eyebrow text-[#8a6107]">Cadastro corporativo</span>
+      <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Novo cliente</h2>
+      <p className="mt-3 max-w-xl text-xs leading-relaxed text-[#777]">O endereço da edificação é preenchido depois, na própria lista — é ele que sai impresso no atestado de treinamento.</p>
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <label htmlFor="cliente-nome"><span className={labelClass}>Nome de exibição</span><Input id="cliente-nome" required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className={fieldClass} /></label>
+        <label htmlFor="cliente-razao"><span className={labelClass}>Razão social</span><Input id="cliente-razao" required value={draft.legalName} onChange={(e) => setDraft({ ...draft, legalName: e.target.value })} className={fieldClass} /></label>
+        <label htmlFor="cliente-cnpj"><span className={labelClass}>CNPJ</span><Input id="cliente-cnpj" required value={draft.document} onChange={(e) => setDraft({ ...draft, document: e.target.value })} className={fieldClass} /></label>
+        <label htmlFor="cliente-unidade"><span className={labelClass}>Unidade / cidade</span><Input id="cliente-unidade" required value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} className={fieldClass} /></label>
+        <label htmlFor="cliente-responsavel"><span className={labelClass}>Responsável na empresa</span><Input id="cliente-responsavel" required value={draft.contactName} onChange={(e) => setDraft({ ...draft, contactName: e.target.value })} className={fieldClass} /></label>
+        <label htmlFor="cliente-email"><span className={labelClass}>E-mail do responsável</span><Input id="cliente-email" required type="email" value={draft.contactEmail} onChange={(e) => setDraft({ ...draft, contactEmail: e.target.value })} className={fieldClass} /></label>
+        <label className="md:col-span-2" htmlFor="cliente-telefone"><span className={labelClass}>Telefone</span><Input id="cliente-telefone" value={draft.contactPhone} onChange={(e) => setDraft({ ...draft, contactPhone: e.target.value })} className={fieldClass} /></label>
+      </div>
+      <Button type="submit" className="mt-6 h-13 rounded-none bg-[#f2ad19] px-8 text-[11px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900]"><Plus className="size-4" />Salvar e gerar acesso</Button>
+    </form> : null}
   </div>;
 }

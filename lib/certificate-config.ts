@@ -29,6 +29,18 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
   },
 };
 
+/**
+ * O registro profissional do instrutor vale como registro?
+ *
+ * Cadastro em branco e "00000" são o mesmo caso na prática: instrutor sem
+ * habilitação registrada. Nesses o documento sai assinado só pela responsável
+ * técnica — assinar sem registro ao lado é o que não pode.
+ */
+export function registroValido(registry: string | null | undefined) {
+  const limpo = (registry ?? '').replace(/[^0-9a-z]/gi, '');
+  return limpo.length > 0 && !/^0+$/.test(limpo);
+}
+
 export function certificateSetup(nr: string) {
   return CERTIFICATE_SETUP[nr.trim()] ?? null;
 }

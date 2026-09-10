@@ -22,8 +22,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       trainingId: id,
       userId: user.id,
     });
+    // Num treinamento de vários dias, encerrar um dia não encerra a turma —
+    // e emitir certificado no fim do 1º dia era justamente o defeito.
+    if (!resultado.trainingCompleted) {
+      return NextResponse.json({ ...resultado, certificatePublished: false, certificateProblem: null });
+    }
     // O PDF vai para os documentos da turma. Falhar aqui não desfaz o
-    // encerramento — a Space pode republicar pela aba Certificados.
+    // encerramento — a Space pode republicar pela aba Arquivos.
     const publicacao = await publishCertificateDocument({ trainingId: id, user });
     return NextResponse.json({
       ...resultado,

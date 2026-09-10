@@ -63,7 +63,10 @@ function rows<T>(result: DatabaseResult<T>): T[] {
  * em produção (Turso, pela rede) isso somava ~15 idas em sequência a cada
  * arranque frio da função, antes de qualquer trabalho útil.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
+
+/** Data no formato do banco e do <input type="date">. */
+const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Colunas criadas depois da versão 1 do schema.
@@ -190,6 +193,19 @@ export function ensurePortalSchema(): Promise<void> {
         qr_enabled INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       )`),
+      // Um registro por DIA do treinamento. Existe porque cada dia pode ter um
+      // instrutor diferente, e o certificado sai com a assinatura do último.
+      d1.prepare(`CREATE TABLE IF NOT EXISTS training_sessions (
+        id TEXT PRIMARY KEY,
+        training_id TEXT NOT NULL REFERENCES trainings(id) ON DELETE CASCADE,
+        day_number INTEGER NOT NULL,
+        session_date TEXT NOT NULL,
+        start_time TEXT NOT NULL DEFAULT '',
+        end_time TEXT NOT NULL DEFAULT '',
+        instructor_id TEXT REFERENCES instructors(id) ON DELETE SET NULL,
+        status TEXT NOT NULL DEFAULT 'scheduled',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`),
       d1.prepare(`CREATE TABLE IF NOT EXISTS instructor_availability (
         id TEXT PRIMARY KEY,
         instructor_id TEXT NOT NULL REFERENCES instructors(id) ON DELETE CASCADE,
@@ -207,6 +223,7 @@ export function ensurePortalSchema(): Promise<void> {
         content_type TEXT NOT NULL,
         size INTEGER NOT NULL,
         kind TEXT NOT NULL,
+        session_id TEXT,
         status TEXT NOT NULL DEFAULT 'registered',
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       )`),
@@ -300,6 +317,12 @@ export function ensurePortalSchema(): Promise<void> {
         'CREATE INDEX IF NOT EXISTS idx_trainings_client_date ON trainings(client_id, training_date)',
       ),
       d1.prepare(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_training_sessions_day ON training_sessions(training_id, day_number)',
+      ),
+      d1.prepare(
+        'CREATE INDEX IF NOT EXISTS idx_training_sessions_instructor_date ON training_sessions(instructor_id, session_date)',
+      ),
+      d1.prepare(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_files_object_key ON files(object_key)',
       ),
       d1.prepare(
@@ -340,6 +363,8 @@ export function ensurePortalSchema(): Promise<void> {
       { tabela: 'trainings', coluna: 'instructor_id', alter: 'ALTER TABLE trainings ADD COLUMN instructor_id TEXT' },
       { tabela: 'trainings', coluna: 'training_dates', alter: "ALTER TABLE trainings ADD COLUMN training_dates TEXT NOT NULL DEFAULT ''" },
       { tabela: 'trainings', coluna: 'content_program', alter: "ALTER TABLE trainings ADD COLUMN content_program TEXT NOT NULL DEFAULT ''" },
+      // Dia do treinamento a que o arquivo pertence (a foto da lista assinada).
+      { tabela: 'files', coluna: 'session_id', alter: 'ALTER TABLE files ADD COLUMN session_id TEXT' },
       { tabela: 'participants', coluna: 'rg', alter: "ALTER TABLE participants ADD COLUMN rg TEXT NOT NULL DEFAULT ''" },
       { tabela: 'participants', coluna: 'birth_date', alter: "ALTER TABLE participants ADD COLUMN birth_date TEXT NOT NULL DEFAULT ''" },
       // Endereço da edificação: sai impresso no atestado de treinamento.
@@ -397,6 +422,8 @@ export function ensurePortalSchema(): Promise<void> {
       } catch { /* coluna já existe */ }
     }
 
+    await criarSessoesDeTurmasAntigas(d1);
+
     // PRAGMA optimize não é permitido no Turso (ele gerencia isso sozinho);
     // executa apenas no SQLite local.
     if (!process.env.TURSO_DATABASE_URL) {
@@ -422,6 +449,128 @@ export function ensurePortalSchema(): Promise<void> {
   return schemaPromise;
 }
 
+
+/**
+ * Turmas criadas antes da tabela de dias ganham uma sessão por data, todas com
+ * o instrutor que a turma já tinha. Só toca em turma que ainda não tem sessão,
+ * então repetir a migração não duplica nada.
+ */
+async function criarSessoesDeTurmasAntigas(d1: DatabaseBinding) {
+  const pendentes = await d1
+    .prepare(`SELECT t.id, t.training_date, t.training_dates, t.instructor_id, t.status
+      FROM trainings t
+      WHERE NOT EXISTS (SELECT 1 FROM training_sessions s WHERE s.training_id = t.id)`)
+    .all<{ id: string; training_date: string; training_dates: string; instructor_id: string | null; status: string }>();
+  const insercoes = [];
+  for (const turma of rows(pendentes)) {
+    for (const [indice, data] of datasDaTurma(turma).entries()) {
+      insercoes.push(
+        d1
+          .prepare(`INSERT INTO training_sessions (
+            id, training_id, day_number, session_date, start_time, end_time, instructor_id, status
+          ) VALUES (?, ?, ?, ?, '', '', ?, ?)`)
+          .bind(makeId('session'), turma.id, indice + 1, data, turma.instructor_id, turma.status),
+      );
+    }
+  }
+  if (insercoes.length > 0) await d1.batch(insercoes);
+}
+
+/** As datas gravadas na turma, em ordem, com recuo para a data principal. */
+function datasDaTurma(turma: { training_date: string; training_dates: string }): string[] {
+  let datas: string[] = [];
+  try {
+    datas = turma.training_dates ? (JSON.parse(turma.training_dates) as string[]) : [];
+  } catch { datas = []; }
+  if (!Array.isArray(datas) || datas.length === 0) datas = [turma.training_date];
+  return datas.filter(Boolean);
+}
+
+/**
+ * O instrutor enxerga a turma quando tem ao menos um DIA dela atribuído.
+ * Antes o vínculo era a coluna trainings.instructor_id, que só cabe um.
+ */
+const INSTRUTOR_NA_TURMA = `EXISTS (SELECT 1 FROM training_sessions s
+  WHERE s.training_id = t.id AND s.instructor_id = ?)`;
+
+export type TrainingSessionRow = {
+  id: string;
+  training_id: string;
+  day_number: number;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  instructor_id: string | null;
+  instructor_name: string | null;
+  status: string;
+};
+
+export async function listTrainingSessions(trainingId: string): Promise<TrainingSessionRow[]> {
+  const result = await getD1()
+    .prepare(`SELECT s.id, s.training_id, s.day_number, s.session_date, s.start_time,
+      s.end_time, s.instructor_id, i.name AS instructor_name, s.status
+      FROM training_sessions s
+      LEFT JOIN instructors i ON i.id = s.instructor_id
+      WHERE s.training_id = ? ORDER BY s.day_number ASC`)
+    .bind(trainingId)
+    .all<TrainingSessionRow>();
+  return rows(result);
+}
+
+/**
+ * A turma é o resumo dos dias dela: status, datas e — o que importa para o
+ * certificado — o instrutor do ÚLTIMO dia concluído, que é quem assina.
+ *
+ * Chamar sempre que uma sessão mudar. Devolve `concluiuAgora` para quem chama
+ * saber se é a hora de emitir os documentos: emitir no fim de cada dia era
+ * justamente o defeito.
+ */
+export async function sincronizarTurma(trainingId: string) {
+  const d1 = getD1();
+  const sessoes = await listTrainingSessions(trainingId);
+  if (sessoes.length === 0) return { concluiuAgora: false, status: 'scheduled' as const };
+
+  const anterior = await d1
+    .prepare('SELECT status FROM trainings WHERE id = ? LIMIT 1')
+    .bind(trainingId)
+    .first<{ status: string }>();
+
+  const concluidas = sessoes.filter((dia) => dia.status === 'completed');
+  const status = concluidas.length === sessoes.length
+    ? 'completed'
+    : sessoes.some((dia) => dia.status !== 'scheduled') ? 'in_progress' : 'scheduled';
+
+  // Quem assina é o instrutor do último dia dado. Enquanto nenhum dia terminou,
+  // vale o último dia que já tem instrutor escalado.
+  const referencia = [...concluidas].reverse().find((dia) => dia.instructor_id)
+    ?? [...sessoes].reverse().find((dia) => dia.instructor_id)
+    ?? null;
+
+  const datas = sessoes.map((dia) => dia.session_date);
+  await d1
+    .prepare(`UPDATE trainings SET status = ?, training_date = ?, training_dates = ?,
+      instructor_id = ?, instructor = ? WHERE id = ?`)
+    .bind(
+      status,
+      datas[0],
+      JSON.stringify(datas),
+      referencia?.instructor_id ?? null,
+      referencia?.instructor_name ?? '',
+      trainingId,
+    )
+    .run();
+
+  return { concluiuAgora: status === 'completed' && anterior?.status !== 'completed', status };
+}
+
+/** Existe foto da lista assinada arquivada nesta turma? */
+export async function temListaAssinada(trainingId: string) {
+  const linha = await getD1()
+    .prepare("SELECT count(*) AS total FROM files WHERE training_id = ? AND kind = 'attendance'")
+    .bind(trainingId)
+    .first<{ total: number }>();
+  return (linha?.total ?? 0) > 0;
+}
 
 export async function findUserByEmail(
   email: string,
@@ -870,7 +1019,7 @@ export async function getInstructorDashboardData(
     .first<CompanyInstructor>();
   if (!instructor) return null;
 
-  const [trainingsResult, availabilityResult, participantsResult, documentsResult] =
+  const [trainingsResult, availabilityResult, participantsResult, documentsResult, sessoes] =
     await Promise.all([
       d1
         .prepare(`SELECT t.id, t.client_id, t.instructor_id,
@@ -883,7 +1032,7 @@ export async function getInstructorDashboardData(
           FROM trainings t
           JOIN clients c ON c.id = t.client_id
           LEFT JOIN instructors i ON i.id = t.instructor_id
-          WHERE t.instructor_id = ?
+          WHERE ${INSTRUTOR_NA_TURMA}
           ORDER BY t.training_date ASC`)
         .bind(instructor.id)
         .all<CompanyTraining>(),
@@ -900,7 +1049,7 @@ export async function getInstructorDashboardData(
           FROM participants p
           JOIN trainings t ON t.id = p.training_id
           JOIN clients c ON c.id = t.client_id
-          WHERE t.instructor_id = ?
+          WHERE ${INSTRUTOR_NA_TURMA}
           ORDER BY p.created_at DESC`)
         .bind(instructor.id)
         .all<CompanyParticipant>(),
@@ -911,11 +1060,12 @@ export async function getInstructorDashboardData(
           WHERE instructor_id = ? ORDER BY created_at DESC`)
         .bind(instructor.id)
         .all<CompanyInstructorDocument>(),
+      sessoesPorTurma(d1, instructor.id),
     ]);
 
   return {
     instructor,
-    trainings: rows(trainingsResult),
+    trainings: rows(trainingsResult).map((turma) => ({ ...turma, sessions: sessoes.get(turma.id) ?? [] })),
     availability: rows(availabilityResult),
     documents: rows(documentsResult),
     participants: rows(participantsResult),
@@ -934,7 +1084,7 @@ export async function saveInstructorAvailability(input: {
   note: string;
 }) {
   await ensurePortalSchema();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.availableDate)) {
+  if (!DATA_ISO.test(input.availableDate)) {
     throw new Error('Informe uma data válida.');
   }
   const id = makeId('availability');
@@ -976,6 +1126,18 @@ export async function removeInstructorAvailability(input: {
   );
 }
 
+/**
+ * O dia deste instrutor nesta turma: o primeiro ainda não concluído, ou o
+ * último que ele deu. É sobre ele que iniciar e encerrar agem.
+ */
+async function diaDoInstrutor(trainingId: string, instructorId: string) {
+  const sessoes = await listTrainingSessions(trainingId);
+  const minhas = sessoes.filter((dia) => dia.instructor_id === instructorId);
+  if (minhas.length === 0) return null;
+  const atual = minhas.find((dia) => dia.status !== 'completed') ?? minhas[minhas.length - 1];
+  return { atual, sessoes, minhas };
+}
+
 export async function startInstructorTraining(input: {
   instructorId: string;
   trainingId: string;
@@ -984,27 +1146,28 @@ export async function startInstructorTraining(input: {
   await ensurePortalSchema();
   const d1 = getD1();
   const training = await d1
-    .prepare(`SELECT id, qr_token, status FROM trainings
-      WHERE id = ? AND instructor_id = ? LIMIT 1`)
+    .prepare(`SELECT t.id, t.qr_token FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`)
     .bind(input.trainingId, input.instructorId)
-    .first<{ id: string; qr_token: string; status: string }>();
+    .first<{ id: string; qr_token: string }>();
   if (!training) throw new Error('Treinamento não encontrado para este instrutor.');
-  if (training.status === 'completed') {
-    throw new Error('Este treinamento já foi concluído.');
+  const dia = await diaDoInstrutor(input.trainingId, input.instructorId);
+  if (!dia) throw new Error('Nenhum dia deste treinamento está atribuído a você.');
+  if (dia.atual.status === 'completed') {
+    throw new Error('Todos os seus dias neste treinamento já foram concluídos.');
   }
   await d1
-    .prepare(`UPDATE trainings SET status = 'in_progress'
-      WHERE id = ? AND instructor_id = ?`)
-    .bind(input.trainingId, input.instructorId)
+    .prepare("UPDATE training_sessions SET status = 'in_progress' WHERE id = ?")
+    .bind(dia.atual.id)
     .run();
+  await sincronizarTurma(input.trainingId);
   await writeAudit(
     input.userId,
     'training.started',
     'training',
     input.trainingId,
-    {},
+    { dia: dia.atual.day_number },
   );
-  return { qrToken: training.qr_token, status: 'in_progress' as const };
+  return { qrToken: training.qr_token, status: 'in_progress' as const, day: dia.atual.day_number };
 }
 
 export async function listInstructorTrainingParticipants(input: {
@@ -1019,13 +1182,20 @@ export async function listInstructorTrainingParticipants(input: {
       FROM participants p
       JOIN trainings t ON t.id = p.training_id
       JOIN clients c ON c.id = t.client_id
-      WHERE t.id = ? AND t.instructor_id = ?
+      WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA}
       ORDER BY p.created_at DESC`)
     .bind(input.trainingId, input.instructorId)
     .all<CompanyParticipant>();
   return rows(result);
 }
 
+/**
+ * Encerra o DIA do instrutor. A turma só fecha — e só então os documentos são
+ * emitidos — quando o último dia é encerrado.
+ *
+ * A folha de presença é impressa no 1º dia com uma coluna por data e assinada
+ * ao longo do treinamento, então a foto dela é cobrada apenas no último dia.
+ */
 export async function completeInstructorTraining(input: {
   instructorId: string;
   trainingId: string;
@@ -1033,29 +1203,176 @@ export async function completeInstructorTraining(input: {
 }) {
   await ensurePortalSchema();
   const d1 = getD1();
-  const training = await d1
-    .prepare(`SELECT id, status FROM trainings
-      WHERE id = ? AND instructor_id = ? LIMIT 1`)
-    .bind(input.trainingId, input.instructorId)
-    .first<{ id: string; status: string }>();
-  if (!training) throw new Error('Treinamento não encontrado para este instrutor.');
-  if (training.status !== 'in_progress') {
-    throw new Error('Só é possível encerrar um treinamento em andamento.');
+  const dia = await diaDoInstrutor(input.trainingId, input.instructorId);
+  if (!dia) throw new Error('Treinamento não encontrado para este instrutor.');
+  if (dia.atual.status === 'completed') {
+    throw new Error('Este dia do treinamento já foi encerrado.');
   }
-  await d1
-    .prepare(`UPDATE trainings SET status = 'completed'
-      WHERE id = ? AND instructor_id = ?`)
-    .bind(input.trainingId, input.instructorId)
-    .run();
-  await writeAudit(input.userId, 'training.completed', 'training', input.trainingId, {});
 
-  // Encerrar a turma já emite o lote de certificados: quem estava na lista de
-  // presença é exatamente quem recebe.
+  const ultimoPendente = dia.sessoes.every(
+    (outro) => outro.id === dia.atual.id || outro.status === 'completed',
+  );
+  if (ultimoPendente && !(await temListaAssinada(input.trainingId))) {
+    throw new Error(
+      'Envie a foto da lista de presença assinada antes de encerrar o treinamento.',
+    );
+  }
+
+  await d1
+    .prepare("UPDATE training_sessions SET status = 'completed' WHERE id = ?")
+    .bind(dia.atual.id)
+    .run();
+  const { concluiuAgora } = await sincronizarTurma(input.trainingId);
+  await writeAudit(input.userId, 'training.day_completed', 'training', input.trainingId, {
+    dia: dia.atual.day_number,
+    turmaConcluida: concluiuAgora,
+  });
+
+  if (!concluiuAgora) {
+    const restantes = dia.sessoes.filter(
+      (outro) => outro.id !== dia.atual.id && outro.status !== 'completed',
+    ).length;
+    return { status: 'in_progress' as const, certificates: 0, trainingCompleted: false, remainingDays: restantes };
+  }
+
+  // Só na virada da turma: quem estava na lista de presença é quem recebe.
   const emitidos = await issueCertificateBatch({
     trainingId: input.trainingId,
     byUserId: input.userId,
   });
-  return { status: 'completed' as const, certificates: emitidos };
+  return { status: 'completed' as const, certificates: emitidos, trainingCompleted: true, remainingDays: 0 };
+}
+
+/**
+ * A Space fecha a turma quando o instrutor sumiu. Aqui a foto da lista é aviso,
+ * não trava — quem confirma assume, e fica registrado.
+ */
+export async function completeTrainingByAdmin(input: {
+  trainingId: string;
+  byUserId: string;
+  semLista?: boolean;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const sessoes = await listTrainingSessions(input.trainingId);
+  if (sessoes.length === 0) throw new Error('Treinamento não encontrado.');
+  const pendentes = sessoes.filter((dia) => dia.status !== 'completed');
+  if (pendentes.length === 0) throw new Error('Este treinamento já está concluído.');
+
+  const listaEnviada = await temListaAssinada(input.trainingId);
+  if (!listaEnviada && !input.semLista) throw new Error('SEM_LISTA');
+
+  await d1.batch(
+    pendentes.map((dia) =>
+      d1.prepare("UPDATE training_sessions SET status = 'completed' WHERE id = ?").bind(dia.id),
+    ),
+  );
+  const { concluiuAgora } = await sincronizarTurma(input.trainingId);
+  await writeAudit(input.byUserId, 'training.completed_by_company', 'training', input.trainingId, {
+    dias: pendentes.map((dia) => dia.day_number),
+    semListaAssinada: !listaEnviada,
+  });
+  const emitidos = await issueCertificateBatch({
+    trainingId: input.trainingId,
+    byUserId: input.byUserId,
+  });
+  return { concluiuAgora, certificates: emitidos, listaEnviada };
+}
+
+export type CobrancaDeTurma = {
+  training: { id: string; nr: string; title: string; client_name: string; training_date: string; status: string };
+  faltaLista: boolean;
+  instrutores: { id: string; name: string; email: string; phone: string; dias: number[] }[];
+};
+
+/**
+ * Quem ainda deve alguma coisa nesta turma: os instrutores dos dias que não
+ * foram encerrados. Sem dia pendente não há quem cobrar.
+ */
+export async function getTrainingReminderTargets(trainingId: string): Promise<CobrancaDeTurma | null> {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const training = await d1
+    .prepare(`SELECT t.id, t.nr, t.title, t.training_date, t.status, c.name AS client_name
+      FROM trainings t JOIN clients c ON c.id = t.client_id WHERE t.id = ? LIMIT 1`)
+    .bind(trainingId)
+    .first<{ id: string; nr: string; title: string; training_date: string; status: string; client_name: string }>();
+  if (!training) return null;
+
+  const pendentes = (await listTrainingSessions(trainingId)).filter((dia) => dia.status !== 'completed');
+  const porInstrutor = new Map<string, number[]>();
+  for (const dia of pendentes) {
+    if (!dia.instructor_id) continue;
+    const dias = porInstrutor.get(dia.instructor_id);
+    if (dias) dias.push(dia.day_number); else porInstrutor.set(dia.instructor_id, [dia.day_number]);
+  }
+
+  const instrutores: CobrancaDeTurma['instrutores'] = [];
+  if (porInstrutor.size > 0) {
+    const ids = [...porInstrutor.keys()];
+    const marcadores = ids.map(() => '?').join(', ');
+    const encontrados = await d1
+      .prepare(`SELECT id, name, email, phone FROM instructors WHERE id IN (${marcadores})`)
+      .bind(...ids)
+      .all<{ id: string; name: string; email: string; phone: string }>();
+    for (const linha of rows(encontrados)) {
+      instrutores.push({ ...linha, dias: porInstrutor.get(linha.id) ?? [] });
+    }
+  }
+
+  return {
+    training,
+    faltaLista: !(await temListaAssinada(trainingId)),
+    instrutores,
+  };
+}
+
+/** A Space escala (ou troca) o instrutor, a data e o horário de um dia. */
+export async function updateTrainingSession(input: {
+  trainingId: string;
+  sessionId: string;
+  instructorId?: string | null;
+  sessionDate?: string;
+  startTime?: string;
+  endTime?: string;
+  byUserId: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const atual = await d1
+    .prepare('SELECT id FROM training_sessions WHERE id = ? AND training_id = ? LIMIT 1')
+    .bind(input.sessionId, input.trainingId)
+    .first<{ id: string }>();
+  if (!atual) throw new Error('Dia do treinamento não encontrado.');
+
+  if (input.instructorId) {
+    const instrutor = await d1
+      .prepare("SELECT id FROM instructors WHERE id = ? AND status IN ('active', 'invited') LIMIT 1")
+      .bind(input.instructorId)
+      .first<{ id: string }>();
+    if (!instrutor) throw new Error('Selecione um instrutor aprovado.');
+  }
+  if (input.sessionDate !== undefined && !DATA_ISO.test(input.sessionDate)) {
+    throw new Error('Informe uma data válida para o dia.');
+  }
+
+  const campos: string[] = [];
+  const valores: (string | null)[] = [];
+  if (input.instructorId !== undefined) { campos.push('instructor_id = ?'); valores.push(input.instructorId || null); }
+  if (input.sessionDate !== undefined) { campos.push('session_date = ?'); valores.push(input.sessionDate); }
+  if (input.startTime !== undefined) { campos.push('start_time = ?'); valores.push(input.startTime.trim()); }
+  if (input.endTime !== undefined) { campos.push('end_time = ?'); valores.push(input.endTime.trim()); }
+  if (campos.length === 0) return { ok: true as const };
+
+  await d1
+    .prepare(`UPDATE training_sessions SET ${campos.join(', ')} WHERE id = ?`)
+    .bind(...valores, input.sessionId)
+    .run();
+  await sincronizarTurma(input.trainingId);
+  await writeAudit(input.byUserId, 'training.session_updated', 'training', input.trainingId, {
+    sessionId: input.sessionId,
+  });
+  return { ok: true as const };
 }
 
 /**
@@ -1147,17 +1464,12 @@ export async function addParticipantByInstructor(input: {
   await ensurePortalSchema();
   const d1 = getD1();
   const training = await d1
-    .prepare(`SELECT id, participant_limit,
-      (SELECT count(*) FROM participants p WHERE p.training_id = trainings.id) AS participant_count
-      FROM trainings WHERE id = ? AND instructor_id = ? LIMIT 1`)
+    .prepare(`SELECT t.id FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`)
     .bind(input.trainingId, input.instructorId)
-    .first<{ id: string; participant_limit: number; participant_count: number }>();
+    .first<{ id: string }>();
   if (!training) throw new Error('Treinamento não encontrado para este instrutor.');
   if (!input.participant.fullName.trim() || !input.participant.documentId.trim()) {
     throw new Error('Informe ao menos o nome e o identificador do participante.');
-  }
-  if (training.participant_limit > 0 && training.participant_count >= training.participant_limit) {
-    throw new Error('O limite de participantes deste treinamento foi atingido.');
   }
   const id = makeId('participant');
   try {
@@ -1195,7 +1507,7 @@ export async function removeParticipantByInstructor(input: {
   const participant = await d1
     .prepare(`SELECT p.id FROM participants p
       JOIN trainings t ON t.id = p.training_id
-      WHERE p.id = ? AND t.id = ? AND t.instructor_id = ? LIMIT 1`)
+      WHERE p.id = ? AND t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`)
     .bind(input.participantId, input.trainingId, input.instructorId)
     .first<{ id: string }>();
   if (!participant) throw new Error('Participante não encontrado.');
@@ -1213,21 +1525,22 @@ export async function getAttendanceListData(input: {
   const training = await d1
     .prepare(`SELECT t.id, c.name AS client_name, t.location, t.duration,
       COALESCE(i.name, t.instructor) AS instructor, t.nr, t.title,
-      t.training_date, t.training_dates, t.content_program, t.instructor_id
+      t.training_date, t.training_dates, t.content_program, t.instructor_id,
+      CASE WHEN ${INSTRUTOR_NA_TURMA} THEN 1 ELSE 0 END AS meu
       FROM trainings t
       JOIN clients c ON c.id = t.client_id
       LEFT JOIN instructors i ON i.id = t.instructor_id
       WHERE t.id = ? LIMIT 1`)
-    .bind(input.trainingId)
+    .bind(input.user.instructor_id ?? '', input.trainingId)
     .first<{
       id: string; client_name: string; location: string; duration: string;
       instructor: string; nr: string; title: string; training_date: string;
       training_dates: string; content_program: string; instructor_id: string | null;
+      meu: number;
     }>();
   if (!training) return null;
-  if (!isAdmin && (!input.user.instructor_id || training.instructor_id !== input.user.instructor_id)) {
-    return null;
-  }
+  // Qualquer instrutor escalado para um dos dias imprime a lista da turma.
+  if (!isAdmin && training.meu !== 1) return null;
   let dates: string[] = [];
   try {
     dates = training.training_dates ? (JSON.parse(training.training_dates) as string[]) : [];
@@ -1653,7 +1966,13 @@ export async function getClientAddress(clientId: string): Promise<ClientAddress>
 
 export async function deleteTrainingByAdmin(input: { trainingId: string; byUserId: string }) {
   await ensurePortalSchema();
-  await getD1().prepare('DELETE FROM trainings WHERE id = ?').bind(input.trainingId).run();
+  const d1 = getD1();
+  // O ON DELETE CASCADE já daria conta, mas depende de foreign_keys ligado —
+  // apagar explicitamente evita dia órfão aparecendo na agenda.
+  await d1.batch([
+    d1.prepare('DELETE FROM training_sessions WHERE training_id = ?').bind(input.trainingId),
+    d1.prepare('DELETE FROM trainings WHERE id = ?').bind(input.trainingId),
+  ]);
   await writeAudit(input.byUserId, 'training.deleted', 'training', input.trainingId, {});
 }
 
@@ -1670,10 +1989,18 @@ export async function deleteClientByAdmin(input: { clientId: string; byUserId: s
 export async function deleteInstructorByAdmin(input: { instructorId: string; byUserId: string }) {
   await ensurePortalSchema();
   const d1 = getD1();
+  // Os dias dele voltam a ficar sem escala, e o nome sai da turma: deixar o
+  // nome de um instrutor excluído gravado sairia impresso nos documentos.
+  const afetadas = await d1
+    .prepare('SELECT DISTINCT training_id FROM training_sessions WHERE instructor_id = ?')
+    .bind(input.instructorId)
+    .all<{ training_id: string }>();
   await d1.batch([
+    d1.prepare('UPDATE training_sessions SET instructor_id = NULL WHERE instructor_id = ?').bind(input.instructorId),
     d1.prepare("DELETE FROM users WHERE instructor_id = ? AND role = 'instructor'").bind(input.instructorId),
     d1.prepare('DELETE FROM instructors WHERE id = ?').bind(input.instructorId),
   ]);
+  for (const linha of rows(afetadas)) await sincronizarTurma(linha.training_id);
   await writeAudit(input.byUserId, 'instructor.deleted', 'instructor', input.instructorId, {});
 }
 
@@ -1771,26 +2098,51 @@ export async function listAuditLogs(limit = 60): Promise<AuditEntry[]> {
   return rows(result);
 }
 
+/** Os dias de todas as turmas, agrupados por turma, numa consulta só. */
+async function sessoesPorTurma(d1: DatabaseBinding, instructorId?: string) {
+  const consulta = instructorId
+    ? `SELECT s.id, s.training_id, s.day_number, s.session_date, s.start_time,
+        s.end_time, s.instructor_id, i.name AS instructor_name, s.status
+       FROM training_sessions s
+       LEFT JOIN instructors i ON i.id = s.instructor_id
+       WHERE EXISTS (SELECT 1 FROM training_sessions meu
+         WHERE meu.training_id = s.training_id AND meu.instructor_id = ?)
+       ORDER BY s.day_number ASC`
+    : `SELECT s.id, s.training_id, s.day_number, s.session_date, s.start_time,
+        s.end_time, s.instructor_id, i.name AS instructor_name, s.status
+       FROM training_sessions s
+       LEFT JOIN instructors i ON i.id = s.instructor_id
+       ORDER BY s.day_number ASC`;
+  const preparada = d1.prepare(consulta);
+  const resultado = await (instructorId ? preparada.bind(instructorId) : preparada).all<TrainingSessionRow>();
+  const mapa = new Map<string, TrainingSessionRow[]>();
+  for (const dia of rows(resultado)) {
+    const lista = mapa.get(dia.training_id);
+    if (lista) lista.push(dia); else mapa.set(dia.training_id, [dia]);
+  }
+  return mapa;
+}
+
 export async function getCompanyDashboardData(
   currentUser: { id: string; email: string; is_owner?: number },
 ): Promise<CompanyDashboardData> {
   await ensurePortalSchema();
   const d1 = getD1();
-  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult] =
+  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes] =
     await Promise.all([
       d1
         .prepare(
           `SELECT id, name, legal_name, document, unit, contact_name,
            contact_email, contact_phone, address, district, city, state,
            postal_code, status, created_at
-           FROM clients ORDER BY created_at DESC`,
+           FROM clients ORDER BY name COLLATE NOCASE ASC`,
         )
         .all<CompanyClient>(),
       d1
         .prepare(
           `SELECT id, name, document, email, phone, professional_registry,
            specialties, base_city, status, source, created_at
-           FROM instructors ORDER BY created_at DESC`,
+           FROM instructors ORDER BY name COLLATE NOCASE ASC`,
         )
         .all<CompanyInstructor>(),
       d1
@@ -1822,7 +2174,7 @@ export async function getCompanyDashboardData(
         .prepare(
           `SELECT f.id, f.client_id, c.name AS client_name, f.training_id,
            t.title AS training_title, t.nr AS training_nr, f.name,
-           f.object_key, f.content_type, f.size, f.kind, f.status, f.created_at
+           f.object_key, f.content_type, f.size, f.kind, f.session_id, f.status, f.created_at
            FROM files f
            JOIN clients c ON c.id = f.client_id
            JOIN trainings t ON t.id = f.training_id
@@ -1840,13 +2192,14 @@ export async function getCompanyDashboardData(
            ORDER BY p.created_at DESC`,
         )
         .all<CompanyParticipant>(),
+      sessoesPorTurma(d1),
     ]);
 
   return {
     clients: rows(clientsResult),
     instructors: rows(instructorsResult),
     instructorAvailability: rows(instructorAvailabilityResult),
-    trainings: rows(trainingsResult),
+    trainings: rows(trainingsResult).map((turma) => ({ ...turma, sessions: sessoes.get(turma.id) ?? [] })),
     files: rows(filesResult),
     participants: rows(participantsResult),
     currentUser: {
@@ -1857,16 +2210,26 @@ export async function getCompanyDashboardData(
   };
 }
 
+export type NovoDiaDeTreinamento = {
+  date: string;
+  startTime?: string;
+  endTime?: string;
+  instructorId?: string | null;
+};
+
+/**
+ * A turma nasce com um registro por dia. O instrutor é opcional de propósito:
+ * a data costuma ser fechada com o cliente antes de haver escala, e num
+ * treinamento de vários dias cada dia pode acabar com um instrutor diferente.
+ */
 export async function createTraining(input: {
   clientId: string;
-  instructorId: string;
   nr: string;
   title: string;
-  dates: string[];
+  days: NovoDiaDeTreinamento[];
   contentProgram: string;
   duration: string;
   location: string;
-  participantLimit: number;
   createdByUserId: string;
 }) {
   await ensurePortalSchema();
@@ -1876,48 +2239,77 @@ export async function createTraining(input: {
     .bind(input.clientId)
     .first<{ id: string }>();
   if (!client) throw new Error('Cliente não encontrado.');
-  const instructor = await d1
-    .prepare(`SELECT id, name FROM instructors
-      WHERE id = ? AND status IN ('active', 'invited') LIMIT 1`)
-    .bind(input.instructorId)
-    .first<{ id: string; name: string }>();
-  if (!instructor) throw new Error('Selecione um instrutor aprovado.');
-  const dates = input.dates.map((value) => value.trim()).filter(Boolean).slice(0, 3);
-  if (dates.length === 0) throw new Error('Informe ao menos uma data para o treinamento.');
-  const primaryDate = dates[0];
+
+  const dias = (input.days ?? [])
+    .map((dia) => ({
+      date: (dia.date ?? '').trim(),
+      startTime: (dia.startTime ?? '').trim(),
+      endTime: (dia.endTime ?? '').trim(),
+      instructorId: dia.instructorId || null,
+    }))
+    .filter((dia) => DATA_ISO.test(dia.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (dias.length === 0) throw new Error('Informe ao menos uma data para o treinamento.');
+
+  // Confere de uma vez só os instrutores escalados na criação, se houver.
+  const escalados = [...new Set(dias.map((dia) => dia.instructorId).filter(Boolean))] as string[];
+  const nomes = new Map<string, string>();
+  if (escalados.length > 0) {
+    const marcadores = escalados.map(() => '?').join(', ');
+    const encontrados = await d1
+      .prepare(`SELECT id, name FROM instructors
+        WHERE id IN (${marcadores}) AND status IN ('active', 'invited')`)
+      .bind(...escalados)
+      .all<{ id: string; name: string }>();
+    for (const linha of rows(encontrados)) nomes.set(linha.id, linha.name);
+    if (nomes.size !== escalados.length) throw new Error('Selecione um instrutor aprovado.');
+  }
+
+  const primaryDate = dias[0].date;
   const id = makeId('training');
   const digits = input.nr.replace(/\D/g, '').padStart(2, '0');
   const suffix = crypto.randomUUID().slice(0, 6).toUpperCase();
   const code = `SL-${primaryDate.slice(0, 4)}-${digits}-${suffix}`;
   const qrToken = `${code}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-  await d1
-    .prepare(`INSERT INTO trainings (
-      id, client_id, instructor_id, code, nr, title, training_date, training_dates,
-      content_program, duration, location, instructor, status, participant_limit, qr_token, qr_enabled
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, 1)`)
-    .bind(
-      id,
-      input.clientId,
-      instructor.id,
-      code,
-      input.nr.trim(),
-      input.title.trim(),
-      primaryDate,
-      JSON.stringify(dates),
-      (input.contentProgram ?? '').trim(),
-      input.duration.trim(),
-      input.location.trim(),
-      instructor.name,
-      input.participantLimit,
-      qrToken,
-    )
-    .run();
+  // Vale o instrutor do último dia: é ele quem assina o certificado.
+  const ultimoEscalado = [...dias].reverse().find((dia) => dia.instructorId);
+
+  await d1.batch([
+    d1
+      .prepare(`INSERT INTO trainings (
+        id, client_id, instructor_id, code, nr, title, training_date, training_dates,
+        content_program, duration, location, instructor, status, participant_limit, qr_token, qr_enabled
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, ?, 1)`)
+      .bind(
+        id,
+        input.clientId,
+        ultimoEscalado?.instructorId ?? null,
+        code,
+        input.nr.trim(),
+        input.title.trim(),
+        primaryDate,
+        JSON.stringify(dias.map((dia) => dia.date)),
+        (input.contentProgram ?? '').trim(),
+        input.duration.trim(),
+        input.location.trim(),
+        ultimoEscalado ? nomes.get(ultimoEscalado.instructorId as string) ?? '' : '',
+        qrToken,
+      ),
+    ...dias.map((dia, indice) =>
+      d1
+        .prepare(`INSERT INTO training_sessions (
+          id, training_id, day_number, session_date, start_time, end_time, instructor_id, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled')`)
+        .bind(makeId('session'), id, indice + 1, dia.date, dia.startTime, dia.endTime, dia.instructorId),
+    ),
+  ]);
+
   await writeAudit(
     input.createdByUserId,
     'training.created',
     'training',
     id,
-    { clientId: input.clientId, instructorId: instructor.id },
+    { clientId: input.clientId, dias: dias.length },
   );
   return { id, code, qrToken };
 }
@@ -1951,8 +2343,8 @@ export async function findTrainingForInstructor(input: {
 }) {
   await ensurePortalSchema();
   return getD1()
-    .prepare(`SELECT id, client_id, nr, title, status
-      FROM trainings WHERE id = ? AND instructor_id = ? LIMIT 1`)
+    .prepare(`SELECT t.id, t.client_id, t.nr, t.title, t.status
+      FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`)
     .bind(input.trainingId, input.instructorId)
     .first<{ id: string; client_id: string; nr: string; title: string; status: string }>();
 }
@@ -1966,14 +2358,15 @@ export async function registerStoredFile(input: {
   contentType: string;
   size: number;
   kind: 'photo' | 'document' | 'attendance';
+  sessionId?: string | null;
   createdByUserId: string;
 }) {
   await ensurePortalSchema();
   await getD1()
     .prepare(`INSERT INTO files (
       id, client_id, training_id, name, object_key, content_type,
-      size, kind, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'stored')`)
+      size, kind, session_id, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'stored')`)
     .bind(
       input.fileId,
       input.clientId,
@@ -1983,6 +2376,7 @@ export async function registerStoredFile(input: {
       input.contentType,
       input.size,
       input.kind,
+      input.sessionId ?? null,
     )
     .run();
   await writeAudit(input.createdByUserId, 'file.uploaded', 'training', input.trainingId, {
@@ -2055,7 +2449,7 @@ export async function findFileForUser(input: {
     // trabalho dele. Fica arquivada como documento, mas continua acessível.
     if (file.kind !== 'photo' && file.kind !== 'attendance') return null;
     const owned = await getD1()
-      .prepare('SELECT id FROM trainings WHERE id = ? AND instructor_id = ? LIMIT 1')
+      .prepare(`SELECT t.id FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`)
       .bind(file.training_id, user.instructor_id)
       .first<{ id: string }>();
     return owned ? file : null;
@@ -2176,12 +2570,6 @@ export async function registerParticipant(
 ) {
   const training = await findTrainingByToken(token);
   if (!training) throw new Error('Este formulário não está disponível.');
-  if (
-    training.participant_limit > 0 &&
-    training.participant_count >= training.participant_limit
-  ) {
-    throw new Error('O limite de participantes deste treinamento foi atingido.');
-  }
   const id = makeId('participant');
   await getD1()
     .prepare(`INSERT INTO participants (
