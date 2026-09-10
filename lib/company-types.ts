@@ -73,7 +73,10 @@ export type CompanyTraining = {
   client_name: string;
   code: string;
   nr: string;
+  /** Título que sai impresso no certificado. */
   title: string;
+  /** Nome interno para diferenciar turmas; nunca sai em documento. */
+  internal_label: string;
   training_date: string;
   duration: string;
   location: string;

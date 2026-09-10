@@ -213,7 +213,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
       <label htmlFor="arquivos-treinamento"><span className={labelClass}>Treinamento</span>
         <select id="arquivos-treinamento" value={trainingId} onChange={(event) => setTrainingId(event.target.value)} className={selectClass}>
           <option value="">Todas as turmas deste cliente</option>
-          {clientTrainings.map((training) => <option key={training.id} value={training.id}>{training.nr} · {training.title} · {formatDate(training.training_date)}</option>)}
+          {clientTrainings.map((training) => <option key={training.id} value={training.id}>{training.nr} · {training.internal_label || training.title} · {formatDate(training.training_date)}</option>)}
         </select>
       </label>
     </div>
@@ -246,7 +246,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
     </section> : <section>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <span className="eyebrow text-[#8a6107]">{selectedTraining ? `${selectedTraining.nr} · ${selectedTraining.title}` : clientName || 'Histórico'}</span>
+          <span className="eyebrow text-[#8a6107]">{selectedTraining ? `${selectedTraining.nr} · ${selectedTraining.internal_label || selectedTraining.title}` : clientName || 'Histórico'}</span>
           <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">{copy.plural} {selectedTraining ? 'desta turma' : 'do cliente'}</h2>
         </div>
         <div className="flex flex-wrap gap-2">

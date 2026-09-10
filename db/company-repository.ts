@@ -63,7 +63,7 @@ function rows<T>(result: DatabaseResult<T>): T[] {
  * em produção (Turso, pela rede) isso somava ~15 idas em sequência a cada
  * arranque frio da função, antes de qualquer trabalho útil.
  */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 /** Data no formato do banco e do <input type="date">. */
 const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -183,6 +183,7 @@ export function ensurePortalSchema(): Promise<void> {
         title TEXT NOT NULL,
         training_date TEXT NOT NULL,
         training_dates TEXT NOT NULL DEFAULT '',
+        internal_label TEXT NOT NULL DEFAULT '',
         content_program TEXT NOT NULL DEFAULT '',
         duration TEXT NOT NULL,
         location TEXT NOT NULL,
@@ -362,6 +363,9 @@ export function ensurePortalSchema(): Promise<void> {
       { tabela: 'users', coluna: 'is_owner', alter: 'ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0' },
       { tabela: 'trainings', coluna: 'instructor_id', alter: 'ALTER TABLE trainings ADD COLUMN instructor_id TEXT' },
       { tabela: 'trainings', coluna: 'training_dates', alter: "ALTER TABLE trainings ADD COLUMN training_dates TEXT NOT NULL DEFAULT ''" },
+      // Nome interno da turma: serve para diferenciar duas turmas do mesmo
+      // treinamento. NUNCA sai em documento — o certificado usa 'title'.
+      { tabela: 'trainings', coluna: 'internal_label', alter: "ALTER TABLE trainings ADD COLUMN internal_label TEXT NOT NULL DEFAULT ''" },
       { tabela: 'trainings', coluna: 'content_program', alter: "ALTER TABLE trainings ADD COLUMN content_program TEXT NOT NULL DEFAULT ''" },
       // Dia do treinamento a que o arquivo pertence (a foto da lista assinada).
       { tabela: 'files', coluna: 'session_id', alter: 'ALTER TABLE files ADD COLUMN session_id TEXT' },
@@ -1023,7 +1027,7 @@ export async function getInstructorDashboardData(
     await Promise.all([
       d1
         .prepare(`SELECT t.id, t.client_id, t.instructor_id,
-          c.name AS client_name, t.code, t.nr, t.title, t.training_date,
+          c.name AS client_name, t.code, t.nr, t.title, t.internal_label, t.training_date,
           t.duration, t.location, COALESCE(i.name, t.instructor) AS instructor,
           t.status, t.participant_limit, t.qr_token, t.qr_enabled,
           t.created_at,
@@ -1325,6 +1329,32 @@ export async function getTrainingReminderTargets(trainingId: string): Promise<Co
     faltaLista: !(await temListaAssinada(trainingId)),
     instrutores,
   };
+}
+
+/**
+ * Renomeia a identificação da turma. É só o nome interno: o título impresso no
+ * certificado continua sendo `title` e não muda por aqui.
+ */
+export async function renameTraining(input: {
+  trainingId: string;
+  internalLabel: string;
+  byUserId: string;
+}) {
+  await ensurePortalSchema();
+  const existe = await getD1()
+    .prepare('SELECT id FROM trainings WHERE id = ? LIMIT 1')
+    .bind(input.trainingId)
+    .first<{ id: string }>();
+  if (!existe) throw new Error('Treinamento não encontrado.');
+  const identificacao = input.internalLabel.trim().slice(0, 120);
+  await getD1()
+    .prepare('UPDATE trainings SET internal_label = ? WHERE id = ?')
+    .bind(identificacao, input.trainingId)
+    .run();
+  await writeAudit(input.byUserId, 'training.renamed', 'training', input.trainingId, {
+    identificacao,
+  });
+  return { ok: true as const };
 }
 
 /** A Space escala (ou troca) o instrutor, a data e o horário de um dia. */
@@ -2158,7 +2188,7 @@ export async function getCompanyDashboardData(
       d1
         .prepare(
           `SELECT t.id, t.client_id, t.instructor_id, c.name AS client_name,
-           t.code, t.nr, t.title, t.training_date, t.duration, t.location,
+           t.code, t.nr, t.title, t.internal_label, t.training_date, t.duration, t.location,
            COALESCE(i.name, t.instructor) AS instructor,
            t.status, t.participant_limit, t.qr_token, t.qr_enabled,
            t.created_at,
@@ -2225,7 +2255,10 @@ export type NovoDiaDeTreinamento = {
 export async function createTraining(input: {
   clientId: string;
   nr: string;
+  /** Título que sai impresso no certificado. */
   title: string;
+  /** Nome interno da turma; nunca sai em documento. */
+  internalLabel?: string;
   days: NovoDiaDeTreinamento[];
   contentProgram: string;
   duration: string;
@@ -2277,9 +2310,9 @@ export async function createTraining(input: {
   await d1.batch([
     d1
       .prepare(`INSERT INTO trainings (
-        id, client_id, instructor_id, code, nr, title, training_date, training_dates,
+        id, client_id, instructor_id, code, nr, title, internal_label, training_date, training_dates,
         content_program, duration, location, instructor, status, participant_limit, qr_token, qr_enabled
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, ?, 1)`)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, ?, 1)`)
       .bind(
         id,
         input.clientId,
@@ -2287,6 +2320,7 @@ export async function createTraining(input: {
         code,
         input.nr.trim(),
         input.title.trim(),
+        (input.internalLabel ?? '').trim(),
         primaryDate,
         JSON.stringify(dias.map((dia) => dia.date)),
         (input.contentProgram ?? '').trim(),
@@ -2543,7 +2577,7 @@ export async function findTrainingByToken(token: string) {
   return getD1()
     .prepare(
       `SELECT t.id, t.client_id, t.instructor_id, c.name AS client_name, t.code, t.nr,
-       t.title, t.training_date, t.duration, t.location, t.instructor,
+       t.title, t.internal_label, t.training_date, t.duration, t.location, t.instructor,
        t.status, t.participant_limit, t.qr_token, t.qr_enabled, t.created_at,
        0 AS file_count,
        (SELECT count(*) FROM participants p WHERE p.training_id = t.id) AS participant_count
@@ -2617,7 +2651,7 @@ export async function getClientPortalData(
   const [trainingResult, fileResult, certificateResult] = await Promise.all([
     d1
       .prepare(
-        `SELECT t.id, t.client_id, t.code, t.nr, t.title, t.training_date,
+        `SELECT t.id, t.client_id, t.code, t.nr, t.title, t.internal_label, t.training_date,
          t.duration, t.location, t.instructor, t.status,
          (SELECT count(*) FROM participants p WHERE p.training_id = t.id) AS participant_count,
          (SELECT count(*) FROM files f WHERE f.training_id = t.id AND f.kind = 'photo') AS photo_count,

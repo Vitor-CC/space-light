@@ -10,10 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import type { CompanyDashboardData, CompanyInstructor, CompanyTraining, TrainingSession } from '@/lib/company-types';
-import { completeTrainingByCompany, createMockTraining, deleteTraining, remindTrainingInstructor, updateTrainingDay } from '@/lib/mock-company-database';
+import { completeTrainingByCompany, createMockTraining, deleteTraining, remindTrainingInstructor, renameTraining, updateTrainingDay } from '@/lib/mock-company-database';
 import type { NovoDia } from '@/lib/mock-company-database';
 import { nrInfo } from '@/lib/nr-catalog';
-import { scheduleWindow, trainingScheduleMessage, whatsappLink } from '@/lib/whatsapp';
+import { scheduleWindow, trainingReminderMessage, trainingScheduleMessage, whatsappLink } from '@/lib/whatsapp';
 
 type Aba = 'agenda' | 'lista' | 'criar';
 type Notify = (message: string) => void;
@@ -93,11 +93,35 @@ function DayRow({ training, session, instructors, reload, notify }: { training: 
   </div>;
 }
 
-function TrainingActions({ training, reload, notify }: { training: CompanyTraining; reload: Reload; notify: Notify }) {
+function TrainingActions({ training, instructors, faltaLista, reload, notify }: { training: CompanyTraining; instructors: CompanyInstructor[]; faltaLista: boolean; reload: Reload; notify: Notify }) {
   const [ocupado, setOcupado] = useState('');
   const [confirmarSemLista, setConfirmarSemLista] = useState('');
   const [links, setLinks] = useState<{ name: string; url: string }[]>([]);
+  const [identificacao, setIdentificacao] = useState(training.internal_label);
   const concluido = training.status === 'completed';
+
+  // Quem ainda deve alguma coisa: instrutor de dia não encerrado. O link do
+  // WhatsApp é montado aqui mesmo, sem passar pelo servidor — assim o botão
+  // já vale antes de a cobrança por e-mail ser disparada.
+  const devedores = [...new Map((training.sessions ?? [])
+    .filter((dia) => dia.status !== 'completed' && dia.instructor_id)
+    .map((dia) => [dia.instructor_id as string, dia]))
+    .values()]
+    .map((dia) => {
+      const instrutor = instructors.find((item) => item.id === dia.instructor_id);
+      const url = instrutor?.phone
+        ? whatsappLink(instrutor.phone, trainingReminderMessage({
+            instructorName: instrutor.name,
+            nr: training.nr,
+            title: training.title,
+            clientName: training.client_name,
+            dateLabel: formatDate(dia.session_date),
+            faltaLista,
+          }))
+        : null;
+      return { nome: instrutor?.name ?? 'Instrutor', url };
+    });
+  const cobraveisPorWhats = devedores.filter((item) => item.url);
 
   async function encerrar(semLista: boolean) {
     setOcupado('encerrando');
@@ -120,8 +144,19 @@ function TrainingActions({ training, reload, notify }: { training: CompanyTraini
       setLinks(resultado.links);
       notify(resultado.enviados.length
         ? `Cobrança enviada por e-mail para ${resultado.enviados.join(', ')}.${resultado.falhas.length ? ` Sem e-mail: ${resultado.falhas.join(', ')}.` : ''}`
-        : 'Nenhum e-mail pôde ser enviado — use o link do WhatsApp abaixo.');
+        : 'Nenhum e-mail pôde ser enviado — use o botão do WhatsApp ao lado.');
     } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao cobrar o instrutor.'); }
+    finally { setOcupado(''); }
+  }
+
+  async function renomear() {
+    if (identificacao.trim() === training.internal_label) return;
+    setOcupado('renomeando');
+    try {
+      await renameTraining(training.id, identificacao);
+      notify(identificacao.trim() ? 'Identificação da turma salva.' : 'Identificação removida.');
+      await reload();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao renomear a turma.'); }
     finally { setOcupado(''); }
   }
 
@@ -141,33 +176,39 @@ function TrainingActions({ training, reload, notify }: { training: CompanyTraini
       </div>
     </div> : null}
 
+    <div className="mb-3 flex flex-col gap-2 border-b border-black/8 pb-3 sm:flex-row sm:items-center">
+      <label htmlFor={`identificacao-${training.id}`} className="shrink-0 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#777]">Identificação da turma</label>
+      <Input id={`identificacao-${training.id}`} value={identificacao} onChange={(e) => setIdentificacao(e.target.value)} onBlur={() => void renomear()} placeholder="Ex.: Turma A - manhã" className={`${fieldClass} flex-1`} />
+      <span className="shrink-0 text-[11px] text-[#999]">Não aparece em documento</span>
+    </div>
+
     <div className="flex flex-wrap gap-2">
       {concluido ? null : <>
-        <button type="button" onClick={() => void cobrar()} disabled={Boolean(ocupado)} className="inline-flex h-11 items-center gap-2 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white disabled:opacity-50">{ocupado === 'cobrando' ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}Cobrar instrutor</button>
+        {cobraveisPorWhats.map((item) => <a key={item.nome} href={item.url as string} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center gap-2 bg-[#25D366] px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#1fb855]"><MessageCircle className="size-4" />{cobraveisPorWhats.length > 1 ? `Cobrar ${item.nome.split(' ')[0]} no WhatsApp` : 'Cobrar no WhatsApp'}</a>)}
+        <button type="button" onClick={() => void cobrar()} disabled={Boolean(ocupado)} className="inline-flex h-11 items-center gap-2 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white disabled:opacity-50">{ocupado === 'cobrando' ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}Cobrar por e-mail</button>
         <button type="button" onClick={() => void encerrar(false)} disabled={Boolean(ocupado)} className="inline-flex h-11 items-center gap-2 bg-black px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-white hover:bg-[#f2ad19] hover:text-black disabled:opacity-50">{ocupado === 'encerrando' ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Encerrar turma</button>
       </>}
       <a href={`/lista-presenca/${training.id}`} target="_blank" rel="noopener" className="inline-flex h-11 items-center gap-2 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">Lista (PDF)</a>
       <button type="button" onClick={() => void remover()} className="ml-auto inline-flex h-11 items-center gap-2 border border-[#b62525]/40 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] hover:bg-[#b62525] hover:text-white"><Trash2 className="size-4" />Excluir</button>
     </div>
 
-    {links.length ? <div className="mt-3 flex flex-wrap gap-2 border-t border-black/8 pt-3">
-      <span className="self-center text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#777]">Também pelo WhatsApp:</span>
-      {links.map((link) => <a key={link.url} href={link.url} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 bg-[#25D366] px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#1fb855]"><MessageCircle className="size-4" />{link.name.split(' ')[0]}</a>)}
-    </div> : null}
+    {devedores.length > 0 && devedores.every((item) => !item.url) && !concluido ? <p className="mt-3 border-t border-black/8 pt-3 text-[11px] text-[#888]">Sem telefone no cadastro do instrutor não dá para cobrar por WhatsApp — inclua o número na aba Instrutores.</p> : null}
+    {links.length ? <p className="mt-3 border-t border-black/8 pt-3 text-[11px] text-[#888]">E-mail disparado para {links.map((link) => link.name).join(', ')}.</p> : null}
   </div>;
 }
 
 /** Uma turma na lista: cabeçalho sempre visível, dias e ações ao abrir. */
-function TrainingRow({ training, instructors, reload, notify, aberta, alternar }: { training: CompanyTraining; instructors: CompanyInstructor[]; reload: Reload; notify: Notify; aberta: boolean; alternar: () => void }) {
+function TrainingRow({ training, instructors, faltaLista, reload, notify, aberta, alternar }: { training: CompanyTraining; instructors: CompanyInstructor[]; faltaLista: boolean; reload: Reload; notify: Notify; aberta: boolean; alternar: () => void }) {
   const dias = training.sessions ?? [];
   const semInstrutor = dias.filter((dia) => !dia.instructor_id).length;
   return <article className="border border-black/10 bg-white">
     <button type="button" onClick={alternar} aria-expanded={aberta} className="flex w-full items-center gap-4 p-4 text-left hover:bg-[#fff8e8]">
       <span className="flex size-11 shrink-0 items-center justify-center bg-black font-heading text-xs font-black text-[#f2ad19]">{training.nr}</span>
       <span className="min-w-0 flex-1">
-        <strong className="block truncate text-sm font-extrabold uppercase tracking-[0.04em]">{training.title}</strong>
+        <strong className="block truncate text-sm font-extrabold uppercase tracking-[0.04em]">{training.internal_label || training.title}</strong>
         <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#777]">
           <span className="font-bold text-[#8a6107]">{training.client_name}</span>
+          {training.internal_label ? <span className="truncate">{training.title}</span> : null}
           <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-3.5" />{formatDate(training.training_date)}</span>
           <span>{dias.length === 1 ? '1 dia' : `${dias.length} dias`}</span>
           <span>{training.participant_count} inscrito(s)</span>
@@ -179,7 +220,7 @@ function TrainingRow({ training, instructors, reload, notify, aberta, alternar }
     </button>
     {aberta ? <>
       {dias.map((dia) => <DayRow key={dia.id} training={training} session={dia} instructors={instructors} reload={reload} notify={notify} />)}
-      <TrainingActions training={training} reload={reload} notify={notify} />
+      <TrainingActions training={training} instructors={instructors} faltaLista={faltaLista} reload={reload} notify={notify} />
     </> : null}
   </article>;
 }
@@ -236,8 +277,8 @@ function Agenda({ data, reload, notify }: { data: CompanyDashboardData; reload: 
             <span className="flex size-12 shrink-0 items-center justify-center bg-black font-heading text-sm font-black text-[#f2ad19]">{training.nr}</span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2"><StatusTag status={session.status} /><span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#999]">Dia {session.day_number} de {training.sessions.length}</span></div>
-              <h3 className="mt-3 text-base font-extrabold uppercase leading-tight tracking-[0.05em]">{training.title}</h3>
-              <p className="mt-2 text-xs font-bold text-[#8a6107]">{training.client_name}</p>
+              <h3 className="mt-3 text-base font-extrabold uppercase leading-tight tracking-[0.05em]">{training.internal_label || training.title}</h3>
+              <p className="mt-2 text-xs font-bold text-[#8a6107]">{training.client_name}{training.internal_label ? ` · ${training.title}` : ''}</p>
               <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#666]">
                 {formatWindow(session) ? <span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" />{formatWindow(session)}</span> : null}
                 <span className="inline-flex items-center gap-1.5">{training.location}</span>
@@ -256,7 +297,7 @@ function Agenda({ data, reload, notify }: { data: CompanyDashboardData; reload: 
 // Criação
 // ---------------------------------------------------------------------------
 
-type Draft = { clientId: string; nr: string; title: string; days: NovoDia[]; contentProgram: string; duration: string; location: string };
+type Draft = { clientId: string; nr: string; title: string; internalLabel: string; days: NovoDia[]; contentProgram: string; duration: string; location: string };
 
 function diaVazio(instructorId: string | null = null): NovoDia {
   return { date: '', startTime: '08:00', endTime: '18:00', instructorId };
@@ -295,6 +336,7 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
     clientId: data.clients[0]?.id || '',
     nr: 'NR 23',
     title: '',
+    internalLabel: '',
     days: [diaVazio()],
     contentProgram: nrInfo('NR 23')?.content ?? '',
     duration: '8 horas',
@@ -329,7 +371,7 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
     try {
       const result = await createMockTraining(draft);
       aoCriar(result.id);
-      setDraft({ ...draft, title: '', days: [diaVazio()], contentProgram: nrInfo(draft.nr)?.content ?? '', location: '' });
+      setDraft({ ...draft, title: '', internalLabel: '', days: [diaVazio()], contentProgram: nrInfo(draft.nr)?.content ?? '', location: '' });
       notify('Treinamento criado com QR Code próprio.');
       await reload();
     } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao criar treinamento.'); }
@@ -348,10 +390,15 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
         <label htmlFor="training-nr"><span className={labelClass}>Norma</span>
           <select id="training-nr" value={draft.nr} onChange={(e) => changeNr(e.target.value)} className={selectClass}>{NORMAS.map((nr) => <option key={nr}>{nr}</option>)}</select>
         </label>
-        <label htmlFor="training-title"><span className={labelClass}>Treinamento</span>
-          <Input id="training-title" required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Título da turma" className={fieldClass} />
+        <label htmlFor="training-title"><span className={labelClass}>Título no certificado</span>
+          <Input id="training-title" required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Ex.: Treinamento de Brigada de Incêndio - Intermediário" className={fieldClass} />
         </label>
       </div>
+
+      <label htmlFor="training-label"><span className={labelClass}>Identificação da turma</span>
+        <Input id="training-label" value={draft.internalLabel} onChange={(e) => setDraft({ ...draft, internalLabel: e.target.value })} placeholder="Ex.: Turma A - manhã" className={fieldClass} />
+        <span className="mt-2 block text-[11px] leading-relaxed text-[#888]">Só para vocês separarem duas turmas do mesmo treinamento na agenda e nas listas. <strong>Não aparece em nenhum documento.</strong></span>
+      </label>
 
       <fieldset className="border border-black/12 p-4">
         <legend className="px-2 text-[10px] font-extrabold uppercase tracking-[0.12em]">Dias do treinamento</legend>
@@ -376,8 +423,8 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
         <label htmlFor="training-duration"><span className={labelClass}>Carga horária</span>
           <Input id="training-duration" required value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: e.target.value })} className={fieldClass} />
         </label>
-        <label htmlFor="training-location"><span className={labelClass}>Local</span>
-          <Input id="training-location" required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} placeholder="Unidade e cidade" className={fieldClass} />
+        <label htmlFor="training-location"><span className={labelClass}>Endereço do treinamento</span>
+          <Input id="training-location" required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} placeholder="Rua, número, bairro e cidade" className={fieldClass} />
         </label>
       </div>
 
@@ -405,13 +452,18 @@ export function CompanyTrainings({ data, reload, notify }: { data: CompanyDashbo
   const instrutores = data.instructors.filter((item) => item.status === 'active');
   const alvo = busca.trim().toLowerCase();
   const filtradas = useMemo(() => data.trainings.filter((training) => {
-    const casaBusca = !alvo || `${training.title} ${training.nr} ${training.client_name} ${training.code}`.toLowerCase().includes(alvo);
+    const casaBusca = !alvo || `${training.title} ${training.internal_label} ${training.nr} ${training.client_name} ${training.code}`.toLowerCase().includes(alvo);
     if (!casaBusca) return false;
     if (filtro === 'todos') return true;
     if (filtro === 'sem_instrutor') return (training.sessions ?? []).some((dia) => !dia.instructor_id);
     return training.status === filtro;
   }), [data.trainings, alvo, filtro]);
 
+  // Turmas que já receberam a foto da lista assinada: muda o texto da cobrança.
+  const turmasComLista = useMemo(
+    () => new Set(data.files.filter((file) => file.kind === 'attendance').map((file) => file.training_id)),
+    [data.files],
+  );
   const semEscala = data.trainings.filter((training) => (training.sessions ?? []).some((dia) => !dia.instructor_id)).length;
   const nova = criada ? data.trainings.find((item) => item.id === criada) : undefined;
 
@@ -442,7 +494,7 @@ export function CompanyTrainings({ data, reload, notify }: { data: CompanyDashbo
           </select>
         </label>
       </div>
-      {filtradas.map((training) => <TrainingRow key={training.id} training={training} instructors={instrutores} reload={reload} notify={notify}
+      {filtradas.map((training) => <TrainingRow key={training.id} training={training} instructors={instrutores} faltaLista={!turmasComLista.has(training.id)} reload={reload} notify={notify}
         aberta={aberta === training.id} alternar={() => setAberta((atual) => (atual === training.id ? null : training.id))} />)}
       {filtradas.length === 0 ? <EmptyState icon={CalendarPlus} title="Nenhuma turma encontrada" text={data.trainings.length === 0 ? 'Crie a primeira turma na aba Criar para liberar QR, participantes e arquivos.' : 'Ajuste a busca ou o filtro de situação.'} /> : null}
     </div> : null}
