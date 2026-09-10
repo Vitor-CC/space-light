@@ -60,11 +60,6 @@ export async function completeTrainingByCompany(trainingId: string, semLista = f
   return { needsConfirmation: false as const, ...payload };
 }
 
-/** Cobra o instrutor do dia em aberto: e-mail automático + WhatsApp pronto. */
-export function remindTrainingInstructor(trainingId: string) {
-  return requestJson<{ ok: true; enviados: string[]; falhas: string[]; links: { name: string; url: string }[]; faltaLista: boolean }>(`/api/company/trainings/${encodeURIComponent(trainingId)}/remind`, { method: 'POST' });
-}
-
 /**
  * Envia um arquivo por requisição de propósito: uma função da Vercel aceita
  * no máximo 4,5 MB por requisição, então um lote inteiro de uma vez estouraria.

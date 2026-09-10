@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, BellRing, CalendarDays, CalendarPlus, Check, ChevronDown, Clock3, Loader2, MessageCircle, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CalendarPlus, Check, ChevronDown, Clock3, Loader2, MessageCircle, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { ptBR } from 'date-fns/locale';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import type { CompanyDashboardData, CompanyInstructor, CompanyTraining, TrainingSession } from '@/lib/company-types';
-import { completeTrainingByCompany, createMockTraining, deleteTraining, remindTrainingInstructor, renameTraining, updateTrainingDay } from '@/lib/mock-company-database';
+import { completeTrainingByCompany, createMockTraining, deleteTraining, renameTraining, updateTrainingDay } from '@/lib/mock-company-database';
 import type { NovoDia } from '@/lib/mock-company-database';
 import { nrInfo } from '@/lib/nr-catalog';
 import { scheduleWindow, trainingReminderMessage, trainingScheduleMessage, whatsappLink } from '@/lib/whatsapp';
@@ -96,7 +96,6 @@ function DayRow({ training, session, instructors, reload, notify }: { training: 
 function TrainingActions({ training, instructors, faltaLista, reload, notify }: { training: CompanyTraining; instructors: CompanyInstructor[]; faltaLista: boolean; reload: Reload; notify: Notify }) {
   const [ocupado, setOcupado] = useState('');
   const [confirmarSemLista, setConfirmarSemLista] = useState('');
-  const [links, setLinks] = useState<{ name: string; url: string }[]>([]);
   const [identificacao, setIdentificacao] = useState(training.internal_label);
   const concluido = training.status === 'completed';
 
@@ -137,18 +136,6 @@ function TrainingActions({ training, instructors, faltaLista, reload, notify }: 
     finally { setOcupado(''); }
   }
 
-  async function cobrar() {
-    setOcupado('cobrando');
-    try {
-      const resultado = await remindTrainingInstructor(training.id);
-      setLinks(resultado.links);
-      notify(resultado.enviados.length
-        ? `Cobrança enviada por e-mail para ${resultado.enviados.join(', ')}.${resultado.falhas.length ? ` Sem e-mail: ${resultado.falhas.join(', ')}.` : ''}`
-        : 'Nenhum e-mail pôde ser enviado — use o botão do WhatsApp ao lado.');
-    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao cobrar o instrutor.'); }
-    finally { setOcupado(''); }
-  }
-
   async function renomear() {
     if (identificacao.trim() === training.internal_label) return;
     setOcupado('renomeando');
@@ -185,7 +172,6 @@ function TrainingActions({ training, instructors, faltaLista, reload, notify }: 
     <div className="flex flex-wrap gap-2">
       {concluido ? null : <>
         {cobraveisPorWhats.map((item) => <a key={item.nome} href={item.url as string} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center gap-2 bg-[#25D366] px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#1fb855]"><MessageCircle className="size-4" />{cobraveisPorWhats.length > 1 ? `Cobrar ${item.nome.split(' ')[0]} no WhatsApp` : 'Cobrar no WhatsApp'}</a>)}
-        <button type="button" onClick={() => void cobrar()} disabled={Boolean(ocupado)} className="inline-flex h-11 items-center gap-2 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white disabled:opacity-50">{ocupado === 'cobrando' ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}Cobrar por e-mail</button>
         <button type="button" onClick={() => void encerrar(false)} disabled={Boolean(ocupado)} className="inline-flex h-11 items-center gap-2 bg-black px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-white hover:bg-[#f2ad19] hover:text-black disabled:opacity-50">{ocupado === 'encerrando' ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Encerrar turma</button>
       </>}
       <a href={`/lista-presenca/${training.id}`} target="_blank" rel="noopener" className="inline-flex h-11 items-center gap-2 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">Lista (PDF)</a>
@@ -193,7 +179,6 @@ function TrainingActions({ training, instructors, faltaLista, reload, notify }: 
     </div>
 
     {devedores.length > 0 && devedores.every((item) => !item.url) && !concluido ? <p className="mt-3 border-t border-black/8 pt-3 text-[11px] text-[#888]">Sem telefone no cadastro do instrutor não dá para cobrar por WhatsApp — inclua o número na aba Instrutores.</p> : null}
-    {links.length ? <p className="mt-3 border-t border-black/8 pt-3 text-[11px] text-[#888]">E-mail disparado para {links.map((link) => link.name).join(', ')}.</p> : null}
   </div>;
 }
 

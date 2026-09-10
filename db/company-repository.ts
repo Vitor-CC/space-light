@@ -1283,54 +1283,6 @@ export async function completeTrainingByAdmin(input: {
   return { concluiuAgora, certificates: emitidos, listaEnviada };
 }
 
-export type CobrancaDeTurma = {
-  training: { id: string; nr: string; title: string; client_name: string; training_date: string; status: string };
-  faltaLista: boolean;
-  instrutores: { id: string; name: string; email: string; phone: string; dias: number[] }[];
-};
-
-/**
- * Quem ainda deve alguma coisa nesta turma: os instrutores dos dias que não
- * foram encerrados. Sem dia pendente não há quem cobrar.
- */
-export async function getTrainingReminderTargets(trainingId: string): Promise<CobrancaDeTurma | null> {
-  await ensurePortalSchema();
-  const d1 = getD1();
-  const training = await d1
-    .prepare(`SELECT t.id, t.nr, t.title, t.training_date, t.status, c.name AS client_name
-      FROM trainings t JOIN clients c ON c.id = t.client_id WHERE t.id = ? LIMIT 1`)
-    .bind(trainingId)
-    .first<{ id: string; nr: string; title: string; training_date: string; status: string; client_name: string }>();
-  if (!training) return null;
-
-  const pendentes = (await listTrainingSessions(trainingId)).filter((dia) => dia.status !== 'completed');
-  const porInstrutor = new Map<string, number[]>();
-  for (const dia of pendentes) {
-    if (!dia.instructor_id) continue;
-    const dias = porInstrutor.get(dia.instructor_id);
-    if (dias) dias.push(dia.day_number); else porInstrutor.set(dia.instructor_id, [dia.day_number]);
-  }
-
-  const instrutores: CobrancaDeTurma['instrutores'] = [];
-  if (porInstrutor.size > 0) {
-    const ids = [...porInstrutor.keys()];
-    const marcadores = ids.map(() => '?').join(', ');
-    const encontrados = await d1
-      .prepare(`SELECT id, name, email, phone FROM instructors WHERE id IN (${marcadores})`)
-      .bind(...ids)
-      .all<{ id: string; name: string; email: string; phone: string }>();
-    for (const linha of rows(encontrados)) {
-      instrutores.push({ ...linha, dias: porInstrutor.get(linha.id) ?? [] });
-    }
-  }
-
-  return {
-    training,
-    faltaLista: !(await temListaAssinada(trainingId)),
-    instrutores,
-  };
-}
-
 /**
  * Renomeia a identificação da turma. É só o nome interno: o título impresso no
  * certificado continua sendo `title` e não muda por aqui.
