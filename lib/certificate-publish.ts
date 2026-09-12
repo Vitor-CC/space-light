@@ -63,7 +63,12 @@ export async function publishCertificateDocument(input: {
   const data = await getCertificateData({ trainingId: input.trainingId });
   if (!data) return { ok: false, reason: 'Treinamento não encontrado.' };
   if (data.participants.length === 0) {
-    return { ok: false, reason: 'A turma não tem participantes na lista de presença.' };
+    return {
+      ok: false,
+      reason: data.participantsWithMissingDays > 0
+        ? 'Nenhum participante tem presença (check-in) em todos os dias do treinamento.'
+        : 'A turma não tem participantes na lista de presença.',
+    };
   }
   if (!certificateSetup(data.training.nr)) {
     return { ok: false, reason: `A base legal da ${data.training.nr} ainda não foi cadastrada.` };

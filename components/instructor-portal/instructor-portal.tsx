@@ -31,6 +31,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { ptBR } from 'date-fns/locale';
 
+import { PresencaBadge } from '@/components/company-portal/company-ui';
 import { Calendar } from '@/components/ui/calendar';
 import type { CompanyParticipant, CompanyTraining } from '@/lib/company-types';
 import { INSTRUCTOR_DOCUMENT_STATUS, REQUIRED_INSTRUCTOR_DOCUMENTS } from '@/lib/instructor-documents';
@@ -343,8 +344,8 @@ function TrainingRoom({ data, selectedId, selectTraining, reload, notify }: { da
   }
   function exportCsv() {
     if (!training) return;
-    const header = ['Nome', 'Identificador', 'Função', 'E-mail', 'Telefone', 'Entrada'];
-    const body = participants.map((p) => [p.full_name, p.document_id, p.job_title, p.email, p.phone, new Date(p.created_at).toLocaleString('pt-BR')]
+    const header = ['Nome', 'Identificador', 'Presença (dias)', 'Função', 'E-mail', 'Telefone', 'Entrada'];
+    const body = participants.map((p) => [p.full_name, p.document_id, `${p.days_present}/${p.days_total}`, p.job_title, p.email, p.phone, new Date(p.created_at).toLocaleString('pt-BR')]
       .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(';'));
     const csv = '﻿' + [header.join(';'), ...body].join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -361,6 +362,8 @@ function TrainingRoom({ data, selectedId, selectTraining, reload, notify }: { da
   // No último dia a foto da lista assinada é obrigatória — é o comprovante do
   // treinamento inteiro, com uma coluna de assinatura por data.
   const travadoSemLista = ultimoPendente && listasEnviadas === 0;
+  // Só quem tem check-in em todos os dias recebe certificado ao encerrar.
+  const completos = participants.filter((p) => p.days_total > 0 && p.days_present >= p.days_total).length;
   // O instrutor já fechou o dia dele, mas a turma segue com os outros dias.
   const meuDiaFechado = diaAtual?.status === 'completed' && training.status !== 'completed';
   return <div className="space-y-6"><label className="block max-w-2xl"><span className="mb-2 block text-[10px] font-extrabold uppercase tracking-[0.12em]">Treinamento</span><select value={training.id} onChange={(event) => selectTraining(event.target.value)} className="h-12 w-full border border-black/15 bg-white px-3 text-sm outline-none focus:border-[#f2ad19]">{data.trainings.map((item) => { const rotulo = rotuloDoDia(item, data.instructor.id); return <option key={item.id} value={item.id}>{item.client_name} · {item.nr} · {item.internal_label ? `${item.internal_label} · ` : ''}{formatDate(item.training_date)}{rotulo ? ` · ${rotulo}` : ''}</option>; })}</select></label>{dias.length > 1 ? <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-l-4 border-[#f2ad19] bg-white p-4">
@@ -385,7 +388,7 @@ function TrainingRoom({ data, selectedId, selectTraining, reload, notify }: { da
         </div> : confirmando ? <div className="border-2 border-[#b62525] bg-[#fff5f5] p-4">
           <strong className="block text-sm font-extrabold uppercase tracking-[0.04em] text-[#b62525]">{ultimoPendente ? 'Encerrar esta turma?' : `Encerrar o dia ${diaAtual?.day_number ?? 1}?`}</strong>
           <p className="mt-2 text-xs leading-relaxed text-[#666]">{ultimoPendente
-            ? `A lista de presença é congelada com ${participants.length} participante(s) e os certificados são emitidos. Não dá para reabrir.`
+            ? `A lista de presença é congelada e os certificados são emitidos para ${completos} de ${participants.length} participante(s): só quem fez check-in em todos os dias. Não dá para reabrir.`
             : 'O seu dia é fechado e a turma segue com os outros dias. Os certificados saem só quando o último dia for encerrado.'}</p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <button type="button" onClick={() => setConfirmando(false)} className="inline-flex h-12 flex-1 items-center justify-center border border-black/20 bg-white text-[10px] font-extrabold uppercase tracking-[0.12em] hover:bg-black hover:text-white">Voltar</button>
@@ -401,11 +404,12 @@ function TrainingRoom({ data, selectedId, selectTraining, reload, notify }: { da
             <button type="button" onClick={() => void removeParticipant(participant.id)} aria-label={`Remover ${participant.full_name}`} className="inline-flex size-10 shrink-0 items-center justify-center border border-black/10 text-[#999] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-4" /></button>
           </div>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-black/8 pt-3 text-xs text-[#777]">
+            <PresencaBadge present={participant.days_present} total={participant.days_total} />
             <span>{participant.job_title || 'Sem função'}</span>
             <span>{participant.email || participant.phone || 'Sem contato'}</span>
             <span>{new Date(participant.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
-        </li>)}</ul><div className="hidden overflow-x-auto md:block border border-black/10 bg-white"><table className="w-full min-w-[760px] text-left text-xs"><thead className="bg-black text-[10px] font-extrabold uppercase tracking-[0.12em] text-white"><tr><th className="p-4">Participante</th><th className="p-4">Identificador</th><th className="p-4">Função</th><th className="p-4">Contato</th><th className="p-4">Entrada</th><th className="p-4 text-right">Ações</th></tr></thead><tbody className="divide-y divide-black/8">{participants.map((participant) => <tr key={participant.id}><td className="p-4 font-bold">{participant.full_name}</td><td className="p-4 text-[#666]">{participant.document_id}</td><td className="p-4 text-[#666]">{participant.job_title || '—'}</td><td className="p-4 text-[#666]">{participant.email || participant.phone || '—'}</td><td className="p-4 text-[#666]">{new Date(participant.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</td><td className="p-4 text-right"><button type="button" onClick={() => void removeParticipant(participant.id)} aria-label={`Remover ${participant.full_name}`} className="inline-flex size-8 items-center justify-center border border-black/10 text-[#999] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-3.5" /></button></td></tr>)}</tbody></table></div></> : <Empty icon={UsersRound} title="Aguardando participantes" text="Adicione manualmente ou aguarde o preenchimento pelo QR Code." />}</section></>}<TrainingFiles trainingId={training.id} notify={notify} onCount={setListasEnviadas} /></div>;
+        </li>)}</ul><div className="hidden overflow-x-auto md:block border border-black/10 bg-white"><table className="w-full min-w-[760px] text-left text-xs"><thead className="bg-black text-[10px] font-extrabold uppercase tracking-[0.12em] text-white"><tr><th className="p-4">Participante</th><th className="p-4">Identificador</th><th className="p-4">Presença</th><th className="p-4">Função</th><th className="p-4">Contato</th><th className="p-4">Entrada</th><th className="p-4 text-right">Ações</th></tr></thead><tbody className="divide-y divide-black/8">{participants.map((participant) => <tr key={participant.id}><td className="p-4 font-bold">{participant.full_name}</td><td className="p-4 text-[#666]">{participant.document_id}</td><td className="p-4"><PresencaBadge present={participant.days_present} total={participant.days_total} /></td><td className="p-4 text-[#666]">{participant.job_title || '—'}</td><td className="p-4 text-[#666]">{participant.email || participant.phone || '—'}</td><td className="p-4 text-[#666]">{new Date(participant.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</td><td className="p-4 text-right"><button type="button" onClick={() => void removeParticipant(participant.id)} aria-label={`Remover ${participant.full_name}`} className="inline-flex size-8 items-center justify-center border border-black/10 text-[#999] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-3.5" /></button></td></tr>)}</tbody></table></div></> : <Empty icon={UsersRound} title="Aguardando participantes" text="Adicione manualmente ou aguarde o preenchimento pelo QR Code." />}</section></>}<TrainingFiles trainingId={training.id} notify={notify} onCount={setListasEnviadas} /></div>;
 }
 
 function Profile({ data, reload, notify }: { data: InstructorDashboardData; reload: () => Promise<void>; notify: (message: string) => void }) {

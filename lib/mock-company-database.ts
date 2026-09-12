@@ -1,4 +1,4 @@
-import type { AuditEntry, CompanyDashboardData, CompanyEmployee, CompanyTraining, TrainingSession } from '@/lib/company-types';
+import type { AuditEntry, CheckinResult, CompanyDashboardData, CompanyEmployee, CompanyTraining, TrainingSession } from '@/lib/company-types';
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -6,8 +6,17 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
   });
   const payload = (await response.json().catch(() => ({}))) as { error?: string } & T;
-  if (!response.ok) throw new Error(payload.error || 'Não foi possível concluir a operação.');
+  if (!response.ok) throw new RequestError(payload.error || 'Não foi possível concluir a operação.', response.status);
   return payload;
+}
+
+/** Erro de API com o status HTTP, para a tela distinguir recusa (403) de falha. */
+export class RequestError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
 }
 
 export function readMockCompanyDatabase() {
@@ -102,7 +111,12 @@ export function findMockTrainingByToken(token: string) {
 }
 
 export function registerMockParticipant(token: string, input: { fullName: string; documentId: string; rg: string; birthDate: string; email: string; phone: string; jobTitle: string }) {
-  return requestJson<{ id: string; training: CompanyTraining }>(`/api/public/trainings/${encodeURIComponent(token)}`, { method: 'POST', body: JSON.stringify(input) });
+  return requestJson<{ id: string; training: CompanyTraining; checkin: CheckinResult }>(`/api/public/trainings/${encodeURIComponent(token)}`, { method: 'POST', body: JSON.stringify(input) });
+}
+
+/** Check-in só com o CPF. `found: false` quando é o primeiro acesso do aluno na turma. */
+export function checkinParticipant(token: string, documentId: string) {
+  return requestJson<{ found: boolean; checkin: CheckinResult | null }>(`/api/public/trainings/${encodeURIComponent(token)}`, { method: 'POST', body: JSON.stringify({ checkinOnly: true, documentId }) });
 }
 
 // --- Equipe Space Light (funcionários) e auditoria ---

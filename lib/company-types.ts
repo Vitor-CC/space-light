@@ -122,6 +122,20 @@ export type CompanyParticipant = {
   phone: string;
   job_title: string;
   created_at: string;
+  /** Dias da turma com check-in deste aluno. */
+  days_present: number;
+  /** Dias da turma. Certificado só com days_present === days_total. */
+  days_total: number;
+};
+
+/** Resposta do check-in pelo QR: qual dia foi marcado e quantos o aluno já tem. */
+export type CheckinResult = {
+  participantId: string;
+  fullName: string;
+  day: number;
+  totalDays: number;
+  daysPresent: number;
+  alreadyCheckedIn: boolean;
 };
 
 export type AttendanceListData = {

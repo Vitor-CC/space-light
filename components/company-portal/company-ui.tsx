@@ -108,3 +108,9 @@ export function TrainingSummary({ training }: { training: CompanyTraining }) {
 export function AccessCredentials({ eyebrow, note, email, password, onDismiss }: { eyebrow: string; note: string; email: string; password: string; onDismiss: () => void }) {
   return <div className="border-l-4 border-[#f2ad19] bg-black p-5 text-white"><span className="eyebrow text-[#f2ad19]">{eyebrow}</span><p className="mt-3 text-sm text-white/60">{note}</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><div className="border border-white/15 p-3"><span className="block text-[10px] font-extrabold uppercase tracking-[0.1em] text-white/40">E-mail</span><strong className="mt-1 block break-all text-sm">{email}</strong></div><div className="border border-white/15 p-3"><span className="block text-[10px] font-extrabold uppercase tracking-[0.1em] text-white/40">Senha temporária</span><strong className="mt-1 block break-all font-mono text-sm text-[#f2ad19]">{password}</strong></div></div><button type="button" onClick={onDismiss} className="mt-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-white/50 hover:text-white">Já salvei estes dados</button></div>;
 }
+
+/** Check-ins do aluno na turma. Verde só com todos os dias: é quem recebe certificado. */
+export function PresencaBadge({ present, total }: { present: number; total: number }) {
+  const completo = total > 0 && present >= total;
+  return <span title={completo ? 'Presença em todos os dias: recebe certificado' : 'Falta check-in em algum dia: ainda sem certificado'} className={`inline-flex items-center whitespace-nowrap px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] ${completo ? 'bg-[#daf2df] text-[#17642d]' : 'bg-[#fff8e8] text-[#8a6107]'}`}>{present}/{total} {total === 1 ? 'dia' : 'dias'}</span>;
+}

@@ -29,9 +29,13 @@ export default async function CertificatePage({ params }: { params: Promise<{ tr
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#efefeb] p-8">
         <div className="max-w-lg border-l-4 border-[#f2ad19] bg-white p-6">
-          <strong className="text-sm uppercase tracking-[0.08em]">Nenhum participante nesta turma</strong>
+          <strong className="text-sm uppercase tracking-[0.08em]">
+            {data.participantsWithMissingDays > 0 ? 'Ninguém com presença em todos os dias' : 'Nenhum participante nesta turma'}
+          </strong>
           <p className="mt-2 text-sm leading-relaxed text-[#666]">
-            O certificado é emitido por participante. Registre a presença da turma antes de emitir.
+            {data.participantsWithMissingDays > 0
+              ? 'O certificado só é emitido para quem fez o check-in em todos os dias do treinamento.'
+              : 'O certificado é emitido por participante. Registre a presença da turma antes de emitir.'}
           </p>
         </div>
       </main>
