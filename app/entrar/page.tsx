@@ -58,7 +58,7 @@ export default async function ChooseAreaPage({ searchParams }: { searchParams: P
           <ArrowUpRight className="size-6 shrink-0 text-white/30 transition group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:text-black" />
         </Link>)}</nav>
 
-        <p className="mt-8 text-xs leading-relaxed text-white/45">Não tem acesso ainda? <Link href="/cliente/cadastro" className="font-bold text-[#f2ad19] underline underline-offset-2 hover:text-white">Cadastre sua empresa</Link> ou <Link href="/instrutor/cadastro" className="font-bold text-[#f2ad19] underline underline-offset-2 hover:text-white">cadastre-se como instrutor</Link>. Funcionários da Space recebem o acesso do dono da conta.</p>
+        <p className="mt-8 text-xs leading-relaxed text-white/45">Não tem acesso ainda? Empresas recebem o nome de usuário da equipe Space Light. Instrutores podem <Link href="/instrutor/cadastro" className="font-bold text-[#f2ad19] underline underline-offset-2 hover:text-white">se cadastrar aqui</Link>. Funcionários da Space recebem o acesso do dono da conta.</p>
       </div>
     </div>
   </main>;

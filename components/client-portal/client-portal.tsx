@@ -576,11 +576,11 @@ function Profile({ data }: { data: ClientPortalData }) {
         <div className="mt-8 border-t border-black/8 pt-6">
           <span className="eyebrow text-[#8a6107]">Só a Space Light altera</span>
           <dl className="mt-3 divide-y divide-black/8">
-            {[['Razão social', organization.legalName], ['CNPJ', organization.document], ['E-mail de acesso', organization.email]].map(([label, value]) => (
+            {[['Razão social', organization.legalName], ['CNPJ', organization.document], ['E-mail de contato', organization.email]].map(([label, value]) => (
               <div key={label} className="grid gap-1 py-3 sm:grid-cols-[150px_1fr]"><dt className="text-xs font-bold text-[#777]">{label}</dt><dd className="text-sm font-semibold">{value}</dd></div>
             ))}
           </dl>
-          <p className="mt-3 text-xs leading-relaxed text-[#888]">Razão social e CNPJ saem impressos na lista de presença, e o e-mail é o seu login — por isso a mudança passa pela equipe.</p>
+          <p className="mt-3 text-xs leading-relaxed text-[#888]">Razão social e CNPJ saem impressos na lista de presença, e o seu login é o nome de usuário criado pela equipe — por isso a mudança passa pela equipe.</p>
         </div>
       </section>
 

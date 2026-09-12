@@ -1,5 +1,6 @@
 import { getD1 } from '@/db';
 import { INSTRUCTOR_DOCUMENT_CATEGORIES } from '@/lib/instructor-documents';
+import { normalizarUsuario, USUARIO_REGRA, usuarioValido } from '@/lib/usuario';
 import type { DatabaseBinding, DatabaseResult } from '@/db/sqlite-adapter';
 import type {
   ClientCertificate,
@@ -39,6 +40,8 @@ export type StoredUser = {
   active: number;
   must_reset: number;
   is_owner: number;
+  /** Login da empresa (role client). Instrutor e equipe entram por e-mail. */
+  username: string | null;
 };
 
 let schemaPromise: Promise<void> | null = null;
@@ -64,7 +67,7 @@ function rows<T>(result: DatabaseResult<T>): T[] {
  * em produção (Turso, pela rede) isso somava ~15 idas em sequência a cada
  * arranque frio da função, antes de qualquer trabalho útil.
  */
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 /** Data no formato do banco e do <input type="date">. */
 const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -170,6 +173,7 @@ export function ensurePortalSchema(): Promise<void> {
         password_salt TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'client',
         is_owner INTEGER NOT NULL DEFAULT 0,
+        username TEXT,
         active INTEGER NOT NULL DEFAULT 1,
         must_reset INTEGER NOT NULL DEFAULT 0,
         last_login_at TEXT,
@@ -376,6 +380,9 @@ export function ensurePortalSchema(): Promise<void> {
     const COLUNAS_EXTRAS: { tabela: string; coluna: string; alter: string }[] = [
       { tabela: 'users', coluna: 'instructor_id', alter: 'ALTER TABLE users ADD COLUMN instructor_id TEXT' },
       { tabela: 'users', coluna: 'is_owner', alter: 'ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0' },
+      // Login da empresa. Guardado já normalizado (minúsculo), então o índice
+      // único comum basta; conta sem nome (NULL) não conflita com outra.
+      { tabela: 'users', coluna: 'username', alter: 'ALTER TABLE users ADD COLUMN username TEXT' },
       { tabela: 'trainings', coluna: 'instructor_id', alter: 'ALTER TABLE trainings ADD COLUMN instructor_id TEXT' },
       { tabela: 'trainings', coluna: 'training_dates', alter: "ALTER TABLE trainings ADD COLUMN training_dates TEXT NOT NULL DEFAULT ''" },
       // Nome interno da turma: serve para diferenciar duas turmas do mesmo
@@ -420,6 +427,9 @@ export function ensurePortalSchema(): Promise<void> {
     await d1.batch([
       d1.prepare(
         'CREATE INDEX IF NOT EXISTS idx_users_instructor_role ON users(instructor_id, role)',
+      ),
+      d1.prepare(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)',
       ),
       d1.prepare(
         'CREATE INDEX IF NOT EXISTS idx_trainings_instructor_date ON trainings(instructor_id, training_date)',
@@ -634,9 +644,22 @@ export async function findUserByEmail(
   await ensurePortalSchema();
   return getD1()
     .prepare(`SELECT id, client_id, instructor_id, name, email, password_hash, password_salt,
-      role, is_owner, active, must_reset
+      role, is_owner, active, must_reset, username
       FROM users WHERE lower(email) = ? LIMIT 1`)
     .bind(normalizeEmail(email))
+    .first<StoredUser>();
+}
+
+/** Empresa entra pelo nome de usuário, e só contas de cliente têm um. */
+export async function findClientUserByUsername(
+  username: string,
+): Promise<StoredUser | null> {
+  await ensurePortalSchema();
+  return getD1()
+    .prepare(`SELECT id, client_id, instructor_id, name, email, password_hash, password_salt,
+      role, is_owner, active, must_reset, username
+      FROM users WHERE username = ? AND role = 'client' LIMIT 1`)
+    .bind(normalizarUsuario(username))
     .first<StoredUser>();
 }
 
@@ -646,7 +669,7 @@ export async function findUserById(
   await ensurePortalSchema();
   return getD1()
     .prepare(`SELECT id, client_id, instructor_id, name, email, password_hash, password_salt,
-      role, is_owner, active, must_reset
+      role, is_owner, active, must_reset, username
       FROM users WHERE id = ? LIMIT 1`)
     .bind(userId)
     .first<StoredUser>();
@@ -718,7 +741,7 @@ async function findUserForReset(target: {
   if (!column || !value) return null;
   return getD1()
     .prepare(`SELECT id, client_id, instructor_id, name, email, password_hash, password_salt,
-      role, is_owner, active, must_reset
+      role, is_owner, active, must_reset, username
       FROM users WHERE ${column} = ? ORDER BY created_at ASC LIMIT 1`)
     .bind(value)
     .first<StoredUser>();
@@ -759,8 +782,37 @@ export async function resetUserPasswordByAdmin(input: {
     userId: target.id,
     name: target.name,
     email: target.email,
+    username: target.username ?? null,
     active: target.active === 1,
   };
+}
+
+/** Valida o formato e garante que nenhuma outra conta já usa o nome. */
+async function exigirUsuarioLivre(valor: string, exceptoUserId?: string) {
+  const username = normalizarUsuario(valor);
+  if (!usuarioValido(username)) throw new Error(`Nome de usuário inválido. ${USUARIO_REGRA}`);
+  const dono = await getD1()
+    .prepare('SELECT id FROM users WHERE username = ? LIMIT 1')
+    .bind(username)
+    .first<{ id: string }>();
+  if (dono && dono.id !== exceptoUserId) {
+    throw new Error('Este nome de usuário já está em uso por outra empresa.');
+  }
+  return username;
+}
+
+/** A Space define ou troca o nome de usuário da empresa. Sem ele, a empresa não entra. */
+export async function setClientUsername(input: { clientId: string; username: string; byUserId: string }) {
+  await ensurePortalSchema();
+  const conta = await findUserForReset({ clientId: input.clientId });
+  if (!conta || conta.role !== 'client') throw new Error('Este cliente ainda não tem uma conta de acesso.');
+  const username = await exigirUsuarioLivre(input.username, conta.id);
+  await getD1().prepare('UPDATE users SET username = ? WHERE id = ?').bind(username, conta.id).run();
+  await writeAudit(input.byUserId, 'client.username_set', 'client', input.clientId, {
+    username,
+    anterior: conta.username ?? null,
+  });
+  return { ok: true as const, username };
 }
 
 export async function approveClientAccess(
@@ -798,6 +850,7 @@ export async function createClientByAdmin(input: {
   contactName: string;
   contactEmail: string;
   contactPhone: string;
+  username: string;
   createdByUserId: string;
   passwordHash: string;
   passwordSalt: string;
@@ -807,6 +860,7 @@ export async function createClientByAdmin(input: {
   const id = makeId('client');
   const userId = makeId('user');
   const email = normalizeEmail(input.contactEmail);
+  const username = await exigirUsuarioLivre(input.username);
   await d1.batch([
     d1
       .prepare(`INSERT INTO clients (
@@ -825,14 +879,15 @@ export async function createClientByAdmin(input: {
       ),
     d1
       .prepare(`INSERT INTO users (
-        id, client_id, name, email, password_hash, password_salt, role,
+        id, client_id, name, email, username, password_hash, password_salt, role,
         active, must_reset
-      ) VALUES (?, ?, ?, ?, ?, ?, 'client', 1, 1)`)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'client', 1, 1)`)
       .bind(
         userId,
         id,
         input.contactName.trim(),
         email,
+        username,
         input.passwordHash,
         input.passwordSalt,
       ),
@@ -842,77 +897,9 @@ export async function createClientByAdmin(input: {
     'client.access_invited',
     'client',
     id,
-    { email },
+    { email, username },
   );
-  return { id, userId, email, status: 'invited' as const };
-}
-
-export async function selfRegisterClient(input: {
-  companyName: string;
-  legalName: string;
-  document: string;
-  unit: string;
-  contactName: string;
-  email: string;
-  phone: string;
-  passwordHash: string;
-  passwordSalt: string;
-}) {
-  await ensurePortalSchema();
-  const d1 = getD1();
-  const email = normalizeEmail(input.email);
-  const existing = await d1
-    .prepare(
-      'SELECT id FROM clients WHERE document = ? OR lower(contact_email) = ? LIMIT 1',
-    )
-    .bind(input.document.trim(), email)
-    .first<{ id: string }>();
-  if (existing) {
-    throw new Error(
-      'Já existe um cadastro para este CNPJ ou e-mail. Entre em contato com a Space Light.',
-    );
-  }
-
-  const clientId = makeId('client');
-  const userId = makeId('user');
-  await d1.batch([
-    d1
-      .prepare(`INSERT INTO clients (
-        id, name, legal_name, document, unit, contact_name, contact_email,
-        contact_phone, status, source
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'self')`)
-      .bind(
-        clientId,
-        input.companyName.trim(),
-        input.legalName.trim(),
-        input.document.trim(),
-        input.unit.trim(),
-        input.contactName.trim(),
-        email,
-        input.phone.trim(),
-      ),
-    d1
-      .prepare(`INSERT INTO users (
-        id, client_id, name, email, password_hash, password_salt, role,
-        active, must_reset
-      ) VALUES (?, ?, ?, ?, ?, ?, 'client', 0, 0)`)
-      .bind(
-        userId,
-        clientId,
-        input.contactName.trim(),
-        email,
-        input.passwordHash,
-        input.passwordSalt,
-      ),
-  ]);
-  await writeAudit(
-    userId,
-    'client.self_registered',
-    'client',
-    clientId,
-    { email },
-  );
-  return clientId;
+  return { id, userId, email, username, status: 'invited' as const };
 }
 
 export async function createInstructorByAdmin(input: {
@@ -2198,7 +2185,9 @@ export async function getCompanyDashboardData(
         .prepare(
           `SELECT id, name, legal_name, document, unit, contact_name,
            contact_email, contact_phone, address, district, city, state,
-           postal_code, status, created_at
+           postal_code, status, created_at,
+           (SELECT u.username FROM users u WHERE u.client_id = clients.id AND u.role = 'client'
+            ORDER BY u.created_at ASC LIMIT 1) AS username
            FROM clients ORDER BY name COLLATE NOCASE ASC`,
         )
         .all<CompanyClient>(),

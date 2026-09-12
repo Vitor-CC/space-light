@@ -12,9 +12,9 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        // O "$" fixa o fim do caminho: libera /cliente/cadastro sem liberar
-        // o portal em /cliente.
-        allow: ['/', '/cliente/cadastro', '/instrutor/cadastro'],
+        // O "$" fixa o fim do caminho: bloqueia o portal em /cliente; as rotas
+        // filhas que também não devem ser indexadas vêm listadas abaixo.
+        allow: ['/', '/instrutor/cadastro'],
         disallow: [
           '/api/',
           '/empresa',

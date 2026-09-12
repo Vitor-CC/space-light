@@ -23,8 +23,13 @@ export function readMockCompanyDatabase() {
   return requestJson<CompanyDashboardData>('/api/company/dashboard', { cache: 'no-store' });
 }
 
-export function createMockClient(input: { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string }) {
-  return requestJson<{ id: string; email: string; temporaryPassword: string }>('/api/company/clients', { method: 'POST', body: JSON.stringify(input) });
+export function createMockClient(input: { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string; username: string }) {
+  return requestJson<{ id: string; email: string; username: string; temporaryPassword: string }>('/api/company/clients', { method: 'POST', body: JSON.stringify(input) });
+}
+
+/** Define ou troca o nome de usuário (login) de uma empresa. */
+export function setClientUsername(clientId: string, username: string) {
+  return requestJson<{ ok: true; username: string }>('/api/company/clients/username', { method: 'POST', body: JSON.stringify({ clientId, username }) });
 }
 
 export function approveClient(clientId: string) {
@@ -158,7 +163,7 @@ export function deleteEmployee(userId: string) {
 // --- Redefinição de senha pelo painel ---
 
 export function resetUserPassword(target: { userId?: string; clientId?: string; instructorId?: string }) {
-  return requestJson<{ userId: string; name: string; email: string; active: boolean; temporaryPassword: string }>('/api/company/users/reset-password', { method: 'POST', body: JSON.stringify(target) });
+  return requestJson<{ userId: string; name: string; email: string; username: string | null; active: boolean; temporaryPassword: string }>('/api/company/users/reset-password', { method: 'POST', body: JSON.stringify(target) });
 }
 
 // --- Documentos obrigatórios do instrutor ---

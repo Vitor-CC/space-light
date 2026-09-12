@@ -3,6 +3,7 @@ import { redirectInterno } from '@/lib/safe-redirect';
 import { getAuthEnvironment } from '@/db';
 import {
   bootstrapAdmin,
+  findClientUserByUsername,
   findUserByEmail,
   recordLogin,
 } from '@/db/company-repository';
@@ -20,7 +21,8 @@ function destination(request: Request, path: string) {
 
 export async function POST(request: Request) {
   const form = await request.formData();
-  const email = String(form.get('email') ?? '').trim().toLowerCase();
+  // "login" é o nome de usuário na porta da empresa e o e-mail nas outras duas.
+  const email = String(form.get('login') ?? form.get('email') ?? '').trim().toLowerCase();
   const password = String(form.get('password') ?? '');
   const requestedPath = String(form.get('loginPath') ?? '');
   const loginPath = requestedPath === '/instrutor/login' || requestedPath === '/empresa/login'
@@ -29,9 +31,15 @@ export async function POST(request: Request) {
   const back = (status: string) => `${loginPath}?status=${status}`;
   if (!email || !password) return destination(request, back('invalid'));
 
-  let user = await findUserByEmail(email);
+  // Empresa entra só pelo nome de usuário, e só pela porta dela. Nas outras
+  // portas (por e-mail), conta de empresa é tratada como inexistente.
+  const portaDaEmpresa = loginPath === '/cliente/login';
+  let user = portaDaEmpresa
+    ? await findClientUserByUsername(email)
+    : await findUserByEmail(email);
+  if (!portaDaEmpresa && user?.role === 'client') user = null;
   const initial = getAuthEnvironment();
-  if (!user && email === initial.initialAdminEmail) {
+  if (!user && !portaDaEmpresa && email === initial.initialAdminEmail) {
     const matches = await verifyPassword(
       password,
       initial.initialAdminPasswordHash,

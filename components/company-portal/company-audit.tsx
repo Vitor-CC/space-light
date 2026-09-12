@@ -10,6 +10,7 @@ import { readAuditLogs } from '@/lib/mock-company-database';
 const actionLabels: Record<string, string> = {
   'client.access_invited': 'cadastrou um cliente',
   'client.access_approved': 'aprovou o acesso de um cliente',
+  'client.username_set': 'definiu o nome de usuário de um cliente',
   'instructor.self_registered': 'recebeu um cadastro de instrutor',
   'instructor.created': 'cadastrou um instrutor',
   'instructor.access_approved': 'aprovou o acesso de um instrutor',

@@ -10,7 +10,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const agora = new Date();
   return [
     { url: SITE_URL, lastModified: agora, changeFrequency: 'monthly', priority: 1 },
-    { url: `${SITE_URL}/cliente/cadastro`, lastModified: agora, changeFrequency: 'yearly', priority: 0.5 },
     { url: `${SITE_URL}/instrutor/cadastro`, lastModified: agora, changeFrequency: 'yearly', priority: 0.5 },
   ];
 }

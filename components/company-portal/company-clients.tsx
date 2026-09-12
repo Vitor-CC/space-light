@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, Check, ChevronDown, KeyRound, Loader2, MapPin, Plus, Search, Trash2, TriangleAlert } from 'lucide-react';
+import { Building2, Check, ChevronDown, KeyRound, Loader2, MapPin, Plus, Search, Trash2, TriangleAlert, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 
@@ -8,12 +8,13 @@ import { AccessCredentials, EmptyState, fieldClass, labelClass, selectClass, Sub
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { CompanyClient, CompanyDashboardData } from '@/lib/company-types';
-import { approveClient, createMockClient, deleteClient, resetUserPassword, saveClientAddress } from '@/lib/mock-company-database';
+import { approveClient, createMockClient, deleteClient, resetUserPassword, saveClientAddress, setClientUsername } from '@/lib/mock-company-database';
+import { limparDigitacaoUsuario, USUARIO_REGRA } from '@/lib/usuario';
 
 type Aba = 'lista' | 'criar';
 
-type Draft = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string };
-const emptyDraft: Draft = { name: '', legalName: '', document: '', unit: '', contactName: '', contactEmail: '', contactPhone: '' };
+type Draft = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string; username: string };
+const emptyDraft: Draft = { name: '', legalName: '', document: '', unit: '', contactName: '', contactEmail: '', contactPhone: '', username: '' };
 
 type EnderecoDraft = { address: string; district: string; city: string; state: string; postalCode: string };
 
@@ -82,6 +83,48 @@ function ClientAddress({ client, notify, reload }: { client: CompanyClient; noti
   </div>;
 }
 
+/** Login da empresa no portal. Sem ele, ninguém da empresa consegue entrar. */
+function ClientUsername({ client, notify, reload }: { client: CompanyClient; notify: (message: string) => void; reload: () => Promise<void> }) {
+  const [aberto, setAberto] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [valor, setValor] = useState(client.username ?? '');
+
+  async function salvar(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSalvando(true);
+    try {
+      await setClientUsername(client.id, valor);
+      notify('Nome de usuário salvo. Avise a empresa: é com ele que ela entra no portal.');
+      setAberto(false);
+      await reload();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao salvar o nome de usuário.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return <div>
+    <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="min-w-0">
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">Nome de usuário (login)</span>
+        <p className={`mt-1 text-xs ${client.username ? 'font-mono font-bold text-[#0b0b0b]' : 'font-bold text-[#b62525]'}`}>{client.username ?? 'Não definido'}</p>
+        {!client.username ? <p className="mt-1 text-[11px] leading-relaxed text-[#888]">Sem ele, a empresa não consegue entrar no portal.</p> : null}
+      </div>
+      <button type="button" onClick={() => setAberto((v) => !v)} className="inline-flex h-10 shrink-0 items-center gap-2 border border-black/15 bg-white px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">
+        <UserRound className="size-3.5" />{aberto ? 'Fechar' : client.username ? 'Alterar' : 'Definir'}
+      </button>
+    </div>
+
+    {aberto ? <form onSubmit={salvar} className="mt-4 flex flex-col gap-3 border border-black/10 bg-white p-4 sm:flex-row sm:items-start">
+      <label className="flex-1" htmlFor={`usuario-${client.id}`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">Nome de usuário</span><Input id={`usuario-${client.id}`} required minLength={3} maxLength={40} value={valor} onChange={(e) => setValor(limparDigitacaoUsuario(e.target.value))} placeholder="ex.: amazoncgh7" autoCapitalize="none" spellCheck={false} className={`${fieldClass} font-mono`} /><span className="mt-1.5 block text-[11px] leading-relaxed text-[#888]">{USUARIO_REGRA}</span></label>
+      <Button type="submit" disabled={salvando} className="h-11 rounded-none bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900] sm:mt-[22px]">
+        {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar
+      </Button>
+    </form> : null}
+  </div>;
+}
+
 function ClientRow({ client, turmas, arquivos, inscritos, aberta, alternar, acoes, notify, reload }: {
   client: CompanyClient;
   turmas: number;
@@ -111,6 +154,7 @@ function ClientRow({ client, turmas, arquivos, inscritos, aberta, alternar, acoe
         </span>
       </span>
       {semEndereco ? <span className="hidden shrink-0 items-center gap-1.5 bg-[#fff5f5] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] md:inline-flex"><TriangleAlert className="size-3.5" />Sem endereço</span> : null}
+      {!client.username ? <span className="hidden shrink-0 items-center gap-1.5 bg-[#fff5f5] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] md:inline-flex"><TriangleAlert className="size-3.5" />Sem usuário</span> : null}
       <span className={`shrink-0 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] ${tom}`}>{rotulo}</span>
       <ChevronDown className={`size-4 shrink-0 text-black/35 transition ${aberta ? 'rotate-180' : ''}`} />
     </button>
@@ -119,11 +163,12 @@ function ClientRow({ client, turmas, arquivos, inscritos, aberta, alternar, acoe
       <dl className="grid gap-2 text-xs sm:grid-cols-2">
         <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Razão social</dt><dd className="text-right font-bold">{client.legal_name}</dd></div>
         <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Responsável</dt><dd className="text-right font-bold">{client.contact_name}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">E-mail</dt><dd className="break-all text-right font-bold">{client.contact_email}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">E-mail de contato</dt><dd className="break-all text-right font-bold">{client.contact_email}</dd></div>
         <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Telefone</dt><dd className="text-right font-bold">{client.contact_phone || '—'}</dd></div>
         <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Arquivos</dt><dd className="text-right font-bold">{arquivos}</dd></div>
         <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Treinamentos</dt><dd className="text-right font-bold">{turmas}</dd></div>
       </dl>
+      <ClientUsername client={client} notify={notify} reload={reload} />
       <ClientAddress client={client} notify={notify} reload={reload} />
       <div className="flex flex-wrap gap-2">
         {pendente ? <Button type="button" onClick={acoes.approve} className="h-11 rounded-none bg-[#f2ad19] px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#ff9900]"><Check className="size-4" />Aprovar acesso</Button> : null}
@@ -137,25 +182,27 @@ function ClientRow({ client, turmas, arquivos, inscritos, aberta, alternar, acoe
 export function CompanyClients({ data, reload, notify }: { data: CompanyDashboardData; reload: () => Promise<void>; notify: (message: string) => void }) {
   const [aba, setAba] = useState<Aba>('lista');
   const [query, setQuery] = useState('');
-  const [filtro, setFiltro] = useState<'todos' | 'pending' | 'active' | 'sem_endereco'>('todos');
+  const [filtro, setFiltro] = useState<'todos' | 'pending' | 'active' | 'sem_endereco' | 'sem_usuario'>('todos');
   const [aberta, setAberta] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
-  const [createdAccess, setCreatedAccess] = useState<{ email: string; temporaryPassword: string } | null>(null);
-  const [resetAccess, setResetAccess] = useState<{ name: string; email: string; temporaryPassword: string; active: boolean } | null>(null);
+  const [createdAccess, setCreatedAccess] = useState<{ username: string; temporaryPassword: string } | null>(null);
+  const [resetAccess, setResetAccess] = useState<{ name: string; username: string | null; temporaryPassword: string; active: boolean } | null>(null);
 
   const alvo = query.trim().toLowerCase();
   const alvoDigitos = digitos(query);
   const filtered = useMemo(() => data.clients.filter((client) => {
     const casa = !alvo
-      || `${client.name} ${client.legal_name} ${client.contact_email}`.toLowerCase().includes(alvo)
+      || `${client.name} ${client.legal_name} ${client.contact_email} ${client.username ?? ''}`.toLowerCase().includes(alvo)
       || (alvoDigitos.length > 0 && digitos(client.document).includes(alvoDigitos));
     if (!casa) return false;
     if (filtro === 'sem_endereco') return !enderecoCompleto(client);
+    if (filtro === 'sem_usuario') return !client.username;
     if (filtro === 'todos') return true;
     return client.status === filtro;
   }), [data.clients, alvo, alvoDigitos, filtro]);
 
   const semEndereco = data.clients.filter((client) => !enderecoCompleto(client)).length;
+  const semUsuario = data.clients.filter((client) => !client.username).length;
 
   async function save(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -192,23 +239,29 @@ export function CompanyClients({ data, reload, notify }: { data: CompanyDashboar
       { id: 'criar', label: 'Cadastrar' },
     ]} />
 
-    {createdAccess ? <AccessCredentials eyebrow="Envie ao cliente" note="Esta senha temporária aparece somente agora. O cliente deverá trocá-la no primeiro acesso." email={createdAccess.email} password={createdAccess.temporaryPassword} onDismiss={() => setCreatedAccess(null)} /> : null}
-    {resetAccess ? <AccessCredentials eyebrow={`Nova senha de ${resetAccess.name}`} note={resetAccess.active ? 'Anote agora: a senha aparece somente desta vez. A senha antiga já não funciona e, no próximo acesso, o cliente terá de criar uma nova.' : 'Anote agora: a senha aparece somente desta vez. Atenção: este acesso ainda está inativo — aprove o cliente para ele conseguir entrar.'} email={resetAccess.email} password={resetAccess.temporaryPassword} onDismiss={() => setResetAccess(null)} /> : null}
+    {createdAccess ? <AccessCredentials eyebrow="Envie ao cliente" note="Esta senha temporária aparece somente agora. O cliente deverá trocá-la no primeiro acesso." loginLabel="Nome de usuário" email={createdAccess.username} password={createdAccess.temporaryPassword} onDismiss={() => setCreatedAccess(null)} /> : null}
+    {resetAccess ? <AccessCredentials eyebrow={`Nova senha de ${resetAccess.name}`} note={resetAccess.active ? 'Anote agora: a senha aparece somente desta vez. A senha antiga já não funciona e, no próximo acesso, o cliente terá de criar uma nova.' : 'Anote agora: a senha aparece somente desta vez. Atenção: este acesso ainda está inativo — aprove o cliente para ele conseguir entrar.'} loginLabel="Nome de usuário" email={resetAccess.username ?? 'Não definido — defina antes de enviar'} password={resetAccess.temporaryPassword} onDismiss={() => setResetAccess(null)} /> : null}
 
     {aba === 'lista' ? <>
+      {semUsuario > 0 ? <button type="button" onClick={() => setFiltro('sem_usuario')} className="flex w-full items-center gap-3 border-l-4 border-[#b62525] bg-[#fff5f5] p-4 text-left hover:bg-[#ffecec]">
+        <TriangleAlert className="size-5 shrink-0 text-[#b62525]" />
+        <span className="text-xs font-bold text-[#b62525]">{semUsuario === 1 ? '1 cliente está sem nome de usuário' : `${semUsuario} clientes estão sem nome de usuário`} — sem ele a empresa não consegue entrar no portal. Ver quais →</span>
+      </button> : null}
+
       {semEndereco > 0 ? <button type="button" onClick={() => setFiltro('sem_endereco')} className="flex w-full items-center gap-3 border-l-4 border-[#b62525] bg-[#fff5f5] p-4 text-left hover:bg-[#ffecec]">
         <TriangleAlert className="size-5 shrink-0 text-[#b62525]" />
         <span className="text-xs font-bold text-[#b62525]">{semEndereco === 1 ? '1 cliente está sem endereço da edificação' : `${semEndereco} clientes estão sem endereço da edificação`} — sem ele o atestado sai incompleto. Ver quais →</span>
       </button> : null}
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-black/35" /><Input aria-label="Buscar cliente ou CNPJ" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nome, CNPJ ou e-mail" className={`${fieldClass} pl-11`} /></div>
+        <div className="relative flex-1"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-black/35" /><Input aria-label="Buscar cliente ou CNPJ" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nome, usuário, CNPJ ou e-mail" className={`${fieldClass} pl-11`} /></div>
         <label className="sm:w-60" htmlFor="clientes-filtro"><span className="sr-only">Filtrar clientes</span>
           <select id="clientes-filtro" value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)} className={selectClass}>
             <option value="todos">Todos</option>
             <option value="active">Ativos</option>
             <option value="pending">Aguardando aprovação</option>
             <option value="sem_endereco">Sem endereço</option>
+            <option value="sem_usuario">Sem nome de usuário</option>
           </select>
         </label>
       </div>
@@ -239,8 +292,9 @@ export function CompanyClients({ data, reload, notify }: { data: CompanyDashboar
         <label htmlFor="cliente-cnpj"><span className={labelClass}>CNPJ</span><Input id="cliente-cnpj" required value={draft.document} onChange={(e) => setDraft({ ...draft, document: e.target.value })} className={fieldClass} /></label>
         <label htmlFor="cliente-unidade"><span className={labelClass}>Unidade / cidade</span><Input id="cliente-unidade" required value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} className={fieldClass} /></label>
         <label htmlFor="cliente-responsavel"><span className={labelClass}>Responsável na empresa</span><Input id="cliente-responsavel" required value={draft.contactName} onChange={(e) => setDraft({ ...draft, contactName: e.target.value })} className={fieldClass} /></label>
-        <label htmlFor="cliente-email"><span className={labelClass}>E-mail do responsável</span><Input id="cliente-email" required type="email" value={draft.contactEmail} onChange={(e) => setDraft({ ...draft, contactEmail: e.target.value })} className={fieldClass} /></label>
-        <label className="md:col-span-2" htmlFor="cliente-telefone"><span className={labelClass}>Telefone</span><Input id="cliente-telefone" value={draft.contactPhone} onChange={(e) => setDraft({ ...draft, contactPhone: e.target.value })} className={fieldClass} /></label>
+        <label htmlFor="cliente-email"><span className={labelClass}>E-mail do responsável (contato)</span><Input id="cliente-email" required type="email" value={draft.contactEmail} onChange={(e) => setDraft({ ...draft, contactEmail: e.target.value })} className={fieldClass} /></label>
+        <label htmlFor="cliente-usuario"><span className={labelClass}>Nome de usuário (login)</span><Input id="cliente-usuario" required minLength={3} maxLength={40} value={draft.username} onChange={(e) => setDraft({ ...draft, username: limparDigitacaoUsuario(e.target.value) })} placeholder="ex.: amazoncgh7" autoCapitalize="none" spellCheck={false} className={`${fieldClass} font-mono`} /><span className="mt-1.5 block text-[11px] leading-relaxed text-[#888]">{USUARIO_REGRA}</span></label>
+        <label htmlFor="cliente-telefone"><span className={labelClass}>Telefone</span><Input id="cliente-telefone" value={draft.contactPhone} onChange={(e) => setDraft({ ...draft, contactPhone: e.target.value })} className={fieldClass} /></label>
       </div>
       <Button type="submit" className="mt-6 h-13 rounded-none bg-[#f2ad19] px-8 text-[11px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900]"><Plus className="size-4" />Salvar e gerar acesso</Button>
     </form> : null}
