@@ -122,7 +122,7 @@ export function Certificate({
               <p>
                 Certificamos que
                 <span className="cert-name">
-                  {participante.fullName}{participante.rg ? ` RG - ${participante.rg}` : ''}
+                  {participante.fullName}{participante.documentId ? ` CPF - ${participante.documentId}` : ''}
                 </span>
                 concluiu
               </p>
@@ -141,7 +141,7 @@ export function Certificate({
                 lines={[TECHNICAL_LEAD.role, TECHNICAL_LEAD.name, `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`]}
               />
               <SignatureBlock
-                lines={[participante.fullName, participante.rg ? `RG - ${participante.rg}` : '']}
+                lines={[participante.fullName, participante.documentId ? `CPF - ${participante.documentId}` : '']}
               />
               <SignatureBlock
                 signature={assinaturaInstrutor}

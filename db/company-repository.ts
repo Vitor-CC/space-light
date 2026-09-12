@@ -1,4 +1,5 @@
 import { getD1 } from '@/db';
+import { formatarCpf, formatarRg, problemaCpf, problemaRg } from '@/lib/documentos';
 import { INSTRUCTOR_DOCUMENT_CATEGORIES } from '@/lib/instructor-documents';
 import { normalizarUsuario, USUARIO_REGRA, usuarioValido } from '@/lib/usuario';
 import type { DatabaseBinding, DatabaseResult } from '@/db/sqlite-adapter';
@@ -1495,6 +1496,8 @@ export async function addParticipantByInstructor(input: {
   if (!input.participant.fullName.trim() || !input.participant.documentId.trim()) {
     throw new Error('Informe ao menos o nome e o identificador do participante.');
   }
+  const problemaDocumento = problemaCpf(input.participant.documentId) ?? problemaRg(input.participant.rg ?? '');
+  if (problemaDocumento) throw new Error(problemaDocumento);
   // Checado antes da regra dos dias: quem já está na lista não é "aluno novo".
   if (await acharInscrito(training.id, input.participant.documentId)) {
     throw new Error('Já existe um participante com este identificador nesta turma.');
@@ -1513,8 +1516,8 @@ export async function addParticipantByInstructor(input: {
         id,
         training.id,
         input.participant.fullName.trim(),
-        input.participant.documentId.trim(),
-        (input.participant.rg ?? '').trim(),
+        formatarCpf(input.participant.documentId),
+        formatarRg(input.participant.rg ?? '', input.participant.documentId),
         (input.participant.birthDate ?? '').trim(),
         normalizeEmail(input.participant.email),
         input.participant.phone.trim(),
@@ -2734,7 +2737,8 @@ async function registrarCheckin(
 export async function checkinParticipant(token: string, documentId: string) {
   const training = await findTrainingByToken(token);
   if (!training) throw new Error('Este formulário não está disponível.');
-  if (!documentoNormalizado(documentId)) throw new Error('Informe o CPF.');
+  const problemaDocumento = problemaCpf(documentId);
+  if (problemaDocumento) throw new Error(problemaDocumento);
   const dia = await diaAbertoParaCheckin(training.id);
   if (!dia) throw new Error(SEM_DIA_ABERTO);
   const inscrito = await acharInscrito(training.id, documentId);
@@ -2760,6 +2764,9 @@ export async function registerParticipant(
 ) {
   const training = await findTrainingByToken(token);
   if (!training) throw new Error('Este formulário não está disponível.');
+  // CPF e RG completos, só com números; a pontuação é colocada ao gravar.
+  const problemaDocumento = problemaCpf(input.documentId) ?? problemaRg(input.rg ?? '');
+  if (problemaDocumento) throw new Error(problemaDocumento);
   const dia = await diaAbertoParaCheckin(training.id);
   if (!dia) throw new Error(SEM_DIA_ABERTO);
   // Já inscrito num dia anterior: vale como check-in, sem duplicar o cadastro.
@@ -2777,8 +2784,8 @@ export async function registerParticipant(
       id,
       training.id,
       input.fullName.trim(),
-      input.documentId.trim(),
-      (input.rg ?? '').trim(),
+      formatarCpf(input.documentId),
+      formatarRg(input.rg ?? '', input.documentId),
       (input.birthDate ?? '').trim(),
       normalizeEmail(input.email),
       input.phone.trim(),

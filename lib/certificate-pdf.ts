@@ -377,7 +377,8 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     y -= 52;
     const corpo = 14;
     const larguraTexto = PAGE_W - RIGHT_SAFE - LEFT;
-    const nome = `${caixaAlta(participante.fullName)}${participante.rg ? ` RG - ${participante.rg}` : ''}`;
+    // O certificado identifica o aluno pelo CPF (decisão de 2026-09-12; antes era o RG).
+    const nome = `${caixaAlta(participante.fullName)}${participante.documentId ? ` CPF - ${participante.documentId}` : ''}`;
 
     const prefixo = 'Certificamos que ';
     const sufixo = ' concluiu';
@@ -442,7 +443,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
         },
         {
           assinatura: null,
-          linhas: [caixaAlta(participante.fullName), participante.rg ? `RG - ${participante.rg}` : ''],
+          linhas: [caixaAlta(participante.fullName), participante.documentId ? `CPF - ${participante.documentId}` : ''],
         },
         ...blocoDoInstrutor(data, assinaturaInstrutor),
       ],

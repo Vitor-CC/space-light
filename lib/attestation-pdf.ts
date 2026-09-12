@@ -186,8 +186,8 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   y -= 14;
 
   const colunas: { titulo: string; largura: number; valor: (p: CertificateData['participants'][number]) => string }[] = [
-    { titulo: 'NOME', largura: CONTENT * 0.38, valor: (p) => caixaAlta(p.fullName) },
-    { titulo: 'RG', largura: CONTENT * 0.15, valor: (p) => p.rg },
+    // Sem coluna de RG: o atestado identifica pelo CPF, como o certificado.
+    { titulo: 'NOME', largura: CONTENT * 0.53, valor: (p) => caixaAlta(p.fullName) },
     { titulo: 'CPF', largura: CONTENT * 0.18, valor: (p) => p.documentId },
     { titulo: 'DATA NASC.', largura: CONTENT * 0.14, valor: (p) => formatBirthDate(p.birthDate) },
     { titulo: 'CARGA HORÁRIA', largura: CONTENT * 0.15, valor: () => data.training.duration },
