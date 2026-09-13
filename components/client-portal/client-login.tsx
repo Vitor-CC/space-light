@@ -52,7 +52,7 @@ const portals: Record<LoginPortal, PortalCopy> = {
     title: 'Acesse sua conta',
     description: 'Use o nome de usuário que a Space Light criou para a sua empresa.',
     emailLabel: 'Nome de usuário',
-    emailPlaceholder: 'ex.: amazoncgh7',
+    emailPlaceholder: 'ex.: empresaexemplo1',
     info: { title: 'Acesso criado pela Space', text: 'Use a senha temporária enviada pela equipe e crie uma nova no primeiro acesso.' },
     register: null,
     usernameLogin: true,
