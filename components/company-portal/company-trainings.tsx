@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, CalendarDays, CalendarPlus, Check, ChevronDown, Clock3, Loader2, MessageCircle, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CalendarPlus, Check, ChevronDown, Clock3, Loader2, MessageCircle, Pencil, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { ptBR } from 'date-fns/locale';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import type { CompanyDashboardData, CompanyInstructor, CompanyTraining, TrainingSession } from '@/lib/company-types';
-import { completeTrainingByCompany, createMockTraining, deleteTraining, renameTraining, updateTrainingDay } from '@/lib/mock-company-database';
+import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTraining, removeTrainingDay, renameTraining, updateTrainingDay, updateTrainingDetails } from '@/lib/mock-company-database';
 import type { NovoDia } from '@/lib/mock-company-database';
 import { nrInfo } from '@/lib/nr-catalog';
 import { scheduleWindow, trainingReminderMessage, trainingScheduleMessage, whatsappLink } from '@/lib/whatsapp';
@@ -54,6 +54,18 @@ function DayRow({ training, session, instructors, reload, notify }: { training: 
     finally { setSalvando(false); }
   }
 
+  // A gestão pode tudo: dia encerrado também se edita ou remove.
+  async function removerDia() {
+    if (!window.confirm(`Remover o dia ${session.day_number} (${formatDate(session.session_date)}) desta turma? As presenças marcadas neste dia também saem.`)) return;
+    setSalvando(true);
+    try {
+      await removeTrainingDay(training.id, session.id);
+      notify(`Dia ${session.day_number} removido.`);
+      await reload();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao remover o dia.'); }
+    finally { setSalvando(false); }
+  }
+
   const instrutor = instructors.find((item) => item.id === session.instructor_id);
   const aviso = instrutor?.phone
     ? whatsappLink(instrutor.phone, trainingScheduleMessage({
@@ -74,16 +86,17 @@ function DayRow({ training, session, instructors, reload, notify }: { training: 
       <span className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#999] sm:mt-1 sm:block">de {total}</span>
     </div>
     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(140px,auto)_minmax(180px,auto)_minmax(180px,1fr)_auto]">
-      <Input type="date" aria-label={`Data do dia ${session.day_number}`} disabled={encerrado || salvando} value={session.session_date} onChange={(e) => void salvar({ sessionDate: e.target.value })} className={`${fieldClass} w-full min-w-[140px]`} />
+      <Input type="date" aria-label={`Data do dia ${session.day_number}`} disabled={salvando} value={session.session_date} onChange={(e) => void salvar({ sessionDate: e.target.value })} className={`${fieldClass} w-full min-w-[140px]`} />
       <div className="grid grid-cols-2 gap-2">
-        <Input type="time" aria-label={`Início do dia ${session.day_number}`} disabled={encerrado || salvando} value={session.start_time} onChange={(e) => void salvar({ startTime: e.target.value })} className={`${fieldClass} w-full min-w-[84px]`} />
-        <Input type="time" aria-label={`Fim do dia ${session.day_number}`} disabled={encerrado || salvando} value={session.end_time} onChange={(e) => void salvar({ endTime: e.target.value })} className={`${fieldClass} w-full min-w-[84px]`} />
+        <Input type="time" aria-label={`Início do dia ${session.day_number}`} disabled={salvando} value={session.start_time} onChange={(e) => void salvar({ startTime: e.target.value })} className={`${fieldClass} w-full min-w-[84px]`} />
+        <Input type="time" aria-label={`Fim do dia ${session.day_number}`} disabled={salvando} value={session.end_time} onChange={(e) => void salvar({ endTime: e.target.value })} className={`${fieldClass} w-full min-w-[84px]`} />
       </div>
-      <select aria-label={`Instrutor do dia ${session.day_number}`} disabled={encerrado || salvando} value={session.instructor_id ?? ''} onChange={(e) => void salvar({ instructorId: e.target.value || null })} className={`${selectClass} min-w-[180px] ${session.instructor_id ? '' : 'border-[#b62525] text-[#b62525]'}`}>
+      <select aria-label={`Instrutor do dia ${session.day_number}`} disabled={salvando} value={session.instructor_id ?? ''} onChange={(e) => void salvar({ instructorId: e.target.value || null })} className={`${selectClass} min-w-[180px] ${session.instructor_id ? '' : 'border-[#b62525] text-[#b62525]'}`}>
         <option value="">Sem instrutor — escalar depois</option>
         {instructors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
       <div className="flex items-center gap-2">
+        {total > 1 ? <button type="button" onClick={() => void removerDia()} disabled={salvando} aria-label={`Remover o dia ${session.day_number}`} title="Remover este dia" className="flex size-11 shrink-0 items-center justify-center border border-black/15 bg-white text-[#777] hover:border-[#b62525] hover:text-[#b62525] disabled:opacity-40"><X className="size-4" /></button> : null}
         {salvando ? <Loader2 className="size-4 animate-spin text-[#8a6107]" /> : null}
         {encerrado ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#17642d]"><Check className="size-4" />Encerrado</span>
           : aviso ? <a href={aviso} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center gap-2 whitespace-nowrap border border-black/15 px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#1a7a43] hover:bg-[#25D366] hover:text-black"><MessageCircle className="size-4" />Avisar</a>
@@ -93,7 +106,101 @@ function DayRow({ training, session, instructors, reload, notify }: { training: 
   </div>;
 }
 
-function TrainingActions({ training, instructors, faltaLista, reload, notify }: { training: CompanyTraining; instructors: CompanyInstructor[]; faltaLista: boolean; reload: Reload; notify: Notify }) {
+/** A gestão acrescenta um dia à turma; a numeração segue a ordem das datas. */
+function AddDay({ training, instructors, reload, notify }: { training: CompanyTraining; instructors: CompanyInstructor[]; reload: Reload; notify: Notify }) {
+  const ultimo = training.sessions[training.sessions.length - 1];
+  const [aberto, setAberto] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [dia, setDia] = useState<NovoDia>({ date: '', startTime: ultimo?.start_time || '08:00', endTime: ultimo?.end_time || '18:00', instructorId: ultimo?.instructor_id ?? null });
+
+  async function salvar(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSalvando(true);
+    try {
+      await addTrainingDay(training.id, dia);
+      notify(`Dia ${formatDate(dia.date)} acrescentado à turma.`);
+      setAberto(false);
+      setDia({ ...dia, date: '' });
+      await reload();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao acrescentar o dia.'); }
+    finally { setSalvando(false); }
+  }
+
+  if (!aberto) {
+    return <div className="border-t border-black/8 px-4 py-3"><button type="button" onClick={() => setAberto(true)} className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107] hover:text-black"><Plus className="size-4" />Adicionar dia</button></div>;
+  }
+  return <form onSubmit={salvar} className="grid gap-2 border-t border-black/8 bg-[#fffdf7] p-4 sm:grid-cols-[1fr_auto_auto] xl:grid-cols-[minmax(140px,auto)_auto_auto_minmax(180px,1fr)_auto_auto]">
+    <Input required type="date" aria-label="Data do novo dia" value={dia.date} onChange={(e) => setDia({ ...dia, date: e.target.value })} className={fieldClass} />
+    <Input type="time" aria-label="Início do novo dia" value={dia.startTime} onChange={(e) => setDia({ ...dia, startTime: e.target.value })} className={`${fieldClass} sm:w-28`} />
+    <Input type="time" aria-label="Fim do novo dia" value={dia.endTime} onChange={(e) => setDia({ ...dia, endTime: e.target.value })} className={`${fieldClass} sm:w-28`} />
+    <select aria-label="Instrutor do novo dia" value={dia.instructorId ?? ''} onChange={(e) => setDia({ ...dia, instructorId: e.target.value || null })} className={`${selectClass} sm:col-span-3 xl:col-span-1`}>
+      <option value="">Sem instrutor — escalar depois</option>
+      {instructors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+    </select>
+    <Button type="submit" disabled={salvando} className="h-12 rounded-none bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900]">{salvando ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}Adicionar</Button>
+    <button type="button" onClick={() => setAberto(false)} className="h-12 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">Cancelar</button>
+  </form>;
+}
+
+type DadosTreinamento = { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string };
+
+/** O que sai no certificado e na lista: cliente, norma, título, carga horária, endereço e conteúdo. */
+function TrainingDetails({ training, clients, reload, notify }: { training: CompanyTraining; clients: CompanyDashboardData['clients']; reload: Reload; notify: Notify }) {
+  const inicial = (): DadosTreinamento => ({ clientId: training.client_id, nr: training.nr, title: training.title, duration: training.duration, location: training.location, contentProgram: training.content_program ?? '' });
+  const [aberto, setAberto] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [draft, setDraft] = useState<DadosTreinamento>(inicial);
+  const normas = NORMAS.includes(draft.nr) ? NORMAS : [draft.nr, ...NORMAS];
+
+  async function salvar(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSalvando(true);
+    try {
+      await updateTrainingDetails(training.id, draft);
+      notify(training.status === 'completed'
+        ? 'Dados salvos. A turma já foi encerrada: gere os documentos de novo (aba QR e participantes) para refletir a mudança.'
+        : 'Dados do treinamento salvos.');
+      setAberto(false);
+      await reload();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao salvar o treinamento.'); }
+    finally { setSalvando(false); }
+  }
+
+  if (!aberto) {
+    return <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-black/8 pb-3">
+      <span className="text-[11px] text-[#777]">Cliente, norma, título do certificado, carga horária, endereço e conteúdo programático.</span>
+      <button type="button" onClick={() => { setDraft(inicial()); setAberto(true); }} className="inline-flex h-10 items-center gap-2 border border-black/15 bg-white px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white"><Pencil className="size-3.5" />Editar dados do treinamento</button>
+    </div>;
+  }
+  return <form onSubmit={salvar} className="mb-3 space-y-4 border border-black/10 bg-white p-4">
+    <ClientPicker clients={clients} value={draft.clientId} onChange={(id) => setDraft({ ...draft, clientId: id })} />
+    <div className="grid gap-3 sm:grid-cols-[130px_1fr]">
+      <label htmlFor={`editar-nr-${training.id}`}><span className={labelClass}>Norma</span>
+        <select id={`editar-nr-${training.id}`} value={draft.nr} onChange={(e) => setDraft({ ...draft, nr: e.target.value })} className={selectClass}>{normas.map((nr) => <option key={nr}>{nr}</option>)}</select>
+      </label>
+      <label htmlFor={`editar-titulo-${training.id}`}><span className={labelClass}>Título no certificado</span>
+        <Input id={`editar-titulo-${training.id}`} required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} className={fieldClass} />
+      </label>
+    </div>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label htmlFor={`editar-carga-${training.id}`}><span className={labelClass}>Carga horária</span>
+        <Input id={`editar-carga-${training.id}`} required value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: e.target.value })} className={fieldClass} />
+      </label>
+      <label htmlFor={`editar-local-${training.id}`}><span className={labelClass}>Endereço do treinamento</span>
+        <Input id={`editar-local-${training.id}`} required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} className={fieldClass} />
+      </label>
+    </div>
+    <label htmlFor={`editar-conteudo-${training.id}`}><span className={labelClass}>Conteúdo programático (aparece na lista)</span>
+      <textarea id={`editar-conteudo-${training.id}`} rows={4} value={draft.contentProgram} onChange={(e) => setDraft({ ...draft, contentProgram: e.target.value })} className="w-full border border-black/16 bg-white p-3 text-sm outline-none focus:border-[#f2ad19] focus:ring-2 focus:ring-[#f2ad19]/30" />
+    </label>
+    <div className="flex flex-wrap gap-2">
+      <Button type="submit" disabled={salvando} className="h-11 rounded-none bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900]">{salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar dados</Button>
+      <button type="button" onClick={() => setAberto(false)} className="h-11 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">Cancelar</button>
+    </div>
+  </form>;
+}
+
+function TrainingActions({ training, clients, instructors, faltaLista, reload, notify }: { training: CompanyTraining; clients: CompanyDashboardData['clients']; instructors: CompanyInstructor[]; faltaLista: boolean; reload: Reload; notify: Notify }) {
   const [ocupado, setOcupado] = useState('');
   const [confirmarSemLista, setConfirmarSemLista] = useState('');
   const [identificacao, setIdentificacao] = useState(training.internal_label);
@@ -163,6 +270,8 @@ function TrainingActions({ training, instructors, faltaLista, reload, notify }: 
       </div>
     </div> : null}
 
+    <TrainingDetails training={training} clients={clients} reload={reload} notify={notify} />
+
     <div className="mb-3 flex flex-col gap-2 border-b border-black/8 pb-3 sm:flex-row sm:items-center">
       <label htmlFor={`identificacao-${training.id}`} className="shrink-0 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#777]">Identificação da turma</label>
       <Input id={`identificacao-${training.id}`} value={identificacao} onChange={(e) => setIdentificacao(e.target.value)} onBlur={() => void renomear()} placeholder="Ex.: Turma A - manhã" className={`${fieldClass} flex-1`} />
@@ -183,7 +292,7 @@ function TrainingActions({ training, instructors, faltaLista, reload, notify }: 
 }
 
 /** Uma turma na lista: cabeçalho sempre visível, dias e ações ao abrir. */
-function TrainingRow({ training, instructors, faltaLista, reload, notify, aberta, alternar }: { training: CompanyTraining; instructors: CompanyInstructor[]; faltaLista: boolean; reload: Reload; notify: Notify; aberta: boolean; alternar: () => void }) {
+function TrainingRow({ training, clients, instructors, faltaLista, reload, notify, aberta, alternar }: { training: CompanyTraining; clients: CompanyDashboardData['clients']; instructors: CompanyInstructor[]; faltaLista: boolean; reload: Reload; notify: Notify; aberta: boolean; alternar: () => void }) {
   const dias = training.sessions ?? [];
   const semInstrutor = dias.filter((dia) => !dia.instructor_id).length;
   return <article className="border border-black/10 bg-white">
@@ -205,7 +314,8 @@ function TrainingRow({ training, instructors, faltaLista, reload, notify, aberta
     </button>
     {aberta ? <>
       {dias.map((dia) => <DayRow key={dia.id} training={training} session={dia} instructors={instructors} reload={reload} notify={notify} />)}
-      <TrainingActions training={training} instructors={instructors} faltaLista={faltaLista} reload={reload} notify={notify} />
+      <AddDay training={training} instructors={instructors} reload={reload} notify={notify} />
+      <TrainingActions training={training} clients={clients} instructors={instructors} faltaLista={faltaLista} reload={reload} notify={notify} />
     </> : null}
   </article>;
 }
@@ -479,7 +589,7 @@ export function CompanyTrainings({ data, reload, notify }: { data: CompanyDashbo
           </select>
         </label>
       </div>
-      {filtradas.map((training) => <TrainingRow key={training.id} training={training} instructors={instrutores} faltaLista={!turmasComLista.has(training.id)} reload={reload} notify={notify}
+      {filtradas.map((training) => <TrainingRow key={training.id} training={training} clients={data.clients} instructors={instrutores} faltaLista={!turmasComLista.has(training.id)} reload={reload} notify={notify}
         aberta={aberta === training.id} alternar={() => setAberta((atual) => (atual === training.id ? null : training.id))} />)}
       {filtradas.length === 0 ? <EmptyState icon={CalendarPlus} title="Nenhuma turma encontrada" text={data.trainings.length === 0 ? 'Crie a primeira turma na aba Criar para liberar QR, participantes e arquivos.' : 'Ajuste a busca ou o filtro de situação.'} /> : null}
     </div> : null}

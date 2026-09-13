@@ -79,6 +79,8 @@ export type CompanyTraining = {
   title: string;
   /** Nome interno para diferenciar turmas; nunca sai em documento. */
   internal_label: string;
+  /** Conteúdo programático; vem só nos dados da gestão. */
+  content_program?: string;
   training_date: string;
   duration: string;
   location: string;
@@ -189,5 +191,7 @@ export type CompanyDashboardData = {
   trainings: CompanyTraining[];
   files: CompanyFile[];
   participants: CompanyParticipant[];
+  /** Um par por presença gravada (check-in do aluno ou marcação da gestão). */
+  attendance: { participant_id: string; session_id: string }[];
   currentUser: { id: string; email: string; isOwner: boolean };
 };

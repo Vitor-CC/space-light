@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, ChevronDown, KeyRound, Plus, Search, Trash2, TriangleAlert, UserRound } from 'lucide-react';
+import { Check, ChevronDown, KeyRound, Loader2, Pencil, Plus, Search, Trash2, TriangleAlert, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { registroValido } from '@/lib/certificate-config';
 import type { CompanyDashboardData, CompanyInstructor } from '@/lib/company-types';
 import { INSTRUCTOR_DOCUMENT_STATUS, REQUIRED_INSTRUCTOR_DOCUMENTS } from '@/lib/instructor-documents';
-import { approveInstructor, createInstructor, deleteInstructor, readInstructorDocuments, resetUserPassword, reviewInstructorDocument } from '@/lib/mock-company-database';
+import { approveInstructor, createInstructor, deleteInstructor, readInstructorDocuments, resetUserPassword, reviewInstructorDocument, updateInstructor } from '@/lib/mock-company-database';
 
 type Aba = 'lista' | 'agenda' | 'criar';
 
@@ -65,13 +65,69 @@ function InstructorDocumentsReview({ instructorId, documents, onDecide }: {
   </div>;
 }
 
-function InstructorRow({ instructor, turmas, documents, aberta, alternar, acoes, onDecide }: {
+type DadosInstrutor = { name: string; document: string; email: string; phone: string; professionalRegistry: string; specialties: string; baseCity: string };
+
+/** A gestão edita qualquer dado do instrutor. O e-mail é o login dele. */
+function InstructorEdit({ instructor, notify, reload }: { instructor: CompanyInstructor; notify: (message: string) => void; reload: () => Promise<void> }) {
+  const inicial = (): DadosInstrutor => ({ name: instructor.name, document: instructor.document, email: instructor.email, phone: instructor.phone ?? '', professionalRegistry: instructor.professional_registry ?? '', specialties: instructor.specialties ?? '', baseCity: instructor.base_city ?? '' });
+  const [aberto, setAberto] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [draft, setDraft] = useState<DadosInstrutor>(inicial);
+
+  async function salvar(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trocouEmail = draft.email.trim().toLowerCase() !== instructor.email.toLowerCase();
+    if (trocouEmail && !window.confirm(`O e-mail é o login do instrutor. Depois de salvar, ${instructor.name} passa a entrar com ${draft.email.trim()}. Continuar?`)) return;
+    setSalvando(true);
+    try {
+      await updateInstructor(instructor.id, draft);
+      notify(trocouEmail ? 'Dados salvos. Avise o instrutor do novo e-mail de acesso.' : 'Dados do instrutor salvos.');
+      setAberto(false);
+      await reload();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao salvar os dados do instrutor.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  const campo = (chave: keyof DadosInstrutor, rotulo: string, extra: { type?: string; required?: boolean; largo?: boolean } = {}) => <label key={chave} className={extra.largo ? 'sm:col-span-2' : ''} htmlFor={`instrutor-${instructor.id}-${chave}`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">{rotulo}</span><Input id={`instrutor-${instructor.id}-${chave}`} type={extra.type ?? 'text'} required={extra.required ?? false} value={draft[chave]} onChange={(e) => setDraft({ ...draft, [chave]: e.target.value })} className={fieldClass} /></label>;
+
+  return <div>
+    <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="min-w-0">
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">Dados do instrutor</span>
+        <p className="mt-1 text-[11px] leading-relaxed text-[#888]">O e-mail é o login. O nome e o registro MTE/RE saem nos documentos.</p>
+      </div>
+      <button type="button" onClick={() => { setDraft(inicial()); setAberto((v) => !v); }} className="inline-flex h-10 shrink-0 items-center gap-2 border border-black/15 bg-white px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">
+        <Pencil className="size-3.5" />{aberto ? 'Fechar' : 'Editar dados'}
+      </button>
+    </div>
+
+    {aberto ? <form onSubmit={salvar} className="mt-4 grid gap-3 border border-black/10 bg-white p-4 sm:grid-cols-2">
+      {campo('name', 'Nome completo', { required: true })}
+      {campo('document', 'CPF', { required: true })}
+      {campo('email', 'E-mail (login)', { type: 'email', required: true })}
+      {campo('phone', 'Telefone / WhatsApp')}
+      {campo('professionalRegistry', 'Registro MTE / RE')}
+      {campo('baseCity', 'Cidade base')}
+      {campo('specialties', 'Especialidades / NRs', { largo: true })}
+      <Button type="submit" disabled={salvando} className="mt-1 h-11 rounded-none bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900] sm:col-span-2">
+        {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar dados
+      </Button>
+    </form> : null}
+  </div>;
+}
+
+function InstructorRow({ instructor, turmas, documents, aberta, alternar, acoes, onDecide, notify, reload }: {
   instructor: CompanyInstructor;
   turmas: number;
   documents: AdminInstructorDocument[];
   aberta: boolean;
   alternar: () => void;
   acoes: { approve: () => void; reset: () => void; remove: () => void };
+  notify: (message: string) => void;
+  reload: () => Promise<void>;
   onDecide: (documentId: string, status: 'approved' | 'rejected') => void;
 }) {
   const pendente = instructor.status === 'pending';
@@ -104,6 +160,7 @@ function InstructorRow({ instructor, turmas, documents, aberta, alternar, acoes,
         <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Registro MTE/RE</dt><dd className={`text-right font-bold ${semRegistro ? 'text-[#b62525]' : ''}`}>{instructor.professional_registry || 'Não informado'}</dd></div>
         <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Turmas atribuídas</dt><dd className="text-right font-bold">{turmas}</dd></div>
       </dl>
+      <InstructorEdit instructor={instructor} notify={notify} reload={reload} />
       <InstructorDocumentsReview instructorId={instructor.id} documents={documents} onDecide={onDecide} />
       <div className="flex flex-wrap gap-2">
         {pendente ? <Button type="button" onClick={acoes.approve} className="h-11 rounded-none bg-[#f2ad19] px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#ff9900]"><Check className="size-4" />Aprovar acesso</Button> : null}
@@ -228,6 +285,7 @@ export function CompanyInstructors({ data, reload, notify }: { data: CompanyDash
         turmas={turmasPorInstrutor.get(instructor.id) ?? 0} documents={instructorDocuments}
         aberta={aberta === instructor.id} alternar={() => setAberta((atual) => (atual === instructor.id ? null : instructor.id))}
         onDecide={(id, status) => void decideDocument(id, status)}
+        notify={notify} reload={reload}
         acoes={{
           approve: () => void approve(instructor.id),
           reset: () => void resetPassword({ id: instructor.id, name: instructor.name }),

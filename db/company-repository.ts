@@ -1392,6 +1392,8 @@ export async function updateTrainingSession(input: {
     .prepare(`UPDATE training_sessions SET ${campos.join(', ')} WHERE id = ?`)
     .bind(...valores, input.sessionId)
     .run();
+  // Trocar a data pode mudar a ordem: "Dia 1" é sempre o primeiro no calendário.
+  if (input.sessionDate !== undefined) await renumerarDias(input.trainingId);
   await sincronizarTurma(input.trainingId);
   await writeAudit(input.byUserId, 'training.session_updated', 'training', input.trainingId, {
     sessionId: input.sessionId,
@@ -1554,6 +1556,378 @@ export async function removeParticipantByInstructor(input: {
     d1.prepare('DELETE FROM participants WHERE id = ?').bind(input.participantId),
   ]);
   await writeAudit(input.userId, 'participant.removed', 'participant', input.participantId, { trainingId: input.trainingId });
+}
+
+// ---------------------------------------------------------------------------
+// Edição pela gestão: a Space altera qualquer dado de empresa, instrutor,
+// treinamento e lista de presença. Tudo fica registrado na Atividade.
+// ---------------------------------------------------------------------------
+
+export async function updateClientByAdmin(input: {
+  clientId: string;
+  byUserId: string;
+  name: string;
+  legalName: string;
+  document: string;
+  unit: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const campos = {
+    name: (input.name ?? '').trim(),
+    legalName: (input.legalName ?? '').trim(),
+    document: (input.document ?? '').trim(),
+    unit: (input.unit ?? '').trim(),
+    contactName: (input.contactName ?? '').trim(),
+    contactEmail: normalizeEmail(input.contactEmail ?? ''),
+    contactPhone: (input.contactPhone ?? '').trim(),
+  };
+  if (!campos.name || !campos.legalName || !campos.document || !campos.unit || !campos.contactName || !campos.contactEmail) {
+    throw new Error('Preencha todos os campos obrigatórios.');
+  }
+  const existe = await d1.prepare('SELECT id FROM clients WHERE id = ? LIMIT 1').bind(input.clientId).first<{ id: string }>();
+  if (!existe) throw new Error('Cliente não encontrado.');
+  const outroCliente = await d1
+    .prepare('SELECT name FROM clients WHERE (document = ? OR lower(contact_email) = ?) AND id != ? LIMIT 1')
+    .bind(campos.document, campos.contactEmail, input.clientId)
+    .first<{ name: string }>();
+  if (outroCliente) throw new Error(`Já existe outro cliente com este CNPJ ou e-mail (${outroCliente.name}).`);
+  // O e-mail da conta da empresa acompanha o de contato, e não pode ser o de
+  // outra conta (instrutor ou equipe). client_id nulo precisa do IS NULL: a
+  // comparação com NULL não é verdadeira nem falsa e esconderia o conflito.
+  const outraConta = await d1
+    .prepare(`SELECT id FROM users WHERE lower(email) = ?
+      AND (client_id IS NULL OR client_id != ? OR role != 'client') LIMIT 1`)
+    .bind(campos.contactEmail, input.clientId)
+    .first<{ id: string }>();
+  if (outraConta) throw new Error('Este e-mail já é usado por outra conta de acesso.');
+  await d1.batch([
+    d1
+      .prepare(`UPDATE clients SET name = ?, legal_name = ?, document = ?, unit = ?, contact_name = ?,
+        contact_email = ?, contact_phone = ?, updated_at = datetime('now') WHERE id = ?`)
+      .bind(campos.name, campos.legalName, campos.document, campos.unit, campos.contactName,
+        campos.contactEmail, campos.contactPhone, input.clientId),
+    d1
+      .prepare("UPDATE users SET email = ?, name = ? WHERE client_id = ? AND role = 'client'")
+      .bind(campos.contactEmail, campos.contactName, input.clientId),
+  ]);
+  await writeAudit(input.byUserId, 'client.updated_by_company', 'client', input.clientId, { nome: campos.name });
+  return { ok: true as const };
+}
+
+export async function updateInstructorByAdmin(input: {
+  instructorId: string;
+  byUserId: string;
+  name: string;
+  document: string;
+  email: string;
+  phone: string;
+  professionalRegistry: string;
+  specialties: string;
+  baseCity: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const campos = {
+    name: (input.name ?? '').trim(),
+    document: (input.document ?? '').trim(),
+    email: normalizeEmail(input.email ?? ''),
+    phone: (input.phone ?? '').trim(),
+    professionalRegistry: (input.professionalRegistry ?? '').trim(),
+    specialties: (input.specialties ?? '').trim(),
+    baseCity: (input.baseCity ?? '').trim(),
+  };
+  if (!campos.name || !campos.document || !campos.email) throw new Error('Informe nome, CPF e e-mail do instrutor.');
+  const existe = await d1.prepare('SELECT id FROM instructors WHERE id = ? LIMIT 1').bind(input.instructorId).first<{ id: string }>();
+  if (!existe) throw new Error('Instrutor não encontrado.');
+  const outroInstrutor = await d1
+    .prepare('SELECT name FROM instructors WHERE (document = ? OR lower(email) = ?) AND id != ? LIMIT 1')
+    .bind(campos.document, campos.email, input.instructorId)
+    .first<{ name: string }>();
+  if (outroInstrutor) throw new Error(`Já existe outro instrutor com este CPF ou e-mail (${outroInstrutor.name}).`);
+  const outraConta = await d1
+    .prepare(`SELECT id FROM users WHERE lower(email) = ?
+      AND (instructor_id IS NULL OR instructor_id != ? OR role != 'instructor') LIMIT 1`)
+    .bind(campos.email, input.instructorId)
+    .first<{ id: string }>();
+  if (outraConta) throw new Error('Este e-mail já é usado por outra conta de acesso.');
+  await d1.batch([
+    d1
+      .prepare(`UPDATE instructors SET name = ?, document = ?, email = ?, phone = ?, professional_registry = ?,
+        specialties = ?, base_city = ?, updated_at = datetime('now') WHERE id = ?`)
+      .bind(campos.name, campos.document, campos.email, campos.phone, campos.professionalRegistry,
+        campos.specialties, campos.baseCity, input.instructorId),
+    // O e-mail é o login dele: trocar aqui troca o acesso.
+    d1
+      .prepare("UPDATE users SET name = ?, email = ? WHERE instructor_id = ? AND role = 'instructor'")
+      .bind(campos.name, campos.email, input.instructorId),
+  ]);
+  // O nome sai impresso nos documentos: as turmas dele pegam o nome novo.
+  const turmas = await d1
+    .prepare('SELECT DISTINCT training_id FROM training_sessions WHERE instructor_id = ?')
+    .bind(input.instructorId)
+    .all<{ training_id: string }>();
+  for (const linha of rows(turmas)) await sincronizarTurma(linha.training_id);
+  await writeAudit(input.byUserId, 'instructor.updated_by_company', 'instructor', input.instructorId, { nome: campos.name });
+  return { ok: true as const };
+}
+
+export async function updateTrainingByAdmin(input: {
+  trainingId: string;
+  byUserId: string;
+  clientId: string;
+  nr: string;
+  title: string;
+  duration: string;
+  location: string;
+  contentProgram: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const campos = {
+    clientId: (input.clientId ?? '').trim(),
+    nr: (input.nr ?? '').trim(),
+    title: (input.title ?? '').trim(),
+    duration: (input.duration ?? '').trim(),
+    location: (input.location ?? '').trim(),
+    contentProgram: (input.contentProgram ?? '').trim(),
+  };
+  if (!campos.clientId || !campos.nr || !campos.title || !campos.duration || !campos.location) {
+    throw new Error('Preencha cliente, norma, título, carga horária e endereço.');
+  }
+  const turma = await d1
+    .prepare('SELECT client_id FROM trainings WHERE id = ? LIMIT 1')
+    .bind(input.trainingId)
+    .first<{ client_id: string }>();
+  if (!turma) throw new Error('Treinamento não encontrado.');
+  const cliente = await d1.prepare('SELECT id FROM clients WHERE id = ? LIMIT 1').bind(campos.clientId).first<{ id: string }>();
+  if (!cliente) throw new Error('Cliente não encontrado.');
+  await d1.batch([
+    d1
+      .prepare(`UPDATE trainings SET client_id = ?, nr = ?, title = ?, duration = ?, location = ?,
+        content_program = ? WHERE id = ?`)
+      .bind(campos.clientId, campos.nr, campos.title, campos.duration, campos.location, campos.contentProgram, input.trainingId),
+    // Arquivos seguem a turma: o cliente novo passa a vê-los no portal dele.
+    d1.prepare('UPDATE files SET client_id = ? WHERE training_id = ?').bind(campos.clientId, input.trainingId),
+  ]);
+  await writeAudit(input.byUserId, 'training.updated', 'training', input.trainingId, {
+    clienteTrocado: turma.client_id !== campos.clientId,
+  });
+  return { ok: true as const };
+}
+
+/**
+ * Dias numerados pela data. Passa por números negativos para não esbarrar no
+ * índice único (turma, dia) no meio da troca.
+ */
+async function renumerarDias(trainingId: string) {
+  const d1 = getD1();
+  const result = await d1
+    .prepare('SELECT id FROM training_sessions WHERE training_id = ? ORDER BY session_date ASC, day_number ASC')
+    .bind(trainingId)
+    .all<{ id: string }>();
+  const ids = rows(result).map((linha) => linha.id);
+  if (ids.length === 0) return;
+  await d1.batch([
+    ...ids.map((id, indice) => d1.prepare('UPDATE training_sessions SET day_number = ? WHERE id = ?').bind(-(indice + 1), id)),
+    ...ids.map((id, indice) => d1.prepare('UPDATE training_sessions SET day_number = ? WHERE id = ?').bind(indice + 1, id)),
+  ]);
+}
+
+export async function addTrainingDayByAdmin(input: {
+  trainingId: string;
+  byUserId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  instructorId: string | null;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  if (!DATA_ISO.test(input.date ?? '')) throw new Error('Informe uma data válida para o dia.');
+  const turma = await d1.prepare('SELECT id FROM trainings WHERE id = ? LIMIT 1').bind(input.trainingId).first<{ id: string }>();
+  if (!turma) throw new Error('Treinamento não encontrado.');
+  if (input.instructorId) {
+    const instrutor = await d1
+      .prepare("SELECT id FROM instructors WHERE id = ? AND status IN ('active', 'invited') LIMIT 1")
+      .bind(input.instructorId)
+      .first<{ id: string }>();
+    if (!instrutor) throw new Error('Selecione um instrutor aprovado.');
+  }
+  const repetido = await d1
+    .prepare('SELECT id FROM training_sessions WHERE training_id = ? AND session_date = ? LIMIT 1')
+    .bind(input.trainingId, input.date)
+    .first<{ id: string }>();
+  if (repetido) throw new Error('Esta turma já tem um dia nesta data.');
+  const maior = await d1
+    .prepare('SELECT COALESCE(MAX(day_number), 0) AS n FROM training_sessions WHERE training_id = ?')
+    .bind(input.trainingId)
+    .first<{ n: number }>();
+  await d1
+    .prepare(`INSERT INTO training_sessions (
+      id, training_id, day_number, session_date, start_time, end_time, instructor_id, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled')`)
+    .bind(makeId('session'), input.trainingId, Number(maior?.n ?? 0) + 1, input.date,
+      (input.startTime ?? '').trim(), (input.endTime ?? '').trim(), input.instructorId || null)
+    .run();
+  await renumerarDias(input.trainingId);
+  await sincronizarTurma(input.trainingId);
+  await writeAudit(input.byUserId, 'training.day_added', 'training', input.trainingId, { data: input.date });
+  return { ok: true as const };
+}
+
+export async function removeTrainingDayByAdmin(input: { trainingId: string; sessionId: string; byUserId: string }) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const sessoes = await listTrainingSessions(input.trainingId);
+  const dia = sessoes.find((item) => item.id === input.sessionId);
+  if (!dia) throw new Error('Dia do treinamento não encontrado.');
+  if (sessoes.length === 1) throw new Error('A turma precisa de pelo menos um dia. Para cancelar tudo, exclua o treinamento.');
+  const presencas = await d1
+    .prepare('SELECT count(*) AS n FROM session_attendance WHERE session_id = ?')
+    .bind(dia.id)
+    .first<{ n: number }>();
+  await d1.batch([
+    d1.prepare('DELETE FROM session_attendance WHERE session_id = ?').bind(dia.id),
+    d1.prepare('UPDATE files SET session_id = NULL WHERE session_id = ?').bind(dia.id),
+    d1.prepare('DELETE FROM training_sessions WHERE id = ?').bind(dia.id),
+  ]);
+  await renumerarDias(input.trainingId);
+  await sincronizarTurma(input.trainingId);
+  await writeAudit(input.byUserId, 'training.day_removed', 'training', input.trainingId, {
+    dia: dia.day_number,
+    data: dia.session_date,
+    presencasRemovidas: Number(presencas?.n ?? 0),
+  });
+  return { ok: true as const };
+}
+
+type DadosParticipanteGestao = {
+  fullName: string;
+  documentId: string;
+  rg: string;
+  birthDate: string;
+  email: string;
+  phone: string;
+  jobTitle: string;
+};
+
+function validarParticipante(dados: DadosParticipanteGestao) {
+  if (!(dados.fullName ?? '').trim()) throw new Error('Informe o nome completo do participante.');
+  const problema = problemaCpf(dados.documentId ?? '') ?? problemaRg(dados.rg ?? '');
+  if (problema) throw new Error(problema);
+}
+
+/** A gestão inclui na lista sem as travas do check-in; a presença é marcada à parte. */
+export async function addParticipantByAdmin(input: {
+  trainingId: string;
+  byUserId: string;
+  participant: DadosParticipanteGestao;
+}) {
+  await ensurePortalSchema();
+  const turma = await getD1().prepare('SELECT id FROM trainings WHERE id = ? LIMIT 1').bind(input.trainingId).first<{ id: string }>();
+  if (!turma) throw new Error('Treinamento não encontrado.');
+  validarParticipante(input.participant);
+  if (await acharInscrito(input.trainingId, input.participant.documentId)) {
+    throw new Error('Já existe um participante com este CPF nesta turma.');
+  }
+  const id = makeId('participant');
+  const dados = input.participant;
+  await getD1()
+    .prepare(`INSERT INTO participants (
+      id, training_id, full_name, document_id, rg, birth_date, email, phone, job_title, consent
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
+    .bind(id, input.trainingId, dados.fullName.trim(), formatarCpf(dados.documentId), formatarRg(dados.rg, dados.documentId),
+      (dados.birthDate ?? '').trim(), normalizeEmail(dados.email ?? ''), (dados.phone ?? '').trim(), (dados.jobTitle ?? '').trim())
+    .run();
+  await writeAudit(input.byUserId, 'participant.added_by_company', 'participant', id, { trainingId: input.trainingId });
+  return { id };
+}
+
+export async function updateParticipantByAdmin(input: {
+  participantId: string;
+  byUserId: string;
+  participant: DadosParticipanteGestao;
+}) {
+  await ensurePortalSchema();
+  const atual = await getD1()
+    .prepare('SELECT id, training_id FROM participants WHERE id = ? LIMIT 1')
+    .bind(input.participantId)
+    .first<{ id: string; training_id: string }>();
+  if (!atual) throw new Error('Participante não encontrado.');
+  validarParticipante(input.participant);
+  const mesmoCpf = await acharInscrito(atual.training_id, input.participant.documentId);
+  if (mesmoCpf && mesmoCpf.id !== atual.id) throw new Error('Já existe outro participante com este CPF nesta turma.');
+  const dados = input.participant;
+  await getD1()
+    .prepare(`UPDATE participants SET full_name = ?, document_id = ?, rg = ?, birth_date = ?, email = ?,
+      phone = ?, job_title = ? WHERE id = ?`)
+    .bind(dados.fullName.trim(), formatarCpf(dados.documentId), formatarRg(dados.rg, dados.documentId),
+      (dados.birthDate ?? '').trim(), normalizeEmail(dados.email ?? ''), (dados.phone ?? '').trim(),
+      (dados.jobTitle ?? '').trim(), atual.id)
+    .run();
+  await writeAudit(input.byUserId, 'participant.updated_by_company', 'participant', atual.id, { trainingId: atual.training_id });
+  return { ok: true as const };
+}
+
+export async function removeParticipantByAdmin(input: { participantId: string; byUserId: string }) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const atual = await d1
+    .prepare('SELECT id, training_id, full_name FROM participants WHERE id = ? LIMIT 1')
+    .bind(input.participantId)
+    .first<{ id: string; training_id: string; full_name: string }>();
+  if (!atual) throw new Error('Participante não encontrado.');
+  await d1.batch([
+    d1.prepare('DELETE FROM session_attendance WHERE participant_id = ?').bind(atual.id),
+    d1.prepare('DELETE FROM participants WHERE id = ?').bind(atual.id),
+  ]);
+  await writeAudit(input.byUserId, 'participant.removed_by_company', 'participant', atual.id, {
+    trainingId: atual.training_id,
+    nome: atual.full_name,
+  });
+  return { ok: true as const };
+}
+
+/**
+ * A gestão marca ou desmarca a presença de um dia. Sem as travas do check-in:
+ * é o caminho para quem esteve na aula e não conseguiu escanear o QR.
+ */
+export async function setAttendanceByAdmin(input: {
+  participantId: string;
+  sessionId: string;
+  present: boolean;
+  byUserId: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const alvo = await d1
+    .prepare(`SELECT p.id, p.training_id, s.day_number FROM participants p
+      JOIN training_sessions s ON s.training_id = p.training_id
+      WHERE p.id = ? AND s.id = ? LIMIT 1`)
+    .bind(input.participantId, input.sessionId)
+    .first<{ id: string; training_id: string; day_number: number }>();
+  if (!alvo) throw new Error('Participante ou dia não encontrado nesta turma.');
+  if (input.present) {
+    await d1
+      .prepare('INSERT OR IGNORE INTO session_attendance (id, session_id, participant_id) VALUES (?, ?, ?)')
+      .bind(makeId('attendance'), input.sessionId, input.participantId)
+      .run();
+  } else {
+    await d1
+      .prepare('DELETE FROM session_attendance WHERE session_id = ? AND participant_id = ?')
+      .bind(input.sessionId, input.participantId)
+      .run();
+  }
+  await writeAudit(input.byUserId, 'attendance.set_by_company', 'participant', input.participantId, {
+    trainingId: alvo.training_id,
+    dia: alvo.day_number,
+    presente: input.present,
+  });
+  return { ok: true as const };
 }
 
 export async function getAttendanceListData(input: {
@@ -2182,7 +2556,7 @@ export async function getCompanyDashboardData(
 ): Promise<CompanyDashboardData> {
   await ensurePortalSchema();
   const d1 = getD1();
-  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes] =
+  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult] =
     await Promise.all([
       d1
         .prepare(
@@ -2214,7 +2588,7 @@ export async function getCompanyDashboardData(
       d1
         .prepare(
           `SELECT t.id, t.client_id, t.instructor_id, c.name AS client_name,
-           t.code, t.nr, t.title, t.internal_label, t.training_date, t.duration, t.location,
+           t.code, t.nr, t.title, t.internal_label, t.training_date, t.duration, t.location, t.content_program,
            COALESCE(i.name, t.instructor) AS instructor,
            t.status, t.participant_limit, t.qr_token, t.qr_enabled,
            t.created_at,
@@ -2250,6 +2624,8 @@ export async function getCompanyDashboardData(
         )
         .all<CompanyParticipant>(),
       sessoesPorTurma(d1),
+      // Presença por dia de cada aluno: a gestão marca e desmarca na lista.
+      d1.prepare('SELECT participant_id, session_id FROM session_attendance').all<{ participant_id: string; session_id: string }>(),
     ]);
 
   return {
@@ -2259,6 +2635,7 @@ export async function getCompanyDashboardData(
     trainings: rows(trainingsResult).map((turma) => ({ ...turma, sessions: sessoes.get(turma.id) ?? [] })),
     files: rows(filesResult),
     participants: rows(participantsResult),
+    attendance: rows(presencasResult),
     currentUser: {
       id: currentUser.id,
       email: currentUser.email,

@@ -17,7 +17,7 @@ export const sectionCopy: Record<CompanySection, { title: string; description: s
   instructors: { title: 'Instrutores', description: 'Cadastros profissionais, aprovações e turmas atribuídas.' },
   trainings: { title: 'Treinamentos', description: 'Agenda por dia, escala de instrutores e criação de novas turmas.' },
   files: { title: 'Arquivos', description: 'Fotos da aula, documentos da turma e envio em lote, cada um no seu lugar.' },
-  participants: { title: 'QR e participantes', description: 'Compartilhe o formulário e acompanhe as inscrições.' },
+  participants: { title: 'QR e participantes', description: 'Compartilhe o formulário, edite a lista de presença e marque a presença de cada dia.' },
   team: { title: 'Funcionários', description: 'Crie e gerencie os acessos da equipe Space Light. Exclusivo do dono da conta.' },
   audit: { title: 'Atividade', description: 'Histórico de ações da equipe: quem fez o quê e quando.' },
 };

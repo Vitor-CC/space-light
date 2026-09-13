@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, Check, ChevronDown, KeyRound, Loader2, MapPin, Plus, Search, Trash2, TriangleAlert, UserRound } from 'lucide-react';
+import { Building2, Check, ChevronDown, KeyRound, Loader2, MapPin, Pencil, Plus, Search, Trash2, TriangleAlert, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 
@@ -8,7 +8,7 @@ import { AccessCredentials, EmptyState, fieldClass, labelClass, selectClass, Sub
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { CompanyClient, CompanyDashboardData } from '@/lib/company-types';
-import { approveClient, createMockClient, deleteClient, resetUserPassword, saveClientAddress, setClientUsername } from '@/lib/mock-company-database';
+import { approveClient, createMockClient, deleteClient, resetUserPassword, saveClientAddress, setClientUsername, updateClient } from '@/lib/mock-company-database';
 import { limparDigitacaoUsuario, USUARIO_REGRA } from '@/lib/usuario';
 
 type Aba = 'lista' | 'criar';
@@ -78,6 +78,58 @@ function ClientAddress({ client, notify, reload }: { client: CompanyClient; noti
       <label htmlFor={`endereco-${client.id}-uf`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">UF</span><Input id={`endereco-${client.id}-uf`} value={draft.state} onChange={(e) => setDraft({ ...draft, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="Ex.: SP" maxLength={2} className={fieldClass} /></label>
       <Button type="submit" disabled={salvando} className="mt-1 h-11 rounded-none bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900] sm:col-span-2">
         {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar endereço
+      </Button>
+    </form> : null}
+  </div>;
+}
+
+type DadosCliente = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string };
+
+/** A gestão edita qualquer dado cadastral da empresa. */
+function ClientEdit({ client, notify, reload }: { client: CompanyClient; notify: (message: string) => void; reload: () => Promise<void> }) {
+  const inicial = (): DadosCliente => ({ name: client.name, legalName: client.legal_name, document: client.document, unit: client.unit, contactName: client.contact_name, contactEmail: client.contact_email, contactPhone: client.contact_phone ?? '' });
+  const [aberto, setAberto] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [draft, setDraft] = useState<DadosCliente>(inicial);
+
+  async function salvar(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSalvando(true);
+    try {
+      await updateClient(client.id, draft);
+      notify('Dados do cliente salvos.');
+      setAberto(false);
+      await reload();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao salvar os dados do cliente.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  const campo = (chave: keyof DadosCliente, rotulo: string, extra: { type?: string; required?: boolean } = {}) => <label key={chave} htmlFor={`cliente-${client.id}-${chave}`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">{rotulo}</span><Input id={`cliente-${client.id}-${chave}`} type={extra.type ?? 'text'} required={extra.required ?? true} value={draft[chave]} onChange={(e) => setDraft({ ...draft, [chave]: e.target.value })} className={fieldClass} /></label>;
+
+  return <div>
+    <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="min-w-0">
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">Dados cadastrais</span>
+        <p className="mt-1 text-[11px] leading-relaxed text-[#888]">Razão social e CNPJ saem impressos nos documentos.</p>
+      </div>
+      <button type="button" onClick={() => { setDraft(inicial()); setAberto((v) => !v); }} className="inline-flex h-10 shrink-0 items-center gap-2 border border-black/15 bg-white px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">
+        <Pencil className="size-3.5" />{aberto ? 'Fechar' : 'Editar dados'}
+      </button>
+    </div>
+
+    {aberto ? <form onSubmit={salvar} className="mt-4 grid gap-3 border border-black/10 bg-white p-4 sm:grid-cols-2">
+      {campo('name', 'Nome de exibição')}
+      {campo('legalName', 'Razão social')}
+      {campo('document', 'CNPJ')}
+      {campo('unit', 'Unidade / cidade')}
+      {campo('contactName', 'Responsável na empresa')}
+      {campo('contactEmail', 'E-mail do responsável (contato)', { type: 'email' })}
+      {campo('contactPhone', 'Telefone', { required: false })}
+      <Button type="submit" disabled={salvando} className="mt-1 h-11 rounded-none bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900] sm:col-span-2">
+        {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar dados
       </Button>
     </form> : null}
   </div>;
@@ -168,6 +220,7 @@ function ClientRow({ client, turmas, arquivos, inscritos, aberta, alternar, acoe
         <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Arquivos</dt><dd className="text-right font-bold">{arquivos}</dd></div>
         <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Treinamentos</dt><dd className="text-right font-bold">{turmas}</dd></div>
       </dl>
+      <ClientEdit client={client} notify={notify} reload={reload} />
       <ClientUsername client={client} notify={notify} reload={reload} />
       <ClientAddress client={client} notify={notify} reload={reload} />
       <div className="flex flex-wrap gap-2">

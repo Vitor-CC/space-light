@@ -183,3 +183,44 @@ export function generateCertificates(trainingId: string) {
 export function saveClientAddress(input: { clientId: string; address: string; district: string; city: string; state: string; postalCode: string }) {
   return requestJson<{ ok: true }>('/api/company/clients/address', { method: 'POST', body: JSON.stringify(input) });
 }
+
+// --- Edição pela gestão ---
+
+export type DadosParticipante = { fullName: string; documentId: string; rg: string; birthDate: string; email: string; phone: string; jobTitle: string };
+
+export function updateClient(clientId: string, input: { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string }) {
+  return requestJson<{ ok: true }>(`/api/company/clients/${encodeURIComponent(clientId)}`, { method: 'PATCH', body: JSON.stringify(input) });
+}
+
+export function updateInstructor(instructorId: string, input: { name: string; document: string; email: string; phone: string; professionalRegistry: string; specialties: string; baseCity: string }) {
+  return requestJson<{ ok: true }>(`/api/company/instructors/${encodeURIComponent(instructorId)}`, { method: 'PATCH', body: JSON.stringify(input) });
+}
+
+export function updateTrainingDetails(trainingId: string, details: { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string }) {
+  return requestJson<{ ok: true }>(`/api/company/trainings/${encodeURIComponent(trainingId)}`, { method: 'PATCH', body: JSON.stringify({ details }) });
+}
+
+export function addTrainingDay(trainingId: string, input: NovoDia) {
+  return requestJson<{ ok: true; sessions: TrainingSession[] }>(`/api/company/trainings/${encodeURIComponent(trainingId)}/sessions`, { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function removeTrainingDay(trainingId: string, sessionId: string) {
+  return requestJson<{ ok: true; sessions: TrainingSession[] }>(`/api/company/trainings/${encodeURIComponent(trainingId)}/sessions`, { method: 'DELETE', body: JSON.stringify({ sessionId }) });
+}
+
+export function addParticipantByCompany(trainingId: string, participant: DadosParticipante) {
+  return requestJson<{ id: string }>('/api/company/participants', { method: 'POST', body: JSON.stringify({ trainingId, ...participant }) });
+}
+
+export function updateParticipantByCompany(participantId: string, participant: DadosParticipante) {
+  return requestJson<{ ok: true }>('/api/company/participants', { method: 'PATCH', body: JSON.stringify({ participantId, ...participant }) });
+}
+
+export function removeParticipantByCompany(participantId: string) {
+  return requestJson<{ ok: true }>('/api/company/participants', { method: 'DELETE', body: JSON.stringify({ participantId }) });
+}
+
+/** Marca (present = true) ou desmarca a presença de um dia, sem as travas do check-in. */
+export function setParticipantAttendance(participantId: string, sessionId: string, present: boolean) {
+  return requestJson<{ ok: true }>('/api/company/participants/attendance', { method: 'POST', body: JSON.stringify({ participantId, sessionId, present }) });
+}
