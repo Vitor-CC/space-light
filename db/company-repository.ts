@@ -3216,7 +3216,7 @@ export async function getClientPortalData(
     d1
       .prepare(
         `SELECT t.id, t.client_id, t.code, t.nr, t.title, t.internal_label, t.training_date,
-         t.duration, t.location, t.instructor, t.status,
+         t.training_dates, t.duration, t.location, t.instructor, t.status,
          (SELECT count(*) FROM participants p WHERE p.training_id = t.id) AS participant_count,
          (SELECT count(*) FROM files f WHERE f.training_id = t.id AND f.kind = 'photo') AS photo_count,
          (SELECT count(*) FROM files f WHERE f.training_id = t.id AND f.kind IN ('document', 'attendance')) AS document_count,
@@ -3234,6 +3234,7 @@ export async function getClientPortalData(
         nr: string;
         title: string;
         training_date: string;
+        training_dates: string;
         duration: string;
         location: string;
         instructor: string;
@@ -3286,7 +3287,8 @@ export async function getClientPortalData(
     nr: item.nr,
     title: item.title,
     date: item.training_date,
-    dateLabel: formatDate(item.training_date),
+    // Turma de vários dias mostra todos eles, não só o primeiro.
+    dateLabel: datasDaTurma(item).map((dia) => formatDate(dia)).join(' · '),
     duration: item.duration,
     location: item.location,
     instructor: item.instructor,

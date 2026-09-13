@@ -8,6 +8,7 @@ import type { SyntheticEvent } from 'react';
 
 import { EmptyState, formatDate, inputClass, PresencaBadge, selectClass } from '@/components/company-portal/company-ui';
 import type { CompanyDashboardData, CompanyParticipant, CompanyTraining } from '@/lib/company-types';
+import { dataDoDia, rotuloDiaDaTurma } from '@/lib/dias-da-turma';
 import { limparDigitacaoCpf, limparDigitacaoRg, problemaCpf, problemaRg } from '@/lib/documentos';
 import { addParticipantByCompany, generateCertificates, removeParticipantByCompany, setParticipantAttendance, updateParticipantByCompany } from '@/lib/mock-company-database';
 import type { DadosParticipante } from '@/lib/mock-company-database';
@@ -210,7 +211,7 @@ export function CompanyParticipants({ data, reload, notify }: { data: CompanyDas
   const completos = participants.filter((item) => item.days_total > 0 && item.days_present >= item.days_total).length;
 
   return <div className="space-y-6">
-    <label className="block max-w-xl"><span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Treinamento</span><select value={training.id} onChange={(e) => setTrainingId(e.target.value)} className={selectClass}>{data.trainings.map((item) => <option key={item.id} value={item.id}>{item.client_name} · {item.nr} · {item.internal_label ? `${item.internal_label} · ` : ''}{formatDate(item.training_date)}</option>)}</select></label>
+    <label className="block max-w-xl"><span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Treinamento</span><select value={training.id} onChange={(e) => setTrainingId(e.target.value)} className={selectClass}>{data.trainings.map((item) => <option key={item.id} value={item.id}>{item.client_name} · {item.nr} · {item.internal_label ? `${item.internal_label} · ` : ''}{formatDate(dataDoDia(item))}{rotuloDiaDaTurma(item)}</option>)}</select></label>
     <QrPanel training={training} />
     <section className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

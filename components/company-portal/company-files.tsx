@@ -7,6 +7,7 @@ import { useMemo, useRef, useState } from 'react';
 import { EmptyState, formatDate, formatFileSize, labelClass, selectClass, SubTabs } from '@/components/company-portal/company-ui';
 import { Button } from '@/components/ui/button';
 import type { CompanyDashboardData, CompanyFile } from '@/lib/company-types';
+import { dataDoDia, rotuloDiaDaTurma } from '@/lib/dias-da-turma';
 import { downloadFilesAsZip } from '@/lib/download-zip';
 import { deleteCompanyFile, generateCertificates, uploadCompanyFiles } from '@/lib/mock-company-database';
 
@@ -213,7 +214,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
       <label htmlFor="arquivos-treinamento"><span className={labelClass}>Treinamento</span>
         <select id="arquivos-treinamento" value={trainingId} onChange={(event) => setTrainingId(event.target.value)} className={selectClass}>
           <option value="">Todas as turmas deste cliente</option>
-          {clientTrainings.map((training) => <option key={training.id} value={training.id}>{training.nr} · {training.internal_label || training.title} · {formatDate(training.training_date)}</option>)}
+          {clientTrainings.map((training) => <option key={training.id} value={training.id}>{training.nr} · {training.internal_label || training.title} · {formatDate(dataDoDia(training))}{rotuloDiaDaTurma(training)}</option>)}
         </select>
       </label>
     </div>

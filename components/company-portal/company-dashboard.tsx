@@ -5,13 +5,14 @@ import { Building2, CalendarPlus, ChevronRight, FileUp, GraduationCap, TriangleA
 import { EmptyState, TrainingSummary } from '@/components/company-portal/company-ui';
 import type { CompanySection } from '@/components/company-portal/company-ui';
 import type { CompanyDashboardData } from '@/lib/company-types';
+import { dataDoDia } from '@/lib/dias-da-turma';
 
 function Metric({ label, value, icon: Icon, onClick }: { label: string; value: number; icon: typeof Building2; onClick: () => void }) {
   return <button type="button" onClick={onClick} className="group flex min-h-36 items-center justify-between bg-white p-6 text-left transition hover:bg-[#fff8e8]"><div><strong className="font-heading text-4xl font-black tracking-[-0.015em]">{value}</strong><span className="mt-2 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#777]">{label}</span></div><span className="flex size-11 items-center justify-center bg-black text-[#f2ad19] transition group-hover:bg-[#f2ad19] group-hover:text-black"><Icon className="size-5" /></span></button>;
 }
 
 export function CompanyDashboard({ data, navigate }: { data: CompanyDashboardData; navigate: (section: CompanySection) => void }) {
-  const nextTraining = [...data.trainings].filter((item) => item.status !== 'completed').sort((a, b) => a.training_date.localeCompare(b.training_date))[0];
+  const nextTraining = [...data.trainings].filter((item) => item.status !== 'completed').sort((a, b) => dataDoDia(a).localeCompare(dataDoDia(b)))[0];
   // Turmas com algum dia sem instrutor: é a pendência que trava a operação,
   // e por isso ocupa o lugar que o antigo painel de "fluxo" desperdiçava.
   const semEscala = data.trainings.filter(

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import type { CompanyDashboardData, CompanyInstructor, CompanyTraining, TrainingSession } from '@/lib/company-types';
 import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTraining, removeTrainingDay, renameTraining, updateTrainingDay, updateTrainingDetails } from '@/lib/mock-company-database';
 import type { NovoDia } from '@/lib/mock-company-database';
+import { dataDoDia as dataDaTurma, proximoDiaDaTurma as proximoDia } from '@/lib/dias-da-turma';
 import { nrInfo } from '@/lib/nr-catalog';
 import { scheduleWindow, trainingReminderMessage, trainingScheduleMessage, whatsappLink } from '@/lib/whatsapp';
 
@@ -35,15 +36,6 @@ function digitos(value: string) {
   return (value ?? '').replace(/\D/g, '');
 }
 
-/** Próximo dia ainda não encerrado da turma (ou o último, se todos foram). */
-function proximoDia(training: CompanyTraining) {
-  const dias = training.sessions ?? [];
-  return dias.find((dia) => dia.status !== 'completed') ?? dias[dias.length - 1] ?? null;
-}
-
-function dataDaTurma(training: CompanyTraining) {
-  return proximoDia(training)?.session_date ?? training.training_date;
-}
 
 // Turmas em aberto agrupadas pelo próximo dia a dar: a lista corrida misturava tudo.
 const GRUPOS = [
