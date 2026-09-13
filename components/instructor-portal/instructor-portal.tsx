@@ -157,10 +157,33 @@ function TrainingCard({ training, onStart }: { training: CompanyTraining; onStar
 
 function Overview({ data, navigate, openTraining }: { data: InstructorDashboardData; navigate: (section: Section) => void; openTraining: (training: CompanyTraining) => void }) {
   const today = isoFromDate(new Date());
+  // Os dias em que ESTE instrutor dá aula: o de hoje é o que ele precisa ver primeiro.
+  const meusDias = data.trainings.flatMap((training) => (training.sessions ?? [])
+    .filter((dia) => dia.instructor_id === data.instructor.id)
+    .map((session) => ({ training, session, total: (training.sessions ?? []).length })));
+  const deHoje = meusDias.filter((item) => item.session.session_date === today);
+  const proximoDeAula = meusDias
+    .filter((item) => item.session.session_date > today && item.session.status !== 'completed')
+    .sort((a, b) => a.session.session_date.localeCompare(b.session.session_date))[0];
+  const hojeBloco = <section className="border-l-4 border-[#f2ad19] bg-black p-5 text-white md:p-6">
+    <span className="eyebrow text-[#f2ad19]">Hoje · {longDate(today)}</span>
+    {deHoje.length ? <ul className="mt-4 space-y-3">{deHoje.map(({ training, session, total }) => { const janela = janelaDoDia(session); return <li key={session.id} className="flex flex-col gap-3 border border-white/15 p-4 sm:flex-row sm:items-center">
+      <div className="min-w-0 flex-1">
+        <strong className="block text-lg font-black uppercase leading-tight tracking-[0.03em]">{training.nr} · {training.internal_label || training.title}</strong>
+        <p className="mt-1 text-xs font-bold text-[#f2ad19]">{training.client_name}{total > 1 ? ` · Dia ${session.day_number} de ${total}` : ''}</p>
+        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/65">{janela ? <span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" />{janela}</span> : null}<span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5" />{training.location}</span><span>{statusLabel(session.status)}</span></p>
+      </div>
+      <button type="button" onClick={() => openTraining(training)} className="inline-flex h-12 shrink-0 items-center justify-center gap-2 bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]"><Play className="size-4" />Abrir sala</button>
+    </li>; })}</ul> : <div className="mt-3">
+      <strong className="block text-lg font-black uppercase tracking-[0.03em]">Nenhum treinamento seu hoje</strong>
+      <p className="mt-1 text-xs text-white/60">{proximoDeAula ? `Próximo: ${longDate(proximoDeAula.session.session_date)} · ${proximoDeAula.training.nr} · ${proximoDeAula.training.internal_label || proximoDeAula.training.title}` : 'Nenhum treinamento futuro atribuído a você.'}</p>
+      {proximoDeAula ? <button type="button" onClick={() => navigate('calendar')} className="mt-4 inline-flex h-11 items-center gap-2 border border-white/20 px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] hover:border-[#f2ad19]"><CalendarDays className="size-4" />Ver no calendário</button> : null}
+    </div>}
+  </section>;
   const upcoming = data.trainings.filter((item) => item.training_date >= today && item.status !== 'completed');
   const next = upcoming[0];
   const active = data.trainings.find((item) => item.status === 'in_progress');
-  return <div className="space-y-6"><div className="grid gap-px bg-black/10 sm:grid-cols-3">{[[upcoming.length, 'Próximas turmas'], [data.availability.length, 'Datas disponíveis'], [data.participants.length, 'Inscrições recebidas']].map(([value, label]) => <div key={label} className="bg-white p-6"><strong className="text-4xl font-black tracking-[-0.015em]">{value}</strong><span className="mt-2 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#777]">{label}</span></div>)}</div>{active ? <div className="border-l-4 border-[#f2ad19] bg-black p-6 text-white"><span className="eyebrow text-[#f2ad19]">Treinamento em andamento</span><h2 className="mt-3 text-2xl font-black uppercase tracking-[0.03em]">{active.nr} · {active.title}</h2><button type="button" onClick={() => openTraining(active)} className="mt-5 inline-flex h-11 items-center gap-2 bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black"><QrCode className="size-4" />Abrir QR e lista</button></div> : null}<section><div className="mb-4 flex items-end justify-between"><div><span className="eyebrow text-[#8a6107]">Próxima entrega</span><h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Próximo treinamento</h2></div><button type="button" onClick={() => navigate('trainings')} className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">Ver todos</button></div>{next ? <TrainingCard training={next} onStart={openTraining} /> : <Empty icon={CalendarCheck2} title="Nenhuma turma agendada" text="Quando a gestão atribuir um treinamento, ele aparecerá aqui." />}</section></div>;
+  return <div className="space-y-6">{hojeBloco}<div className="grid gap-px bg-black/10 sm:grid-cols-3">{[[upcoming.length, 'Próximas turmas'], [data.availability.length, 'Datas disponíveis'], [data.participants.length, 'Inscrições recebidas']].map(([value, label]) => <div key={label} className="bg-white p-6"><strong className="text-4xl font-black tracking-[-0.015em]">{value}</strong><span className="mt-2 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#777]">{label}</span></div>)}</div>{active ? <div className="border-l-4 border-[#f2ad19] bg-black p-6 text-white"><span className="eyebrow text-[#f2ad19]">Treinamento em andamento</span><h2 className="mt-3 text-2xl font-black uppercase tracking-[0.03em]">{active.nr} · {active.title}</h2><button type="button" onClick={() => openTraining(active)} className="mt-5 inline-flex h-11 items-center gap-2 bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black"><QrCode className="size-4" />Abrir QR e lista</button></div> : null}<section><div className="mb-4 flex items-end justify-between"><div><span className="eyebrow text-[#8a6107]">Próxima entrega</span><h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Próximo treinamento</h2></div><button type="button" onClick={() => navigate('trainings')} className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">Ver todos</button></div>{next ? <TrainingCard training={next} onStart={openTraining} /> : <Empty icon={CalendarCheck2} title="Nenhuma turma agendada" text="Quando a gestão atribuir um treinamento, ele aparecerá aqui." />}</section></div>;
 }
 
 function InstructorCalendar({ data, reload, notify, openTraining }: { data: InstructorDashboardData; reload: () => Promise<void>; notify: (message: string) => void; openTraining: (training: CompanyTraining) => void }) {

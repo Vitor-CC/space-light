@@ -1080,10 +1080,15 @@ export async function getInstructorDashboardData(
           ORDER BY t.training_date ASC`)
         .bind(instructor.id)
         .all<CompanyTraining>(),
+      // Escalado na data: a disponibilidade some e fica só o treinamento. Se ele
+      // sair do dia, ela volta — por isso filtra aqui em vez de apagar.
       d1
-        .prepare(`SELECT id, instructor_id, available_date, note, status, created_at
-          FROM instructor_availability
-          WHERE instructor_id = ? ORDER BY available_date ASC`)
+        .prepare(`SELECT a.id, a.instructor_id, a.available_date, a.note, a.status, a.created_at
+          FROM instructor_availability a
+          WHERE a.instructor_id = ?
+          AND NOT EXISTS (SELECT 1 FROM training_sessions s
+            WHERE s.instructor_id = a.instructor_id AND s.session_date = a.available_date)
+          ORDER BY a.available_date ASC`)
         .bind(instructor.id)
         .all<InstructorAvailability>(),
       d1
@@ -1132,6 +1137,11 @@ export async function saveInstructorAvailability(input: {
   if (!DATA_ISO.test(input.availableDate)) {
     throw new Error('Informe uma data válida.');
   }
+  const escalado = await getD1()
+    .prepare('SELECT 1 AS ok FROM training_sessions WHERE instructor_id = ? AND session_date = ? LIMIT 1')
+    .bind(input.instructorId, input.availableDate)
+    .first<{ ok: number }>();
+  if (escalado) throw new Error('Você já tem treinamento neste dia: ele aparece no calendário como treinamento.');
   const id = makeId('availability');
   await getD1()
     .prepare(`INSERT INTO instructor_availability (
@@ -2582,6 +2592,8 @@ export async function getCompanyDashboardData(
            FROM instructor_availability a
            JOIN instructors i ON i.id = a.instructor_id
            WHERE a.status = 'available'
+           AND NOT EXISTS (SELECT 1 FROM training_sessions s
+             WHERE s.instructor_id = a.instructor_id AND s.session_date = a.available_date)
            ORDER BY a.available_date ASC`,
         )
         .all<CompanyInstructorAvailability>(),

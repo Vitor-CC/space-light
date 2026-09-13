@@ -15,7 +15,7 @@ import type { NovoDia } from '@/lib/mock-company-database';
 import { nrInfo } from '@/lib/nr-catalog';
 import { scheduleWindow, trainingReminderMessage, trainingScheduleMessage, whatsappLink } from '@/lib/whatsapp';
 
-type Aba = 'agenda' | 'lista' | 'criar';
+type Aba = 'agenda' | 'lista' | 'concluidas' | 'criar';
 type Notify = (message: string) => void;
 type Reload = () => Promise<void>;
 
@@ -34,6 +34,24 @@ function dateFromIso(value: string) {
 function digitos(value: string) {
   return (value ?? '').replace(/\D/g, '');
 }
+
+/** Próximo dia ainda não encerrado da turma (ou o último, se todos foram). */
+function proximoDia(training: CompanyTraining) {
+  const dias = training.sessions ?? [];
+  return dias.find((dia) => dia.status !== 'completed') ?? dias[dias.length - 1] ?? null;
+}
+
+function dataDaTurma(training: CompanyTraining) {
+  return proximoDia(training)?.session_date ?? training.training_date;
+}
+
+// Turmas em aberto agrupadas pelo próximo dia a dar: a lista corrida misturava tudo.
+const GRUPOS = [
+  { id: 'atrasadas', titulo: 'Atrasadas', texto: 'dia já passou e não foi encerrado' },
+  { id: 'hoje', titulo: 'Hoje', texto: '' },
+  { id: 'semana', titulo: 'Próximos 7 dias', texto: '' },
+  { id: 'depois', titulo: 'Mais adiante', texto: '' },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Ações de um dia e de uma turma
@@ -294,6 +312,7 @@ function TrainingActions({ training, clients, instructors, faltaLista, reload, n
 /** Uma turma na lista: cabeçalho sempre visível, dias e ações ao abrir. */
 function TrainingRow({ training, clients, instructors, faltaLista, reload, notify, aberta, alternar }: { training: CompanyTraining; clients: CompanyDashboardData['clients']; instructors: CompanyInstructor[]; faltaLista: boolean; reload: Reload; notify: Notify; aberta: boolean; alternar: () => void }) {
   const dias = training.sessions ?? [];
+  const proxima = proximoDia(training);
   const semInstrutor = dias.filter((dia) => !dia.instructor_id).length;
   return <article className="border border-black/10 bg-white">
     <button type="button" onClick={alternar} aria-expanded={aberta} className="flex w-full items-center gap-4 p-4 text-left hover:bg-[#fff8e8]">
@@ -303,8 +322,7 @@ function TrainingRow({ training, clients, instructors, faltaLista, reload, notif
         <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#777]">
           <span className="font-bold text-[#8a6107]">{training.client_name}</span>
           {training.internal_label ? <span className="truncate">{training.title}</span> : null}
-          <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-3.5" />{formatDate(training.training_date)}</span>
-          <span>{dias.length === 1 ? '1 dia' : `${dias.length} dias`}</span>
+          <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-3.5" />{formatDate(proxima?.session_date ?? training.training_date)}{dias.length > 1 && proxima ? ` · dia ${proxima.day_number} de ${dias.length}` : ''}</span>
           <span>{training.participant_count} inscrito(s)</span>
         </span>
       </span>
@@ -333,6 +351,8 @@ function Agenda({ data, reload, notify }: { data: CompanyDashboardData; reload: 
   const porData = useMemo(() => {
     const mapa = new Map<string, { training: CompanyTraining; session: TrainingSession }[]>();
     for (const training of data.trainings) {
+      // Turma concluída sai da agenda: fica na aba Concluídas.
+      if (training.status === 'completed') continue;
       for (const session of training.sessions ?? []) {
         const lista = mapa.get(session.session_date);
         if (lista) lista.push({ training, session }); else mapa.set(session.session_date, [{ training, session }]);
@@ -540,36 +560,59 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
 export function CompanyTrainings({ data, reload, notify }: { data: CompanyDashboardData; reload: Reload; notify: Notify }) {
   const [aba, setAba] = useState<Aba>('agenda');
   const [busca, setBusca] = useState('');
-  const [filtro, setFiltro] = useState<'todos' | 'scheduled' | 'in_progress' | 'completed' | 'sem_instrutor'>('todos');
+  const [filtro, setFiltro] = useState<'todos' | 'scheduled' | 'in_progress' | 'sem_instrutor'>('todos');
   const [aberta, setAberta] = useState<string | null>(null);
   const [criada, setCriada] = useState<string | null>(null);
 
   const instrutores = data.instructors.filter((item) => item.status === 'active');
   const alvo = busca.trim().toLowerCase();
-  const filtradas = useMemo(() => data.trainings.filter((training) => {
-    const casaBusca = !alvo || `${training.title} ${training.internal_label} ${training.nr} ${training.client_name} ${training.code}`.toLowerCase().includes(alvo);
-    if (!casaBusca) return false;
+  const casaBusca = (training: CompanyTraining) => !alvo || `${training.title} ${training.internal_label} ${training.nr} ${training.client_name} ${training.code}`.toLowerCase().includes(alvo);
+  // Concluídas ficam fora da agenda e da lista: têm aba própria.
+  const abertas = useMemo(() => data.trainings.filter((training) => training.status !== 'completed'), [data.trainings]);
+  const concluidas = useMemo(
+    () => data.trainings.filter((training) => training.status === 'completed').sort((a, b) => dataDaTurma(b).localeCompare(dataDaTurma(a))),
+    [data.trainings],
+  );
+  const filtradas = abertas.filter((training) => {
+    if (!casaBusca(training)) return false;
     if (filtro === 'todos') return true;
     if (filtro === 'sem_instrutor') return (training.sessions ?? []).some((dia) => !dia.instructor_id);
     return training.status === filtro;
-  }), [data.trainings, alvo, filtro]);
+  });
+  const agora = new Date();
+  const hojeIso = isoFromDate(agora);
+  const emUmaSemana = isoFromDate(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 7));
+  const grupos = GRUPOS.map((grupo) => ({
+    ...grupo,
+    turmas: filtradas.filter((training) => {
+      const dia = dataDaTurma(training);
+      if (grupo.id === 'atrasadas') return dia < hojeIso;
+      if (grupo.id === 'hoje') return dia === hojeIso;
+      if (grupo.id === 'semana') return dia > hojeIso && dia <= emUmaSemana;
+      return dia > emUmaSemana;
+    }).sort((a, b) => dataDaTurma(a).localeCompare(dataDaTurma(b))),
+  })).filter((grupo) => grupo.turmas.length > 0);
+  const concluidasFiltradas = concluidas.filter(casaBusca);
 
   // Turmas que já receberam a foto da lista assinada: muda o texto da cobrança.
   const turmasComLista = useMemo(
     () => new Set(data.files.filter((file) => file.kind === 'attendance').map((file) => file.training_id)),
     [data.files],
   );
-  const semEscala = data.trainings.filter((training) => (training.sessions ?? []).some((dia) => !dia.instructor_id)).length;
+  const semEscala = abertas.filter((training) => (training.sessions ?? []).some((dia) => !dia.instructor_id)).length;
   const nova = criada ? data.trainings.find((item) => item.id === criada) : undefined;
+  const linha = (training: CompanyTraining) => <TrainingRow key={training.id} training={training} clients={data.clients} instructors={instrutores} faltaLista={!turmasComLista.has(training.id)} reload={reload} notify={notify}
+    aberta={aberta === training.id} alternar={() => setAberta((atual) => (atual === training.id ? null : training.id))} />;
 
   return <div className="space-y-6">
     <SubTabs label="Seções de treinamentos" active={aba} onChange={(id) => setAba(id)} tabs={[
       { id: 'agenda', label: 'Agenda' },
-      { id: 'lista', label: 'Turmas', count: data.trainings.length },
+      { id: 'lista', label: 'Em aberto', count: abertas.length },
+      { id: 'concluidas', label: 'Concluídas', count: concluidas.length },
       { id: 'criar', label: 'Criar' },
     ]} />
 
-    {semEscala > 0 && aba !== 'criar' ? <button type="button" onClick={() => { setAba('lista'); setFiltro('sem_instrutor'); }} className="flex w-full items-center gap-3 border-l-4 border-[#b62525] bg-[#fff5f5] p-4 text-left hover:bg-[#ffecec]">
+    {semEscala > 0 && aba !== 'criar' && aba !== 'concluidas' ? <button type="button" onClick={() => { setAba('lista'); setFiltro('sem_instrutor'); }} className="flex w-full items-center gap-3 border-l-4 border-[#b62525] bg-[#fff5f5] p-4 text-left hover:bg-[#ffecec]">
       <AlertTriangle className="size-5 shrink-0 text-[#b62525]" />
       <span className="text-xs font-bold text-[#b62525]">{semEscala === 1 ? '1 turma tem dia sem instrutor escalado.' : `${semEscala} turmas têm dias sem instrutor escalado.`} Ver quais →</span>
     </button> : null}
@@ -584,14 +627,26 @@ export function CompanyTrainings({ data, reload, notify }: { data: CompanyDashbo
             <option value="todos">Todas as situações</option>
             <option value="scheduled">Agendadas</option>
             <option value="in_progress">Em andamento</option>
-            <option value="completed">Concluídas</option>
+
             <option value="sem_instrutor">Sem instrutor escalado</option>
           </select>
         </label>
       </div>
-      {filtradas.map((training) => <TrainingRow key={training.id} training={training} clients={data.clients} instructors={instrutores} faltaLista={!turmasComLista.has(training.id)} reload={reload} notify={notify}
-        aberta={aberta === training.id} alternar={() => setAberta((atual) => (atual === training.id ? null : training.id))} />)}
-      {filtradas.length === 0 ? <EmptyState icon={CalendarPlus} title="Nenhuma turma encontrada" text={data.trainings.length === 0 ? 'Crie a primeira turma na aba Criar para liberar QR, participantes e arquivos.' : 'Ajuste a busca ou o filtro de situação.'} /> : null}
+      {grupos.map((grupo) => <section key={grupo.id} className="space-y-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b-2 border-black pb-2 pt-3">
+          <h3 className={`text-sm font-extrabold uppercase tracking-[0.08em] ${grupo.id === 'atrasadas' ? 'text-[#b62525]' : ''}`}>{grupo.titulo}</h3>
+          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#777]">{grupo.turmas.length === 1 ? '1 turma' : `${grupo.turmas.length} turmas`}{grupo.texto ? ` · ${grupo.texto}` : ''}</span>
+        </div>
+        {grupo.turmas.map(linha)}
+      </section>)}
+      {filtradas.length === 0 ? <EmptyState icon={CalendarPlus} title="Nenhuma turma em aberto" text={abertas.length === 0 ? 'Crie uma turma na aba Criar. As encerradas ficam em Concluídas.' : 'Ajuste a busca ou o filtro de situação.'} /> : null}
+    </div> : null}
+
+    {aba === 'concluidas' ? <div className="space-y-4">
+      <div className="relative"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-black/35" /><Input aria-label="Buscar turma concluída" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por título, cliente, NR ou código" className={`${fieldClass} pl-11`} /></div>
+      <p className="text-xs text-[#777]">Turmas encerradas, da mais recente para a mais antiga. Abra uma para ver ou editar dados, dias e documentos.</p>
+      {concluidasFiltradas.map(linha)}
+      {concluidasFiltradas.length === 0 ? <EmptyState icon={Check} title="Nenhuma turma concluída" text={concluidas.length === 0 ? 'A turma aparece aqui quando o último dia é encerrado.' : 'Ajuste a busca.'} /> : null}
     </div> : null}
 
     {aba === 'criar' ? <div className="space-y-4">
