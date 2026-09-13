@@ -33,7 +33,7 @@ import { ptBR } from 'date-fns/locale';
 
 import { PresencaBadge } from '@/components/company-portal/company-ui';
 import { Calendar } from '@/components/ui/calendar';
-import type { CompanyParticipant, CompanyTraining } from '@/lib/company-types';
+import type { CompanyParticipant, CompanyTraining, TrainingSession } from '@/lib/company-types';
 import { limparDigitacaoCpf, limparDigitacaoRg, problemaCpf, problemaRg } from '@/lib/documentos';
 import { INSTRUCTOR_DOCUMENT_STATUS, REQUIRED_INSTRUCTOR_DOCUMENTS } from '@/lib/instructor-documents';
 import type { InstructorDashboardData } from '@/lib/instructor-types';
@@ -104,6 +104,15 @@ function formatMoment(value: string) {
  * O dia deste instrutor nesta turma: o primeiro ainda aberto, ou o último que
  * ele deu. É sobre ele que iniciar e encerrar agem, no servidor também.
  */
+/** "Sábado, 12 de setembro de 2026": maiúscula só na 1ª letra (o CSS capitalize punha "De"). */
+function longDate(iso: string) {
+  const texto = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(dateFromIso(iso));
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+/** Um dia de aula do instrutor: a turma, qual dia dela é e quantos dias ela tem. */
+type DiaDeAula = { training: CompanyTraining; session: TrainingSession; total: number };
+
 function meuDia(training: CompanyTraining, instructorId: string) {
   const dias = training.sessions ?? [];
   const meus = dias.filter((dia) => dia.instructor_id === instructorId);
@@ -154,11 +163,34 @@ function Overview({ data, navigate, openTraining }: { data: InstructorDashboardD
   return <div className="space-y-6"><div className="grid gap-px bg-black/10 sm:grid-cols-3">{[[upcoming.length, 'Próximas turmas'], [data.availability.length, 'Datas disponíveis'], [data.participants.length, 'Inscrições recebidas']].map(([value, label]) => <div key={label} className="bg-white p-6"><strong className="text-4xl font-black tracking-[-0.015em]">{value}</strong><span className="mt-2 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#777]">{label}</span></div>)}</div>{active ? <div className="border-l-4 border-[#f2ad19] bg-black p-6 text-white"><span className="eyebrow text-[#f2ad19]">Treinamento em andamento</span><h2 className="mt-3 text-2xl font-black uppercase tracking-[0.03em]">{active.nr} · {active.title}</h2><button type="button" onClick={() => openTraining(active)} className="mt-5 inline-flex h-11 items-center gap-2 bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black"><QrCode className="size-4" />Abrir QR e lista</button></div> : null}<section><div className="mb-4 flex items-end justify-between"><div><span className="eyebrow text-[#8a6107]">Próxima entrega</span><h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Próximo treinamento</h2></div><button type="button" onClick={() => navigate('trainings')} className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">Ver todos</button></div>{next ? <TrainingCard training={next} onStart={openTraining} /> : <Empty icon={CalendarCheck2} title="Nenhuma turma agendada" text="Quando a gestão atribuir um treinamento, ele aparecerá aqui." />}</section></div>;
 }
 
-function InstructorCalendar({ data, reload, notify }: { data: InstructorDashboardData; reload: () => Promise<void>; notify: (message: string) => void }) {
+function InstructorCalendar({ data, reload, notify, openTraining }: { data: InstructorDashboardData; reload: () => Promise<void>; notify: (message: string) => void; openTraining: (training: CompanyTraining) => void }) {
   const [selected, setSelected] = useState<Date | undefined>();
   const [note, setNote] = useState('');
-  const trainingDates = data.trainings.map((item) => dateFromIso(item.training_date));
+  // Cada dia em que ESTE instrutor está escalado. Antes o calendário marcava só a
+  // 1ª data da turma: os dias seguintes sumiam e aparecia dia de outro instrutor.
+  const meusDias = useMemo(() => {
+    const mapa = new Map<string, DiaDeAula[]>();
+    for (const training of data.trainings) {
+      const dias = training.sessions ?? [];
+      for (const session of dias) {
+        if (session.instructor_id !== data.instructor.id) continue;
+        const lista = mapa.get(session.session_date) ?? [];
+        lista.push({ training, session, total: dias.length });
+        mapa.set(session.session_date, lista);
+      }
+    }
+    return mapa;
+  }, [data.trainings, data.instructor.id]);
+  const trainingDates = useMemo(() => [...meusDias.keys()].map(dateFromIso), [meusDias]);
   const availableDates = data.availability.map((item) => dateFromIso(item.available_date));
+  const hoje = isoFromDate(new Date());
+  const proximos = useMemo(
+    () => [...meusDias.entries()].filter(([iso]) => iso >= hoje).sort((a, b) => a[0].localeCompare(b[0])).slice(0, 6),
+    [meusDias, hoje],
+  );
+  const selectedIso = selected ? isoFromDate(selected) : '';
+  const doDia = selectedIso ? meusDias.get(selectedIso) ?? [] : [];
+  const disponivelNoDia = selectedIso ? data.availability.find((item) => item.available_date === selectedIso) : undefined;
   async function save(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selected) return notify('Selecione uma data no calendário.');
@@ -171,7 +203,15 @@ function InstructorCalendar({ data, reload, notify }: { data: InstructorDashboar
     try { await requestJson('/api/instructor/availability', { method: 'DELETE', body: JSON.stringify({ availabilityId: id }) }); notify('Disponibilidade removida.'); await reload(); }
     catch (error) { notify(error instanceof Error ? error.message : 'Erro ao remover a data.'); }
   }
-  return <div className="grid gap-6 xl:grid-cols-[.9fr_1.1fr]"><div className="border border-black/10 bg-white p-5 sm:p-7"><Calendar mode="single" selected={selected} onSelect={setSelected} locale={ptBR} modifiers={{ training: trainingDates, available: availableDates }} modifiersClassNames={{ training: 'bg-black text-[#f2ad19] font-bold', available: 'ring-2 ring-[#f2ad19] ring-inset' }} className="mx-auto w-full [--cell-size:--spacing(11)]" /><div className="mt-5 flex flex-wrap gap-4 border-t border-black/10 pt-4 text-[10px] font-bold uppercase tracking-[0.12em] text-[#777]"><span className="flex items-center gap-2"><i className="size-3 bg-black" />Treinamento</span><span className="flex items-center gap-2"><i className="size-3 border-2 border-[#f2ad19]" />Disponível</span></div><form onSubmit={save} className="mt-5 space-y-3"><div className="border-l-4 border-[#f2ad19] bg-[#fff8e8] p-4 text-xs"><strong>{selected ? formatDate(isoFromDate(selected)) : 'Selecione uma data'}</strong><p className="mt-1 text-[#777]">A gestão verá esta data ao organizar novas turmas.</p></div><input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Observação opcional" className="h-12 w-full border border-black/15 bg-white px-4 text-sm outline-none focus:border-[#f2ad19]" /><button type="submit" className="h-12 w-full bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]"><Check className="mr-2 inline size-4" />Marcar disponibilidade</button></form></div><div><span className="eyebrow text-[#8a6107]">Datas informadas</span><h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Minha disponibilidade</h2><div className="mt-5 space-y-3">{data.availability.map((item) => <article key={item.id} className="flex items-center gap-4 border border-black/10 bg-white p-4"><span className="flex size-11 shrink-0 items-center justify-center bg-[#f2ad19]/18 text-[#8a6107]"><CalendarCheck2 className="size-5" /></span><div className="min-w-0 flex-1"><strong className="block text-sm uppercase tracking-[0.08em]">{formatDate(item.available_date)}</strong><p className="mt-1 truncate text-xs text-[#777]">{item.note || 'Disponível para novas turmas'}</p></div><button type="button" onClick={() => void remove(item.id)} aria-label="Remover disponibilidade" className="flex size-10 items-center justify-center border border-black/10 text-[#777] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-4" /></button></article>)}{data.availability.length === 0 ? <Empty icon={CalendarCheck2} title="Nenhuma data informada" text="Escolha no calendário os dias em que você pode ministrar treinamentos." /> : null}</div></div></div>;
+  return <div className="grid gap-6 xl:grid-cols-[.9fr_1.1fr]"><div className="border border-black/10 bg-white p-5 sm:p-7"><Calendar mode="single" selected={selected} onSelect={setSelected} locale={ptBR} modifiers={{ training: trainingDates, available: availableDates }} modifiersClassNames={{ training: 'bg-black text-[#f2ad19] font-bold', available: 'ring-2 ring-[#f2ad19] ring-inset' }} className="mx-auto w-full [--cell-size:--spacing(11)]" /><div className="mt-5 flex flex-wrap gap-4 border-t border-black/10 pt-4 text-[10px] font-bold uppercase tracking-[0.12em] text-[#777]"><span className="flex items-center gap-2"><i className="size-3 bg-black" />Seu treinamento</span><span className="flex items-center gap-2"><i className="size-3 border-2 border-[#f2ad19]" />Disponível</span></div><form onSubmit={save} className="mt-5 space-y-3"><div className="border-l-4 border-[#f2ad19] bg-[#fff8e8] p-4 text-xs"><strong>{selected ? formatDate(isoFromDate(selected)) : 'Selecione uma data'}</strong><p className="mt-1 text-[#777]">A gestão verá esta data ao organizar novas turmas.</p></div><input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Observação opcional" className="h-12 w-full border border-black/15 bg-white px-4 text-sm outline-none focus:border-[#f2ad19]" /><button type="submit" className="h-12 w-full bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]"><Check className="mr-2 inline size-4" />Marcar disponibilidade</button></form></div><div className="space-y-8"><section>{!selected ? <div className="border border-dashed border-black/20 bg-white p-5">
+    <div className="flex items-start gap-3"><CalendarDays className="mt-0.5 size-5 shrink-0 text-[#8a6107]" /><p className="text-xs leading-relaxed text-[#666]">Clique em uma data para ver os treinamentos que você dá nela. Os dias em preto são os seus.</p></div>
+    {proximos.length ? <div className="mt-5"><span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#999]">Seus próximos treinamentos</span><ul className="mt-3 space-y-2">{proximos.map(([iso, itens]) => <li key={iso}><button type="button" onClick={() => setSelected(dateFromIso(iso))} className="flex w-full items-center justify-between gap-3 border border-black/10 px-4 py-3 text-left text-xs transition hover:border-[#f2ad19] hover:bg-[#fff8e8]"><span className="min-w-0"><span className="block font-bold">{longDate(iso)}</span><span className="mt-1 block truncate text-[#777]">{itens.map((item) => `${item.training.nr} · ${item.training.internal_label || item.training.title}`).join(' | ')}</span></span>{iso === hoje ? <span className="shrink-0 bg-black px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#f2ad19]">Hoje</span> : null}</button></li>)}</ul></div> : <p className="mt-5 text-xs text-[#888]">Nenhum treinamento seu a partir de hoje.</p>}
+  </div> : <div>
+    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-black/10 pb-3"><strong className="text-sm font-extrabold uppercase tracking-[0.08em]">{longDate(selectedIso)}</strong><button type="button" onClick={() => setSelected(undefined)} className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107] hover:text-black">Ver próximos</button></div>
+    <span className="mt-4 block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#555]">Seus treinamentos neste dia</span>
+    {doDia.length ? <ul className="mt-3 space-y-3">{doDia.map(({ training, session, total }) => { const janela = janelaDoDia(session); return <li key={session.id} className="border border-black/10 bg-white p-4"><div className="flex items-start gap-4"><span className="flex size-12 shrink-0 items-center justify-center bg-black font-heading text-xs font-black text-[#f2ad19]">{training.nr}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className={`px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] ${session.status === 'in_progress' ? 'bg-[#daf2df] text-[#17642d]' : session.status === 'completed' ? 'bg-black/8 text-[#555]' : 'bg-[#f2ad19]/18 text-[#785303]'}`}>{statusLabel(session.status)}</span>{total > 1 ? <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">Dia {session.day_number} de {total}</span> : null}</div><strong className="mt-2 block text-sm font-extrabold uppercase tracking-[0.05em]">{training.internal_label || training.title}</strong><p className="mt-1 text-xs font-bold text-[#8a6107]">{training.client_name}</p><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-[#666]">{janela ? <span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" />{janela}</span> : null}<span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5" />{training.location}</span></div></div></div><button type="button" onClick={() => openTraining(training)} className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900] sm:w-auto sm:px-5"><Play className="size-4" />Abrir sala</button></li>; })}</ul> : <div className="mt-3 flex flex-col items-center justify-center border border-dashed border-black/20 bg-white p-6 text-center"><CalendarCheck2 className="size-6 text-[#8a6107]" /><strong className="mt-3 text-xs uppercase tracking-[0.1em]">Nenhum treinamento seu nesta data</strong><p className="mt-1 max-w-xs text-xs leading-relaxed text-[#888]">Se puder dar aula neste dia, marque a disponibilidade abaixo do calendário.</p></div>}
+    {disponivelNoDia ? <div className="mt-4 flex items-center gap-3 border-l-4 border-[#f2ad19] bg-[#fff8e8] p-3 text-xs"><CalendarCheck2 className="size-4 shrink-0 text-[#8a6107]" /><span className="min-w-0 flex-1"><strong>Você marcou disponibilidade neste dia</strong>{disponivelNoDia.note ? ` · ${disponivelNoDia.note}` : ''}</span><button type="button" onClick={() => void remove(disponivelNoDia.id)} aria-label="Remover disponibilidade deste dia" className="flex size-9 shrink-0 items-center justify-center border border-black/10 bg-white text-[#777] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-4" /></button></div> : null}
+  </div>}</section><section><span className="eyebrow text-[#8a6107]">Datas informadas</span><h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Minha disponibilidade</h2><div className="mt-5 space-y-3">{data.availability.map((item) => <article key={item.id} className="flex items-center gap-4 border border-black/10 bg-white p-4"><span className="flex size-11 shrink-0 items-center justify-center bg-[#f2ad19]/18 text-[#8a6107]"><CalendarCheck2 className="size-5" /></span><div className="min-w-0 flex-1"><strong className="block text-sm uppercase tracking-[0.08em]">{formatDate(item.available_date)}</strong><p className="mt-1 truncate text-xs text-[#777]">{item.note || 'Disponível para novas turmas'}</p></div><button type="button" onClick={() => void remove(item.id)} aria-label="Remover disponibilidade" className="flex size-10 items-center justify-center border border-black/10 text-[#777] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-4" /></button></article>)}{data.availability.length === 0 ? <Empty icon={CalendarCheck2} title="Nenhuma data informada" text="Escolha no calendário os dias em que você pode ministrar treinamentos." /> : null}</div></section></div></div>;
 }
 
 type TrainingFile = { id: string; name: string; kind: string; size: number; contentType: string; createdAt: string; stored: boolean };
@@ -554,7 +594,7 @@ export function InstructorPortal({ initialData }: { initialData: InstructorDashb
   function openTraining(training: CompanyTraining) { setSelectedTrainingId(training.id); setSection('active'); }
   const content = useMemo(() => {
     if (section === 'overview') return <Overview data={data} navigate={setSection} openTraining={openTraining} />;
-    if (section === 'calendar') return <InstructorCalendar data={data} reload={reload} notify={setNotice} />;
+    if (section === 'calendar') return <InstructorCalendar data={data} reload={reload} notify={setNotice} openTraining={openTraining} />;
     if (section === 'trainings') return <div className="grid gap-4 xl:grid-cols-2">{data.trainings.map((training) => <TrainingCard key={training.id} training={training} onStart={openTraining} />)}{data.trainings.length === 0 ? <div className="xl:col-span-2"><Empty icon={GraduationCap} title="Nenhuma turma atribuída" text="A gestão da Space Light vinculará seus próximos treinamentos aqui." /></div> : null}</div>;
     if (section === 'active') return <TrainingRoom data={data} selectedId={selectedTrainingId} selectTraining={setSelectedTrainingId} reload={reload} notify={setNotice} />;
     if (section === 'documents') return <InstructorDocuments notify={setNotice} />;

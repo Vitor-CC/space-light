@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { ptBR } from 'date-fns/locale';
 
 import { Calendar } from '@/components/ui/calendar';
-import type { CompanyDashboardData } from '@/lib/company-types';
+import type { CompanyDashboardData, CompanyTraining, TrainingSession } from '@/lib/company-types';
 
 function dateFromIso(value: string) {
   const [year, month, day] = value.split('-').map(Number);
@@ -44,16 +44,25 @@ export function CompanyAvailability({ data }: { data: CompanyDashboardData }) {
     [byDate],
   );
 
-  const trainingDates = useMemo(
-    () => data.trainings.map((training) => dateFromIso(training.training_date)),
-    [data.trainings],
-  );
+  // Todos os dias de cada turma, não só o primeiro: turma de 3 dias ocupa 3 datas.
+  const diasPorData = useMemo(() => {
+    const map = new Map<string, { training: CompanyTraining; session: TrainingSession; total: number }[]>();
+    for (const training of data.trainings) {
+      const dias = training.sessions ?? [];
+      for (const session of dias) {
+        const current = map.get(session.session_date) ?? [];
+        current.push({ training, session, total: dias.length });
+        map.set(session.session_date, current);
+      }
+    }
+    return map;
+  }, [data.trainings]);
+
+  const trainingDates = useMemo(() => [...diasPorData.keys()].map(dateFromIso), [diasPorData]);
 
   const selectedIso = selected ? isoFromDate(selected) : '';
   const onSelectedDate = selectedIso ? byDate.get(selectedIso) ?? [] : [];
-  const trainingsOnDate = selectedIso
-    ? data.trainings.filter((training) => training.training_date === selectedIso)
-    : [];
+  const trainingsOnDate = selectedIso ? diasPorData.get(selectedIso) ?? [] : [];
 
   const instructorById = useMemo(
     () => new Map(data.instructors.map((instructor) => [instructor.id, instructor])),
@@ -116,7 +125,7 @@ export function CompanyAvailability({ data }: { data: CompanyDashboardData }) {
 
           {trainingsOnDate.length ? <div className="mt-4 border-l-4 border-black bg-[#f7f7f4] p-4">
             <span className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#555]">Já marcado neste dia</span>
-            <ul className="mt-2 space-y-1 text-xs">{trainingsOnDate.map((training) => <li key={training.id}><strong>{training.nr}</strong> · {training.title} — {training.client_name} <span className="text-[#888]">({training.instructor})</span></li>)}</ul>
+            <ul className="mt-2 space-y-1 text-xs">{trainingsOnDate.map(({ training, session, total }) => <li key={session.id}><strong>{training.nr}</strong> · {training.internal_label || training.title}{total > 1 ? ` (dia ${session.day_number} de ${total})` : ''} — {training.client_name} <span className="text-[#888]">({session.instructor_name ?? 'sem instrutor'})</span></li>)}</ul>
           </div> : null}
 
           {onSelectedDate.length ? <ul className="mt-4 space-y-3">{onSelectedDate.map((item) => {
