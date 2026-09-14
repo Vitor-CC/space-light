@@ -27,6 +27,14 @@ const variantes = cva(
  * Passa por `cn` para que a `className` vença a base quando as duas mexem na
  * mesma propriedade — `hidden lg:inline-flex` precisa derrubar o `inline-flex`.
  */
+/**
+ * Par de botões: empilhados no celular, lado a lado a partir de 640px e de
+ * novo empilhados em 1024, quando ficam numa coluna estreita demais para os
+ * dois.
+ */
+export const linhaDeBotoes =
+  'flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row';
+
 export function botao({
   className,
   ...opcoes

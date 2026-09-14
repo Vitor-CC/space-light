@@ -2,14 +2,14 @@ import { ArrowDown, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { botao } from '@/components/site-novo/botao';
+import { botao, linhaDeBotoes } from '@/components/site-novo/botao';
 import { Confirmar } from '@/components/site-novo/confirmar';
 import { DocSection } from '@/components/site-novo/doc-section';
 import { Figura } from '@/components/site-novo/figura';
 import { ListaDeItens } from '@/components/site-novo/lista-de-itens';
 import { Marcadores } from '@/components/site-novo/marcadores';
 import { TabelaDoc } from '@/components/site-novo/tabela-doc';
-import { texto } from '@/components/site-novo/texto';
+import { grade, texto } from '@/components/site-novo/texto';
 import { WHATSAPP } from '@/lib/site-novo/contato';
 import { imagemMarca } from '@/lib/site-novo/imagens';
 import { ETAPAS } from '@/lib/site-novo/metodo';
@@ -115,40 +115,43 @@ export default function HomeSiteNovo() {
         <h1 className={cn(texto.tituloPagina, 'mt-5')}>
           Segurança que sai do papel.
         </h1>
-        <p className={cn(texto.apoio, 'mt-6')}>
-          Treinamentos de Normas Regulamentadoras com teoria aplicada e prática
-          supervisionada.
-        </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link href={rotas.contato} className={botao({ tamanho: 'lg' })}>
-            Solicitar proposta
-          </Link>
-          <Link
-            href={rotas.treinamentos}
-            className={botao({ variante: 'contorno', tamanho: 'lg' })}
-          >
-            Ver treinamentos
-            <ArrowDown className="size-4" aria-hidden="true" />
-          </Link>
+        <div className={cn(grade.duas, 'mt-6 lg:mt-10')}>
+          <div>
+            <p className={texto.apoio}>
+              Treinamentos de Normas Regulamentadoras com teoria aplicada e
+              prática supervisionada.
+            </p>
+            <div className={cn(linhaDeBotoes, 'mt-8')}>
+              <Link href={rotas.contato} className={botao({ tamanho: 'lg' })}>
+                Solicitar proposta
+              </Link>
+              <Link
+                href={rotas.treinamentos}
+                className={botao({ variante: 'contorno', tamanho: 'lg' })}
+              >
+                Ver treinamentos
+                <ArrowDown className="size-4" aria-hidden="true" />
+              </Link>
+            </div>
+            <Marcadores
+              className="mt-10"
+              itens={[
+                'Teoria + prática',
+                'Conteúdo sob medida',
+                'Instrutores especializados',
+              ]}
+            />
+          </div>
+          <Figura
+            numero="1"
+            src={imagemMarca('heroes/space-light-hero-01')}
+            alt="Participante usa um extintor portátil num fogo controlado, observada por um instrutor e por colegas de colete refletivo."
+            legenda="Exercício com extintor portátil em fogo controlado, sob supervisão."
+            sizes="(min-width: 1440px) 560px, (min-width: 1024px) 40vw, 100vw"
+            posicao="68% 50%"
+            prioridade
+          />
         </div>
-        <Marcadores
-          className="mt-10"
-          itens={[
-            'Teoria + prática',
-            'Conteúdo sob medida',
-            'Instrutores especializados',
-          ]}
-        />
-        <Figura
-          className="mt-10"
-          numero="1"
-          src={imagemMarca('heroes/space-light-hero-01')}
-          alt="Participante usa um extintor portátil num fogo controlado, observada por um instrutor e por colegas de colete refletivo."
-          legenda="Exercício com extintor portátil em fogo controlado, sob supervisão."
-          sizes="(min-width: 1024px) 50vw, 100vw"
-          posicao="68% 50%"
-          prioridade
-        />
       </DocSection>
 
       <DocSection id="treinamentos" numero="02" rotulo="Os treinamentos">
@@ -166,25 +169,27 @@ export default function HomeSiteNovo() {
           </p>
         </div>
 
+        {/* No celular cada norma é um bloco; a partir de 1024, uma linha de
+            índice: código, nome, descrição e link. */}
         <ul className="mt-10 border-t border-doc-ink">
           {NORMAS.map((norma) => (
             <li key={norma.slug} className="border-b border-doc-rule-strong">
               <Link
                 href={rotas.norma(norma.slug)}
-                className="doc-focus group grid grid-cols-[5rem_minmax(0,1fr)] gap-x-4 py-5"
+                className="doc-focus group grid grid-cols-[5rem_minmax(0,1fr)] gap-x-4 py-5 lg:grid-cols-[6rem_minmax(0,13rem)_minmax(0,1fr)_auto] lg:items-baseline lg:gap-x-6 lg:py-6"
               >
-                <span className="font-doc-mono text-2xl leading-none font-semibold text-doc-mark">
+                <span className="font-doc-mono text-2xl leading-none font-semibold text-doc-mark lg:text-3xl">
                   {norma.codigo}
                 </span>
-                <span className="min-w-0">
+                <span className="min-w-0 lg:contents">
                   <span className={cn(texto.tituloItem, 'block')}>
                     {norma.nome}
                   </span>
-                  <span className="mt-2 block text-sm leading-relaxed text-doc-ink-muted">
+                  <span className="mt-2 block text-sm leading-relaxed text-doc-ink-muted lg:mt-0 lg:text-base">
                     {norma.linha}
                   </span>
-                  <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold underline decoration-sl-gold decoration-2 underline-offset-4 group-hover:decoration-doc-ink">
-                    Ver treinamento
+                  <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold underline decoration-sl-gold decoration-2 underline-offset-4 group-hover:decoration-doc-ink lg:mt-0 lg:justify-self-end">
+                    <span className="lg:max-xl:sr-only">Ver treinamento</span>
                     <ArrowRight className="size-4" aria-hidden="true" />
                   </span>
                 </span>
@@ -207,34 +212,44 @@ export default function HomeSiteNovo() {
         <h2 className={cn(texto.tituloSecao, 'mt-4')}>
           Onde a prática muda a percepção.
         </h2>
-        <div className="mt-6 space-y-4">
-          <p className={texto.corpo}>
-            Conteúdo técnico explicado em sala responde à norma.
-          </p>
-          <p className={texto.corpo}>
-            O que muda comportamento é o momento em que a pessoa executa, erra
-            com supervisão e entende o porquê.
-          </p>
-          <p className={cn(texto.corpo, 'font-semibold')}>
-            Por isso a prática supervisionada não é complemento do nosso
-            treinamento — é a parte que faz o resto valer.
-          </p>
-        </div>
 
-        <ListaDeItens numerada className="mt-10" itens={PONTOS_DA_PRATICA} />
+        {/* Ordem do DOM = ordem do celular (argumento, pontos, figuras). No
+            desktop os pontos sobem para a coluna da direita. */}
+        <div className={cn(grade.duas, 'mt-6 lg:mt-10')}>
+          <div className="space-y-4">
+            <p className={texto.corpo}>
+              Conteúdo técnico explicado em sala responde à norma.
+            </p>
+            <p className={texto.corpo}>
+              O que muda comportamento é o momento em que a pessoa executa, erra
+              com supervisão e entende o porquê.
+            </p>
+            <p className={cn(texto.corpo, 'font-semibold')}>
+              Por isso a prática supervisionada não é complemento do nosso
+              treinamento — é a parte que faz o resto valer.
+            </p>
+          </div>
 
-        <div className="mt-10 grid grid-cols-2 gap-x-3 gap-y-6">
-          {FIGURAS_DA_PRATICA.map((figura, indice) => (
-            <Figura
-              key={figura.src}
-              numero={String(indice + 2)}
-              marcador={figura.norma}
-              src={figura.src}
-              alt={figura.alt}
-              legenda={figura.legenda}
-              sizes="(min-width: 1024px) 25vw, 50vw"
-            />
-          ))}
+          <ListaDeItens
+            numerada
+            compacta
+            className="lg:col-start-2 lg:row-span-2 lg:row-start-1"
+            itens={PONTOS_DA_PRATICA}
+          />
+
+          <div className="grid grid-cols-2 gap-x-3 gap-y-6 lg:col-start-1 lg:gap-x-4">
+            {FIGURAS_DA_PRATICA.map((figura, indice) => (
+              <Figura
+                key={figura.src}
+                numero={String(indice + 2)}
+                marcador={figura.norma}
+                src={figura.src}
+                alt={figura.alt}
+                legenda={figura.legenda}
+                sizes="(min-width: 1440px) 270px, (min-width: 1024px) 20vw, 50vw"
+              />
+            ))}
+          </div>
         </div>
 
         <Confirmar bloco className="mt-10">
@@ -266,22 +281,27 @@ export default function HomeSiteNovo() {
 
         <ListaDeItens numerada className="mt-10" itens={ETAPAS} />
 
-        <div className="mt-10">
-          <p className={texto.corpo}>
-            O registro de cada turma fica organizado no portal do cliente,
-            disponível quando a auditoria pedir.
-          </p>
+        <div className={cn(grade.duas, 'mt-10 lg:items-start')}>
+          <div>
+            <p className={texto.corpo}>
+              O registro de cada turma fica organizado no portal do cliente,
+              disponível quando a auditoria pedir.
+            </p>
+            <Link
+              href={rotas.portal}
+              className={cn(
+                texto.link,
+                'mt-6 inline-flex items-center gap-1.5',
+              )}
+            >
+              Conhecer o portal
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          </div>
           <Marcadores
-            className="mt-5 grid-cols-2"
+            className="grid-cols-2"
             itens={['Lista de presença', 'Fotos', 'Documentos', 'Certificados']}
           />
-          <Link
-            href={rotas.portal}
-            className={cn(texto.link, 'mt-6 inline-flex items-center gap-1.5')}
-          >
-            Conhecer o portal
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </Link>
         </div>
       </DocSection>
 
@@ -320,11 +340,11 @@ export default function HomeSiteNovo() {
         <ul className="mt-10 border-t border-doc-ink">
           {[1, 2, 3].map((numero) => (
             <li key={numero} className="border-b border-doc-rule-strong py-6">
-              <figure>
+              <figure className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] lg:items-start lg:gap-x-10">
                 <blockquote>
                   <Confirmar bloco>depoimento real</Confirmar>
                 </blockquote>
-                <figcaption className="mt-3">
+                <figcaption className="mt-3 lg:mt-0">
                   <Confirmar>
                     assinatura por função e tipo de operação de quem deu o
                     depoimento
@@ -335,7 +355,7 @@ export default function HomeSiteNovo() {
           ))}
         </ul>
         <Marcadores
-          className="mt-10"
+          className="mt-10 lg:grid-cols-3"
           itens={[
             'Atuação nacional',
             'Empresas de médio e grande porte',
@@ -345,32 +365,38 @@ export default function HomeSiteNovo() {
       </DocSection>
 
       <DocSection id="proposta" numero="08" rotulo="Proposta" tom="preto">
-        <Image
-          src="/images/branding/space-light-logo-oficial.png"
-          alt="Space Light Engenharia"
-          width={260}
-          height={49}
-          className="h-8 w-auto brightness-0 invert"
-        />
-        <h2 className={cn(texto.tituloSecao, 'mt-8')}>
-          Conte o treinamento que a sua empresa precisa.
-        </h2>
-        <p className={cn(texto.apoio, 'mt-6')}>
-          Preencha o formulário com o essencial e a Space Light retorna com a
-          proposta e o caminho recomendado.
-        </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link href={rotas.contato} className={botao({ tamanho: 'lg' })}>
-            Solicitar proposta
-          </Link>
-          <a
-            href={WHATSAPP.link}
-            target="_blank"
-            rel="noreferrer"
-            className={botao({ variante: 'contorno', tamanho: 'lg' })}
-          >
-            Falar no WhatsApp
-          </a>
+        <div className={cn(grade.duasComTitulo, 'xl:items-end')}>
+          <div>
+            <Image
+              src="/images/branding/space-light-logo-oficial.png"
+              alt="Space Light Engenharia"
+              width={260}
+              height={49}
+              className="h-8 w-auto brightness-0 invert"
+            />
+            <h2 className={cn(texto.tituloSecao, 'mt-8')}>
+              Conte o treinamento que a sua empresa precisa.
+            </h2>
+          </div>
+          <div>
+            <p className={texto.apoio}>
+              Preencha o formulário com o essencial e a Space Light retorna com
+              a proposta e o caminho recomendado.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link href={rotas.contato} className={botao({ tamanho: 'lg' })}>
+                Solicitar proposta
+              </Link>
+              <a
+                href={WHATSAPP.link}
+                target="_blank"
+                rel="noreferrer"
+                className={botao({ variante: 'contorno', tamanho: 'lg' })}
+              >
+                Falar no WhatsApp
+              </a>
+            </div>
+          </div>
         </div>
       </DocSection>
     </>
