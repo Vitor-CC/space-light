@@ -48,6 +48,165 @@
   --ring: #f2ad19;
 }
 
+/*
+ * SITE NOVO — "documento técnico" (em /v2 enquanto convive com o site atual)
+ *
+ * Tudo deste comentário até o fim do bloco `doc-focus` é ACRÉSCIMO. Este
+ * arquivo é compartilhado com os portais: token existente não se altera nem se
+ * remove.
+ *
+ * - `--sl-*`: a paleta da marca, exatamente como na spec. Nenhuma cor nova.
+ * - `--doc-*`: os semânticos do site novo. Ele usa estes, e não
+ *   `--background`, `--foreground` e `--border`, porque os valores existentes
+ *   (#f5f5f2, #0b0b0b, #d4d4cf) não são os da paleta e não podem mudar.
+ * - `.dark` define a paleta escura completa — a do shadcn e a `--doc-*`. Bloco
+ *   preto ou grafite recebe `className="dark"` e as mesmas classes passam a
+ *   valer a versão escura.
+ * - Sombra proibida. Raio zero. O amarelo nunca preenche bloco grande.
+ */
+@theme inline {
+  --font-doc-mono:
+    var(--font-plex-mono), ui-monospace, 'SFMono-Regular', Menlo, Consolas,
+    monospace;
+
+  --color-sl-black: var(--sl-black);
+  --color-sl-graphite: var(--sl-graphite);
+  --color-sl-gold: var(--sl-gold);
+  --color-sl-gold-ink: var(--sl-gold-ink);
+  --color-sl-orange: var(--sl-orange);
+  --color-sl-gray: var(--sl-gray);
+  --color-sl-gray-light: var(--sl-gray-light);
+  --color-sl-off-white: var(--sl-off-white);
+  --color-sl-white: var(--sl-white);
+  --color-sl-error: var(--sl-error);
+
+  --color-doc-paper: var(--doc-paper);
+  --color-doc-sheet: var(--doc-sheet);
+  --color-doc-ink: var(--doc-ink);
+  --color-doc-ink-muted: var(--doc-ink-muted);
+  --color-doc-mark: var(--doc-mark);
+  --color-doc-rule: var(--doc-rule);
+  --color-doc-rule-strong: var(--doc-rule-strong);
+  --color-doc-focus: var(--doc-focus);
+  --color-doc-error: var(--doc-error);
+
+  /* `h-header`, `scroll-mt-header`, `pb-section`, `max-w-doc`, `max-w-measure` */
+  --spacing-header: var(--doc-header-height);
+  --spacing-section: var(--doc-section-space);
+  --spacing-doc-margin: var(--doc-margin-width);
+  --container-doc: var(--doc-page-width);
+  --container-measure: var(--doc-measure);
+}
+
+:root {
+  --sl-black: #000000;
+  --sl-graphite: #30302f;
+  --sl-gold: #f2ad19;
+  --sl-orange: #ff9900;
+  --sl-gray: #666666;
+  --sl-gray-light: #e6e8e9;
+  --sl-off-white: #f7f6f2;
+  --sl-white: #ffffff;
+  /* Vermelho só existe para erro de formulário. */
+  --sl-error: #c32020;
+  /* Dourado escuro para texto sobre fundo claro. O ouro puro não passa AA em
+     texto (≈1,8:1 no off-white); este dá ≈5:1. Antes era escrito na mão. */
+  --sl-gold-ink: #8a6107;
+
+  --doc-paper: var(--sl-off-white);
+  --doc-sheet: var(--sl-white);
+  --doc-ink: var(--sl-black);
+  --doc-ink-muted: var(--sl-gray);
+  /* Numeração, código de norma e marcador em texto. */
+  --doc-mark: var(--sl-gold-ink);
+  /* Fio fino dentro de superfície branca (tabela, lista). */
+  --doc-rule: var(--sl-gray-light);
+  /* Fio estrutural: divisão de seção e a linha da margem. O #e6e8e9 some no
+     off-white, então este é o preto em transparência — não é cor nova. */
+  --doc-rule-strong: color-mix(in srgb, var(--sl-black) 16%, transparent);
+  --doc-focus: var(--sl-black);
+  --doc-error: var(--sl-error);
+
+  /* Ritmo e medidas. Valores fixos: não mudam com o tema. */
+  --doc-header-height: 4.5rem;
+  /* Espaço entre seções: 64px em 375, ≈104px em 1024, 128px em 1440. */
+  --doc-section-space: clamp(4rem, 2.4rem + 6.4vw, 8rem);
+  /* Coluna de margem do documento, só a partir de 1024. */
+  --doc-margin-width: 10.5rem;
+  --doc-page-width: 90rem;
+  /* Medida máxima do texto corrido. */
+  --doc-measure: 70ch;
+}
+
+.dark {
+  --background: var(--sl-black);
+  --foreground: var(--sl-white);
+  --card: var(--sl-graphite);
+  --card-foreground: var(--sl-white);
+  --primary: var(--sl-gold);
+  --primary-foreground: var(--sl-black);
+  --secondary: var(--sl-graphite);
+  --secondary-foreground: var(--sl-white);
+  --muted: var(--sl-graphite);
+  --muted-foreground: color-mix(in srgb, var(--sl-white) 70%, var(--sl-black));
+  --accent: var(--sl-orange);
+  --accent-foreground: var(--sl-black);
+  /* #c32020 sobre preto dá ≈3,5:1 e reprova em texto: clareado com branco. */
+  --destructive: color-mix(in srgb, var(--sl-error) 60%, var(--sl-white));
+  --border: color-mix(in srgb, var(--sl-white) 18%, transparent);
+  --input: color-mix(in srgb, var(--sl-white) 30%, transparent);
+  --ring: var(--sl-gold);
+
+  --doc-paper: var(--sl-black);
+  --doc-sheet: var(--sl-graphite);
+  --doc-ink: var(--sl-white);
+  --doc-ink-muted: color-mix(in srgb, var(--sl-white) 70%, transparent);
+  --doc-mark: var(--sl-gold);
+  --doc-rule: color-mix(in srgb, var(--sl-white) 12%, transparent);
+  --doc-rule-strong: color-mix(in srgb, var(--sl-white) 22%, transparent);
+  --doc-focus: var(--sl-gold);
+  --doc-error: color-mix(in srgb, var(--sl-error) 60%, var(--sl-white));
+
+  color-scheme: dark;
+}
+
+@layer components {
+  /* Caixa da página: largura máxima e respiro lateral. */
+  .doc-shell {
+    width: 100%;
+    max-width: var(--doc-page-width);
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  /* Grade do documento: no desktop, coluna estreita de margem + conteúdo. */
+  .doc-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (min-width: 768px) {
+    .doc-shell {
+      padding-inline: 2.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .doc-grid {
+      grid-template-columns: var(--doc-margin-width) minmax(0, 1fr);
+    }
+  }
+}
+
+/* Foco por teclado do site novo: contorno sólido, preto no claro e ouro no
+   escuro. O `outline-ring/50` global é ouro a 50% e some no fundo claro. */
+@utility doc-focus {
+  &:focus-visible {
+    outline: 2px solid var(--doc-focus);
+    outline-offset: 3px;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
