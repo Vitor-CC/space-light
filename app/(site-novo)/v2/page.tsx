@@ -143,7 +143,6 @@ export default function HomeSiteNovo() {
             />
           </div>
           <Figura
-            numero="1"
             src={imagemMarca('heroes/space-light-hero-01')}
             alt="Participante usa um extintor portátil num fogo controlado, observada por um instrutor e por colegas de colete refletivo."
             legenda="Exercício com extintor portátil em fogo controlado, sob supervisão."
@@ -238,10 +237,9 @@ export default function HomeSiteNovo() {
           />
 
           <div className="grid grid-cols-2 gap-x-3 gap-y-6 lg:col-start-1 lg:gap-x-4">
-            {FIGURAS_DA_PRATICA.map((figura, indice) => (
+            {FIGURAS_DA_PRATICA.map((figura) => (
               <Figura
                 key={figura.src}
-                numero={String(indice + 2)}
                 marcador={figura.norma}
                 src={figura.src}
                 alt={figura.alt}

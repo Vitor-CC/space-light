@@ -82,7 +82,6 @@ export function PaginaDeNorma({ norma }: { norma: NormaComPagina }) {
             </div>
           </div>
           <Figura
-            numero="1"
             src={pagina.figura.src}
             alt={pagina.figura.alt}
             legenda={pagina.figura.legenda}

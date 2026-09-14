@@ -3,11 +3,10 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 /**
- * Foto como figura de documento: enquadrada por um fio e legendada em
- * monoespaçada logo abaixo. Nunca como fundo atrás de texto.
+ * Foto enquadrada por um fio, com a legenda logo abaixo em monoespaçada e
+ * negrito. Nunca como fundo atrás de texto.
  */
 export function Figura({
-  numero,
   src,
   alt,
   legenda,
@@ -18,11 +17,10 @@ export function Figura({
   proporcao = 'aspect-[4/3]',
   className,
 }: {
-  numero: string;
   src: string;
   alt: string;
   legenda: string;
-  /** Rótulo curto ao lado do número, como o código da norma. */
+  /** Rótulo curto acima da legenda, como o código da norma. */
   marcador?: string;
   sizes: string;
   prioridade?: boolean;
@@ -52,11 +50,12 @@ export function Figura({
         />
       </div>
       <figcaption className="mt-2.5 font-doc-mono text-xs leading-snug text-doc-ink-muted">
-        <span className="flex gap-2">
-          <span className="text-doc-mark">Fig. {numero}</span>
-          {marcador ? <span className="text-doc-ink">{marcador}</span> : null}
+        {marcador ? (
+          <span className="block text-doc-ink">{marcador}</span>
+        ) : null}
+        <span className={cn('block font-semibold', marcador && 'mt-1')}>
+          {legenda}
         </span>
-        <span className="mt-1 block">{legenda}</span>
       </figcaption>
     </figure>
   );
