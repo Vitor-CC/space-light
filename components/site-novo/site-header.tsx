@@ -25,7 +25,7 @@ export function SiteHeader() {
               alt=""
               width={260}
               height={49}
-              priority
+              loading="eager"
               className="h-6 w-auto lg:h-7"
             />
           </Link>
