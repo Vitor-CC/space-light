@@ -9,7 +9,11 @@ import { ListaDeItens } from '@/components/site-novo/lista-de-itens';
 import { ListaSimples } from '@/components/site-novo/lista-simples';
 import { grade, texto } from '@/components/site-novo/texto';
 import { WHATSAPP } from '@/lib/site-novo/contato';
-import { NORMAS, type NormaComPagina } from '@/lib/site-novo/normas';
+import {
+  NORMAS,
+  type NormaComPagina,
+  type PaginaDaNorma,
+} from '@/lib/site-novo/normas';
 import { rotas } from '@/lib/site-novo/rotas';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +30,20 @@ export function PaginaDeNorma({ norma }: { norma: NormaComPagina }) {
   const { pagina } = norma;
   const outras = NORMAS.filter((item) => item.slug !== norma.slug);
   const numeroDaFicha = pagina.programa ? 2 : 1;
+
+  // Ao lado das etapas: a grade oficial da Space, quando transcrita, ou o
+  // conteúdo mínimo que a própria norma define. Sem nenhum dos dois, as etapas
+  // ocupam a largura toda.
+  const complemento = pagina.programa ? (
+    <TabelaDePrograma programa={pagina.programa} />
+  ) : pagina.conteudoMinimo ? (
+    <div>
+      <p className="pb-3 font-doc-mono text-xs text-doc-ink-muted">
+        {pagina.conteudoMinimo.legenda}
+      </p>
+      <ListaSimples itens={pagina.conteudoMinimo.itens} />
+    </div>
+  ) : null;
 
   return (
     <>
@@ -103,17 +121,26 @@ export function PaginaDeNorma({ norma }: { norma: NormaComPagina }) {
           </div>
           <ListaSimples itens={pagina.pontos} />
         </div>
-        <p className={cn(texto.rotulo, 'mt-8')}>
-          Fonte:{' '}
-          <a
-            href={pagina.fonte.url}
-            target="_blank"
-            rel="noreferrer"
-            className="doc-focus text-doc-ink underline decoration-sl-gold decoration-2 underline-offset-4"
-          >
-            {pagina.fonte.rotulo}
-          </a>
-        </p>
+        {pagina.aviso ? (
+          <p className="mt-8 max-w-measure border-l-2 border-sl-gold pl-4 text-base leading-relaxed">
+            {pagina.aviso}
+          </p>
+        ) : null}
+        <ul className="mt-8 space-y-2">
+          {pagina.fontes.map((fonte) => (
+            <li key={fonte.url} className={texto.rotulo}>
+              Fonte:{' '}
+              <a
+                href={fonte.url}
+                target="_blank"
+                rel="noreferrer"
+                className="doc-focus text-doc-ink underline decoration-sl-gold decoration-2 underline-offset-4"
+              >
+                {fonte.rotulo}
+              </a>
+            </li>
+          ))}
+        </ul>
       </DocSection>
 
       <DocSection id="para-quem" numero="03" rotulo="Para quem é" tom="folha">
@@ -137,83 +164,14 @@ export function PaginaDeNorma({ norma }: { norma: NormaComPagina }) {
         tom="grafite"
       >
         <h2 className={texto.tituloSecao}>Como a Space aplica</h2>
-        <div className={cn(grade.duas, 'mt-8 lg:items-start')}>
-          <ListaDeItens numerada compacta itens={pagina.aplicacao} />
-
-          {pagina.programa ? (
-            <div>
-              <table className="w-full border-collapse text-left">
-                <caption className={legendaDeTabela}>
-                  {pagina.programa.legenda}
-                </caption>
-                <thead>
-                  <tr className="border-y border-doc-ink bg-doc-rule">
-                    <th
-                      scope="col"
-                      className="w-10 py-3 pl-2 font-doc-mono text-xs font-medium"
-                    >
-                      Nº
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-2 py-3 font-doc-mono text-xs font-medium"
-                    >
-                      Módulo
-                    </th>
-                    <th
-                      scope="col"
-                      className="w-20 py-3 pr-2 text-center font-doc-mono text-xs font-medium"
-                    >
-                      Prática
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagina.programa.modulos.map((linha, indice) => (
-                    <tr
-                      key={linha.modulo}
-                      className="border-b border-doc-rule-strong"
-                    >
-                      <td className="py-3 pl-2 align-top font-doc-mono text-xs tabular-nums text-doc-ink-muted">
-                        {String(indice + 1).padStart(2, '0')}
-                      </td>
-                      <th
-                        scope="row"
-                        className="px-2 py-3 align-top text-sm leading-snug font-semibold"
-                      >
-                        {linha.modulo}
-                      </th>
-                      <td className="py-3 pr-2 text-center align-top">
-                        {linha.pratica ? (
-                          <>
-                            <span
-                              aria-hidden="true"
-                              className="mt-1.5 inline-block size-2 bg-sl-gold"
-                            />
-                            <span className="sr-only">Sim</span>
-                          </>
-                        ) : (
-                          <>
-                            <span
-                              aria-hidden="true"
-                              className="text-doc-ink-muted"
-                            >
-                              —
-                            </span>
-                            <span className="sr-only">Não</span>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className={cn(texto.rotulo, 'mt-3')}>
-                {pagina.programa.origem}
-              </p>
-            </div>
-          ) : null}
-        </div>
+        {complemento ? (
+          <div className={cn(grade.duas, 'mt-8 lg:items-start')}>
+            <ListaDeItens numerada compacta itens={pagina.aplicacao} />
+            {complemento}
+          </div>
+        ) : (
+          <ListaDeItens numerada className="mt-8" itens={pagina.aplicacao} />
+        )}
 
         <Link
           href={rotas.comoTrabalhamos}
@@ -313,5 +271,76 @@ export function PaginaDeNorma({ norma }: { norma: NormaComPagina }) {
         </div>
       </DocSection>
     </>
+  );
+}
+
+/** Grade oficial da Space, módulo a módulo, marcando onde há prática. */
+function TabelaDePrograma({
+  programa,
+}: {
+  programa: NonNullable<PaginaDaNorma['programa']>;
+}) {
+  return (
+    <div>
+      <table className="w-full border-collapse text-left">
+        <caption className={legendaDeTabela}>{programa.legenda}</caption>
+        <thead>
+          <tr className="border-y border-doc-ink bg-doc-rule">
+            <th
+              scope="col"
+              className="w-10 py-3 pl-2 font-doc-mono text-xs font-medium"
+            >
+              Nº
+            </th>
+            <th
+              scope="col"
+              className="px-2 py-3 font-doc-mono text-xs font-medium"
+            >
+              Módulo
+            </th>
+            <th
+              scope="col"
+              className="w-20 py-3 pr-2 text-center font-doc-mono text-xs font-medium"
+            >
+              Prática
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {programa.modulos.map((linha, indice) => (
+            <tr key={linha.modulo} className="border-b border-doc-rule-strong">
+              <td className="py-3 pl-2 align-top font-doc-mono text-xs tabular-nums text-doc-ink-muted">
+                {String(indice + 1).padStart(2, '0')}
+              </td>
+              <th
+                scope="row"
+                className="px-2 py-3 align-top text-sm leading-snug font-semibold"
+              >
+                {linha.modulo}
+              </th>
+              <td className="py-3 pr-2 text-center align-top">
+                {linha.pratica ? (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="mt-1.5 inline-block size-2 bg-sl-gold"
+                    />
+                    <span className="sr-only">Sim</span>
+                  </>
+                ) : (
+                  <>
+                    <span aria-hidden="true" className="text-doc-ink-muted">
+                      —
+                    </span>
+                    <span className="sr-only">Não</span>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className={cn(texto.rotulo, 'mt-3')}>{programa.origem}</p>
+    </div>
   );
 }

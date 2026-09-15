@@ -2,7 +2,7 @@
  * Endereços do site novo. Enquanto ele convive com o site atual, tudo vive sob
  * `/v2`; na troca de rota basta `SITE_BASE = ''`.
  */
-export const SITE_BASE = '/v2';
+export const SITE_BASE: string = '/v2';
 
 const inicio = SITE_BASE || '/';
 
