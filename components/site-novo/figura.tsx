@@ -51,7 +51,7 @@ export function Figura({
       </div>
       <figcaption className="mt-2.5 font-doc-mono text-xs leading-snug text-doc-ink-muted">
         {marcador ? (
-          <span className="block text-doc-ink">{marcador}</span>
+          <span className="block font-semibold text-doc-mark">{marcador}</span>
         ) : null}
         <span className={cn('block font-semibold', marcador && 'mt-1')}>
           {legenda}

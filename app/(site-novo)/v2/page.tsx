@@ -170,7 +170,7 @@ export default function HomeSiteNovo() {
 
         {/* No celular cada norma é um bloco; a partir de 1024, uma linha de
             índice: código, nome, descrição e link. */}
-        <ul className="mt-10 border-t border-doc-ink">
+        <ul data-surgir className="mt-10 border-t border-doc-ink">
           {NORMAS.map((norma) => (
             <li key={norma.slug} className="border-b border-doc-rule-strong">
               <Link
@@ -181,7 +181,12 @@ export default function HomeSiteNovo() {
                   {norma.codigo}
                 </span>
                 <span className="min-w-0 lg:contents">
-                  <span className={cn(texto.tituloItem, 'block')}>
+                  <span
+                    className={cn(
+                      texto.tituloItem,
+                      'block decoration-sl-gold decoration-2 underline-offset-4 group-hover:underline',
+                    )}
+                  >
                     {norma.nome}
                   </span>
                   <span className="mt-2 block text-sm leading-relaxed text-doc-ink-muted lg:mt-0 lg:text-base">
@@ -189,7 +194,10 @@ export default function HomeSiteNovo() {
                   </span>
                   <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold underline decoration-sl-gold decoration-2 underline-offset-4 group-hover:decoration-doc-ink lg:mt-0 lg:justify-self-end">
                     <span className="lg:max-xl:sr-only">Ver treinamento</span>
-                    <ArrowRight className="size-4" aria-hidden="true" />
+                    <ArrowRight
+                      className="size-4 transition-transform duration-200 group-hover:translate-x-1"
+                      aria-hidden="true"
+                    />
                   </span>
                 </span>
               </Link>
@@ -236,7 +244,10 @@ export default function HomeSiteNovo() {
             itens={PONTOS_DA_PRATICA}
           />
 
-          <div className="grid grid-cols-2 gap-x-3 gap-y-6 lg:col-start-1 lg:gap-x-4">
+          <div
+            data-surgir
+            className="grid grid-cols-2 gap-x-3 gap-y-6 lg:col-start-1 lg:gap-x-4"
+          >
             {FIGURAS_DA_PRATICA.map((figura) => (
               <Figura
                 key={figura.src}
@@ -335,7 +346,7 @@ export default function HomeSiteNovo() {
         <h2 className={cn(texto.tituloSecao, 'mt-4')}>
           O que dizem as equipes de segurança.
         </h2>
-        <ul className="mt-10 border-t border-doc-ink">
+        <ul data-surgir className="mt-10 border-t border-doc-ink">
           {[1, 2, 3].map((numero) => (
             <li key={numero} className="border-b border-doc-rule-strong py-6">
               <figure className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] lg:items-start lg:gap-x-10">

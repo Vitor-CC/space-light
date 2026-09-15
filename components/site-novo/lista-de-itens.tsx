@@ -25,7 +25,7 @@ export function ListaDeItens({
 }) {
   const Lista = numerada ? 'ol' : 'ul';
   return (
-    <Lista className={cn('border-t border-doc-ink', className)}>
+    <Lista data-surgir className={cn('border-t border-doc-ink', className)}>
       {itens.map((item, indice) => (
         <li
           key={item.titulo}
@@ -34,8 +34,8 @@ export function ListaDeItens({
             numerada ? 'grid-cols-[2.75rem_minmax(0,1fr)]' : 'grid-cols-1',
             !compacta &&
               (numerada
-                ? 'lg:grid-cols-[3.5rem_minmax(0,14rem)_minmax(0,1fr)] lg:items-baseline lg:gap-x-6'
-                : 'lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:items-baseline lg:gap-x-6'),
+                ? 'lg:grid-cols-[3.5rem_minmax(0,14rem)_minmax(0,1fr)] lg:items-baseline lg:gap-x-6 xl:grid-cols-[3.5rem_minmax(0,18rem)_minmax(0,1fr)]'
+                : 'lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:items-baseline lg:gap-x-6 xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]'),
           )}
         >
           {numerada ? (

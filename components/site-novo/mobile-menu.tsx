@@ -35,7 +35,7 @@ export function MobileMenu() {
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="gap-0 overflow-y-auto border-doc-rule-strong bg-doc-paper text-doc-ink shadow-none data-[side=right]:w-full data-[side=right]:sm:max-w-md"
+        className="doc-ui gap-0 overflow-y-auto border-doc-rule-strong bg-doc-paper text-doc-ink shadow-none data-[side=right]:w-full data-[side=right]:sm:max-w-md"
       >
         <div className="flex h-header shrink-0 items-center justify-between border-b border-doc-rule-strong px-5">
           <SheetTitle className="font-doc-mono text-xs font-normal text-doc-ink-muted">

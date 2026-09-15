@@ -30,7 +30,7 @@ export function TabelaDoc<Chave extends string>({
         <p className="pb-3 font-doc-mono text-xs text-doc-ink-muted">
           {legenda}
         </p>
-        <ul className="border-t border-doc-ink">
+        <ul data-surgir className="border-t border-doc-ink">
           {linhas.map((linha, indice) => (
             <li key={indice} className="border-b border-doc-rule-strong py-5">
               <dl className="grid gap-4">
@@ -63,19 +63,21 @@ export function TabelaDoc<Chave extends string>({
             {legenda}
           </caption>
           <thead>
-            <tr className="border-y border-doc-ink bg-doc-rule">
+            {/* Sem faixa de fundo: fio preto abrindo a tabela, fio fino fechando
+                o cabeçalho, e o texto alinhado ao fio como o resto da página. */}
+            <tr className="border-t border-b border-t-doc-ink border-b-doc-rule-strong">
               {colunas.map((coluna) => (
                 <th
                   key={coluna.chave}
                   scope="col"
-                  className="px-4 py-3 font-doc-mono text-xs font-medium"
+                  className="py-3 pr-6 font-doc-mono text-xs font-medium text-doc-ink-muted last:pr-0"
                 >
                   {coluna.titulo}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody data-surgir>
             {linhas.map((linha, indice) => (
               <tr key={indice} className="border-b border-doc-rule-strong">
                 {colunas.map((coluna) =>
@@ -83,14 +85,14 @@ export function TabelaDoc<Chave extends string>({
                     <th
                       key={coluna.chave}
                       scope="row"
-                      className="px-4 py-4 align-top font-heading text-lg leading-tight font-bold"
+                      className="py-5 pr-6 align-top font-heading text-lg leading-tight font-bold lg:w-56 xl:w-72 xl:text-xl"
                     >
                       {linha[coluna.chave]}
                     </th>
                   ) : (
                     <td
                       key={coluna.chave}
-                      className="px-4 py-4 align-top text-base leading-relaxed"
+                      className="py-5 pr-6 align-top text-base leading-relaxed last:pr-0"
                     >
                       {linha[coluna.chave]}
                     </td>

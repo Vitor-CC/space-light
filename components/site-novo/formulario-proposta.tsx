@@ -9,7 +9,7 @@ import {
 } from 'react';
 
 import { botao } from '@/components/site-novo/botao';
-import { Confirmar } from '@/components/site-novo/confirmar';
+import { caixa, controle, seletor } from '@/components/site-novo/controles';
 import { texto } from '@/components/site-novo/texto';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -56,10 +56,6 @@ const ESTADO_INICIAL: EstadoDaProposta = { status: 'inicial' };
 // Os controles do kit, vestidos com os tokens do documento: fio escuro o
 // bastante para passar 3:1, sem raio, sem anel dourado de foco (o foco é o
 // contorno sólido de `doc-focus`) e erro só em vermelho.
-const controle =
-  'doc-focus h-12 border-doc-ink-muted bg-doc-sheet px-3 text-base text-doc-ink placeholder:text-doc-ink-muted focus-visible:border-doc-ink focus-visible:ring-0 aria-invalid:border-doc-error aria-invalid:ring-0 md:text-base';
-const seletor =
-  'w-full [&_select]:doc-focus [&_select]:h-12 [&_select]:border-doc-ink-muted [&_select]:bg-doc-sheet [&_select]:pl-3 [&_select]:text-base [&_select]:text-doc-ink [&_select]:focus-visible:border-doc-ink [&_select]:focus-visible:ring-0 [&_select]:aria-invalid:border-doc-error [&_select]:aria-invalid:ring-0 [&_svg]:text-doc-ink';
 
 /**
  * Formulário "Solicitar proposta". Valida no navegador ao enviar (e ao sair
@@ -121,11 +117,8 @@ export function FormularioProposta({
         </h3>
         <p className={cn(texto.corpo, 'mt-5')}>
           A equipe da Space Light vai analisar as informações e responder pelo
-          e-mail ou pelo celular informados.
+          e-mail ou pelo celular informados em até 1 dia útil.
         </p>
-        <Confirmar bloco className="mt-4">
-          prazo em que a equipe responde a solicitação de proposta
-        </Confirmar>
         <p className={cn(texto.apoio, 'mt-6')}>
           Se precisar falar agora,{' '}
           <a
@@ -404,7 +397,7 @@ export function FormularioProposta({
                     }
                     data-campo={indice === 0 ? 'treinamentos' : undefined}
                     aria-invalid={erros.treinamentos ? true : undefined}
-                    className="doc-focus size-5 rounded-none border-doc-ink-muted bg-doc-sheet focus-visible:ring-0 data-checked:border-sl-black data-checked:bg-sl-gold data-checked:text-sl-black"
+                    className={caixa}
                   />
                   <span className="font-doc-mono text-sm font-semibold">
                     {opcao.rotulo}

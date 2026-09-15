@@ -190,7 +190,7 @@ export function PaginaDeNorma({ norma }: { norma: NormaComPagina }) {
           <caption className={legendaDeTabela}>
             Tabela {numeroDaFicha}. Ficha técnica da {norma.codigo}
           </caption>
-          <tbody className="border-t border-doc-ink">
+          <tbody data-surgir className="border-t border-doc-ink">
             {[
               ['Carga horária', `carga horária da ${norma.codigo}`],
               [
@@ -223,7 +223,10 @@ export function PaginaDeNorma({ norma }: { norma: NormaComPagina }) {
         tom="folha"
       >
         <h2 className={texto.tituloSecao}>Outras normas</h2>
-        <ul className="mt-8 border-t border-doc-ink md:grid md:grid-cols-2 md:gap-x-10">
+        <ul
+          data-surgir
+          className="mt-8 border-t border-doc-ink md:grid md:grid-cols-2 md:gap-x-10"
+        >
           {outras.map((item) => (
             <li key={item.slug} className="border-b border-doc-rule-strong">
               <Link
@@ -236,7 +239,10 @@ export function PaginaDeNorma({ norma }: { norma: NormaComPagina }) {
                 <span className="min-w-0 flex-1 font-semibold decoration-sl-gold decoration-2 underline-offset-4 group-hover:underline">
                   {item.nome}
                 </span>
-                <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+                <ArrowRight
+                  className="size-4 shrink-0 transition-transform duration-200 group-hover:translate-x-1"
+                  aria-hidden="true"
+                />
               </Link>
             </li>
           ))}
@@ -286,10 +292,10 @@ function TabelaDePrograma({
       <table className="w-full border-collapse text-left">
         <caption className={legendaDeTabela}>{programa.legenda}</caption>
         <thead>
-          <tr className="border-y border-doc-ink bg-doc-rule">
+          <tr className="border-t border-b border-t-doc-ink border-b-doc-rule-strong text-doc-ink-muted">
             <th
               scope="col"
-              className="w-10 py-3 pl-2 font-doc-mono text-xs font-medium"
+              className="w-10 py-3 font-doc-mono text-xs font-medium"
             >
               Nº
             </th>
@@ -301,16 +307,16 @@ function TabelaDePrograma({
             </th>
             <th
               scope="col"
-              className="w-20 py-3 pr-2 text-center font-doc-mono text-xs font-medium"
+              className="w-16 py-3 text-right font-doc-mono text-xs font-medium"
             >
               Prática
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody data-surgir>
           {programa.modulos.map((linha, indice) => (
             <tr key={linha.modulo} className="border-b border-doc-rule-strong">
-              <td className="py-3 pl-2 align-top font-doc-mono text-xs tabular-nums text-doc-ink-muted">
+              <td className="py-3 align-top font-doc-mono text-xs tabular-nums text-doc-ink-muted">
                 {String(indice + 1).padStart(2, '0')}
               </td>
               <th
@@ -319,7 +325,7 @@ function TabelaDePrograma({
               >
                 {linha.modulo}
               </th>
-              <td className="py-3 pr-2 text-center align-top">
+              <td className="py-3 pr-3 text-right align-top">
                 {linha.pratica ? (
                   <>
                     <span

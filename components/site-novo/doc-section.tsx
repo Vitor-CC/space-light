@@ -51,7 +51,10 @@ export function DocSection({
               </span>
             </p>
           </div>
-          <div className="min-w-0 pt-6 pb-section lg:border-l lg:border-doc-rule-strong lg:pt-12 lg:pl-12">
+          <div
+            data-surgir
+            className="min-w-0 pt-6 pb-section lg:border-l lg:border-doc-rule-strong lg:pt-12 lg:pl-12"
+          >
             {children}
           </div>
         </div>

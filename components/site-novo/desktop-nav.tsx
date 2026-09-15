@@ -82,7 +82,7 @@ export function DesktopNav() {
           side="bottom"
           align="start"
           sideOffset={17}
-          className="z-50 h-(--positioner-height) w-(--positioner-width) max-w-(--available-width)"
+          className="doc-ui z-50 h-(--positioner-height) w-(--positioner-width) max-w-(--available-width)"
         >
           <NavigationMenu.Popup className="relative h-(--popup-height) w-(--popup-width) border border-t-0 border-doc-rule-strong bg-doc-sheet text-doc-ink outline-none">
             <NavigationMenu.Viewport className="relative size-full overflow-hidden" />

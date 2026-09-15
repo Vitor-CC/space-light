@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function SiteNovoLayout({ children }: LayoutProps<'/v2'>) {
   return (
-    <div className="flex min-h-dvh flex-col bg-doc-paper text-doc-ink">
+    <div className="doc-ui flex min-h-dvh flex-col bg-doc-paper text-doc-ink">
       <a
         href="#conteudo"
         className="doc-focus sr-only bg-sl-gold px-4 py-3 text-sm font-semibold text-sl-black focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50"

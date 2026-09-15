@@ -51,7 +51,7 @@
 /*
  * SITE NOVO — "documento técnico" (em /v2 enquanto convive com o site atual)
  *
- * Tudo deste comentário até o fim do bloco `doc-focus` é ACRÉSCIMO. Este
+ * Tudo deste comentário até o fim do bloco `.doc-ui` é ACRÉSCIMO. Este
  * arquivo é compartilhado com os portais: token existente não se altera nem se
  * remove.
  *
@@ -205,6 +205,27 @@
     outline: 2px solid var(--doc-focus);
     outline-offset: 3px;
   }
+}
+
+/* Kit de `components/ui` dentro do site novo. Os mesmos arquivos servem os
+   portais, então o site não os edita: veste por escopo, apontando os
+   semânticos do shadcn para os `--doc-*` só dentro de `.doc-ui` (layout do
+   site, painel do menu e popup da navegação, que são portais no <body>).
+   `.doc-ui .dark` vence o `.dark` e mantém o mapeamento nos blocos escuros. */
+.doc-ui,
+.doc-ui .dark {
+  --background: var(--doc-paper);
+  --foreground: var(--doc-ink);
+  --card: var(--doc-sheet);
+  --card-foreground: var(--doc-ink);
+  --popover: var(--doc-sheet);
+  --popover-foreground: var(--doc-ink);
+  --muted-foreground: var(--doc-ink-muted);
+  --border: var(--doc-rule-strong);
+  /* Borda de campo precisa de 3:1 sobre a folha: o cinza #666 dá ≈5,7:1. */
+  --input: var(--doc-ink-muted);
+  --ring: var(--doc-focus);
+  --destructive: var(--doc-error);
 }
 
 @layer base {
