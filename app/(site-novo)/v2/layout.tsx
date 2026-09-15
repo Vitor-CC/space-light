@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { SiteFooter } from '@/components/site-novo/site-footer';
 import { SiteHeader } from '@/components/site-novo/site-header';
+import { Surgir } from '@/components/site-novo/surgir';
 
 export const metadata: Metadata = {
   title: {
@@ -27,6 +28,7 @@ export default function SiteNovoLayout({ children }: LayoutProps<'/v2'>) {
         {children}
       </main>
       <SiteFooter />
+      <Surgir />
     </div>
   );
 }
