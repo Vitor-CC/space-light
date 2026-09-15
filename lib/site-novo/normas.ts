@@ -1,5 +1,6 @@
 import { NR23_PROGRAM } from '@/lib/nr23-program';
 import { imagemMarca } from '@/lib/site-novo/imagens';
+import { TREINAMENTO_OUTRO } from '@/lib/site-novo/proposta';
 
 /**
  * As sete normas do site novo. Menu, rodapé e grade da home leem daqui, e a
@@ -675,3 +676,12 @@ export function normaComPagina(slug: string): NormaComPagina | undefined {
   const norma = NORMAS.find((item) => item.slug === slug);
   return norma?.pagina ? { ...norma, pagina: norma.pagina } : undefined;
 }
+
+/** Opções de treinamento do formulário de proposta: as sete normas e "Outro". */
+export const OPCOES_DE_TREINAMENTO: readonly {
+  valor: string;
+  rotulo: string;
+}[] = [
+  ...NORMAS.map((norma) => ({ valor: norma.slug, rotulo: norma.codigo })),
+  { valor: TREINAMENTO_OUTRO, rotulo: 'Outro' },
+];

@@ -5,12 +5,14 @@ import { botao, linhaDeBotoes } from '@/components/site-novo/botao';
 import { Confirmar } from '@/components/site-novo/confirmar';
 import { DocSection } from '@/components/site-novo/doc-section';
 import { Figura } from '@/components/site-novo/figura';
+import { FormularioProposta } from '@/components/site-novo/formulario-proposta';
 import { ListaDeItens } from '@/components/site-novo/lista-de-itens';
 import { ListaSimples } from '@/components/site-novo/lista-simples';
 import { grade, texto } from '@/components/site-novo/texto';
 import { WHATSAPP } from '@/lib/site-novo/contato';
 import {
   NORMAS,
+  OPCOES_DE_TREINAMENTO,
   type NormaComPagina,
   type PaginaDaNorma,
 } from '@/lib/site-novo/normas';
@@ -241,33 +243,32 @@ export function PaginaDeNorma({ norma }: { norma: NormaComPagina }) {
         </ul>
       </DocSection>
 
-      <DocSection id="proposta" numero="07" rotulo="Proposta" tom="preto">
-        <div className={cn(grade.duasComTitulo, 'xl:items-end')}>
-          <h2 className={texto.tituloSecao}>
-            Conte o treinamento que a sua empresa precisa.
-          </h2>
-          <div>
-            <p className={texto.apoio}>
-              Preencha o formulário com o essencial e a Space Light retorna com
-              a proposta e o caminho recomendado.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href={rotas.proposta(norma.slug)}
-                className={botao({ tamanho: 'lg' })}
-              >
-                Solicitar proposta
-              </Link>
-              <a
-                href={WHATSAPP.link}
-                target="_blank"
-                rel="noreferrer"
-                className={botao({ variante: 'contorno', tamanho: 'lg' })}
-              >
-                Falar no WhatsApp
-              </a>
-            </div>
-          </div>
+      <DocSection id="proposta" numero="07" rotulo="Proposta" tom="folha">
+        <h2 className={cn(texto.tituloSecao, 'max-w-[22ch]')}>
+          Conte o treinamento que a sua empresa precisa.
+        </h2>
+        <p className={cn(texto.apoio, 'mt-6')}>
+          Preencha o formulário com o essencial e a Space Light retorna com a
+          proposta e o caminho recomendado.
+        </p>
+        <p className={cn(texto.apoio, 'mt-4')}>
+          Quer falar agora?{' '}
+          <a
+            href={WHATSAPP.link}
+            target="_blank"
+            rel="noreferrer"
+            className={texto.link}
+          >
+            Falar no WhatsApp
+          </a>
+        </p>
+        {/* A norma da página já vem marcada no formulário. */}
+        <div className="mt-10 max-w-4xl">
+          <FormularioProposta
+            treinamentos={OPCOES_DE_TREINAMENTO}
+            preSelecionados={[norma.slug]}
+            origem={rotas.norma(norma.slug)}
+          />
         </div>
       </DocSection>
     </>
