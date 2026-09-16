@@ -6,13 +6,22 @@ import { texto } from '@/components/site-novo/texto';
 import { WHATSAPP } from '@/lib/site-novo/contato';
 import { OPCOES_DE_TREINAMENTO } from '@/lib/site-novo/normas';
 import { rotas } from '@/lib/site-novo/rotas';
+import {
+  NOME_DA_EMPRESA,
+  imagemOg,
+  metadadosDaPagina,
+} from '@/lib/site-novo/seo';
 import { cn } from '@/lib/utils';
 
-export const metadata: Metadata = {
-  title: 'Solicitar proposta',
-  description:
+export const metadata: Metadata = metadadosDaPagina({
+  titulo: `Solicitar proposta de treinamento | ${NOME_DA_EMPRESA}`,
+  descricao:
     'Preencha o formulário com o essencial e a Space Light retorna com a proposta e o caminho recomendado.',
-};
+  // A consulta (?treinamento=, utm_*) fica fora do canônico.
+  caminho: rotas.contato,
+  imagem: imagemOg('home'),
+  alt: 'Participante usa um extintor portátil num fogo controlado, observada por um instrutor e por colegas de colete refletivo.',
+});
 
 export default async function PaginaDeContato({
   searchParams,

@@ -1,9 +1,11 @@
 import { ArrowDown, ArrowRight } from 'lucide-react';
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 
 import { botao, linhaDeBotoes } from '@/components/site-novo/botao';
 import { Confirmar } from '@/components/site-novo/confirmar';
+import { DadosEstruturados } from '@/components/site-novo/dados-estruturados';
 import { DocSection } from '@/components/site-novo/doc-section';
 import { Figura } from '@/components/site-novo/figura';
 import { ListaDeItens } from '@/components/site-novo/lista-de-itens';
@@ -15,6 +17,12 @@ import { imagemMarca } from '@/lib/site-novo/imagens';
 import { ETAPAS } from '@/lib/site-novo/metodo';
 import { NORMAS } from '@/lib/site-novo/normas';
 import { rotas } from '@/lib/site-novo/rotas';
+import {
+  NOME_DA_EMPRESA,
+  dadosDaOrganizacao,
+  imagemOg,
+  metadadosDaPagina,
+} from '@/lib/site-novo/seo';
 import { cn } from '@/lib/utils';
 
 /*
@@ -107,9 +115,22 @@ const DIFERENCIAIS = [
   },
 ];
 
+const ALT_DA_ABERTURA =
+  'Participante usa um extintor portátil num fogo controlado, observada por um instrutor e por colegas de colete refletivo.';
+
+export const metadata: Metadata = metadadosDaPagina({
+  titulo: `${NOME_DA_EMPRESA} | Treinamentos em Normas Regulamentadoras`,
+  descricao:
+    'Treinamentos de Normas Regulamentadoras com teoria aplicada e prática supervisionada, in company ou em centro de treinamento.',
+  caminho: rotas.inicio,
+  imagem: imagemOg('home'),
+  alt: ALT_DA_ABERTURA,
+});
+
 export default function HomeSiteNovo() {
   return (
     <>
+      <DadosEstruturados dados={dadosDaOrganizacao()} />
       <DocSection numero="01" rotulo="Abertura" tom="preto">
         <p className={texto.eyebrow}>Engenharia de segurança do trabalho</p>
         <h1 className={cn(texto.tituloPagina, 'mt-5')}>
@@ -144,7 +165,7 @@ export default function HomeSiteNovo() {
           </div>
           <Figura
             src={imagemMarca('heroes/space-light-hero-01')}
-            alt="Participante usa um extintor portátil num fogo controlado, observada por um instrutor e por colegas de colete refletivo."
+            alt={ALT_DA_ABERTURA}
             legenda="Exercício com extintor portátil em fogo controlado, sob supervisão."
             sizes="(min-width: 1440px) 560px, (min-width: 1024px) 40vw, 100vw"
             posicao="68% 50%"
