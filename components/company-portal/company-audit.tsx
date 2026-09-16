@@ -1,11 +1,17 @@
 'use client';
 
-import { Activity, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
-import { EmptyState } from '@/components/company-portal/company-ui';
+import {
+  Carregando,
+  ErroAoCarregar,
+  SemPermissao,
+  Vazio,
+  mono,
+} from '@/components/portal/kit';
 import type { AuditEntry } from '@/lib/company-types';
-import { readAuditLogs } from '@/lib/mock-company-database';
+import { RequestError, readAuditLogs } from '@/lib/mock-company-database';
+import { cn } from '@/lib/utils';
 
 const actionLabels: Record<string, string> = {
   'client.access_invited': 'cadastrou um cliente',
@@ -32,10 +38,15 @@ const actionLabels: Record<string, string> = {
   'employee.activated': 'reativou um funcionário',
   'employee.deactivated': 'desativou um funcionário',
   'user.password_reset': 'redefiniu a senha de um acesso',
-  'user.password_self_reset': 'criou uma senha nova pelo link enviado por e-mail',
+  'user.password_self_reset':
+    'criou uma senha nova pelo link enviado por e-mail',
   'file.uploaded': 'enviou um arquivo de treinamento',
   'certificates.issued': 'emitiu os certificados de um treinamento',
   'training.completed': 'encerrou um treinamento',
+  'training.completed_by_company': 'encerrou uma turma pela gestão',
+  'training.day_completed': 'encerrou um dia de treinamento',
+  'training.renamed': 'mudou a identificação de uma turma',
+  'training.session_updated': 'alterou data, horário ou instrutor de um dia',
   'instructor.document_uploaded': 'enviou um documento obrigatório',
   'instructor.document_approved': 'aprovou um documento de instrutor',
   'instructor.document_rejected': 'recusou um documento de instrutor',
@@ -52,43 +63,96 @@ function describe(action: string) {
 
 function formatDateTime(value: string) {
   if (!value) return '';
-  const normalized = value.includes('T') ? value : `${value.replace(' ', 'T')}Z`;
+  const normalized = value.includes('T')
+    ? value
+    : `${value.replace(' ', 'T')}Z`;
   const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'UTC',
   }).format(date);
 }
 
-export function CompanyAudit({ notify }: { notify: (message: string) => void }) {
-  const [entries, setEntries] = useState<AuditEntry[] | null>(null);
+type Carga =
+  | { estado: 'carregando' }
+  | { estado: 'ok'; lista: AuditEntry[] }
+  | { estado: 'erro'; mensagem: string }
+  | { estado: 'restrito' };
+
+function resultadoDoErro(error: unknown): Carga {
+  if (error instanceof RequestError && error.status === 403)
+    return { estado: 'restrito' };
+  return {
+    estado: 'erro',
+    mensagem:
+      error instanceof Error
+        ? error.message
+        : 'Não foi possível carregar a auditoria.',
+  };
+}
+
+export function CompanyAudit() {
+  const [carga, setCarga] = useState<Carga>({ estado: 'carregando' });
 
   const load = useCallback(async () => {
+    setCarga({ estado: 'carregando' });
     try {
-      setEntries(await readAuditLogs());
+      setCarga({ estado: 'ok', lista: await readAuditLogs() });
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Erro ao carregar a atividade.');
-      setEntries([]);
+      setCarga(resultadoDoErro(error));
     }
-  }, [notify]);
+  }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let ativo = true;
+    readAuditLogs()
+      .then((lista) => {
+        if (ativo) setCarga({ estado: 'ok', lista });
+      })
+      .catch((error: unknown) => {
+        if (ativo) setCarga(resultadoDoErro(error));
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
 
-  if (entries === null) {
-    return <div className="flex min-h-56 items-center justify-center border border-dashed border-black/20 bg-white"><Loader2 className="size-6 animate-spin text-[#8a6107]" /></div>;
-  }
+  if (carga.estado === 'carregando') return <Carregando linhas={6} />;
+  if (carga.estado === 'restrito')
+    return <SemPermissao texto="A auditoria é vista só pelo dono da conta." />;
+  if (carga.estado === 'erro')
+    return (
+      <ErroAoCarregar mensagem={carga.mensagem} aoTentar={() => void load()} />
+    );
+  if (carga.lista.length === 0)
+    return <Vazio titulo="Nenhuma ação registrada ainda" />;
 
-  if (entries.length === 0) {
-    return <EmptyState icon={Activity} title="Nenhuma atividade ainda" text="As ações da equipe aparecerão aqui conforme forem feitas." />;
-  }
-
-  return <ol className="space-y-3">{entries.map((entry) => (
-    <li key={entry.id} className="flex gap-4 border border-black/10 bg-white p-4">
-      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center bg-black text-[#f2ad19]"><Activity className="size-4" /></span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm leading-relaxed"><strong className="font-extrabold">{entry.actor_name ?? 'Sistema'}</strong> <span className="text-[#555]">{describe(entry.action)}</span></p>
-        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#999]">{formatDateTime(entry.created_at)}{entry.actor_email ? ` · ${entry.actor_email}` : ''}</p>
-      </div>
-    </li>
-  ))}</ol>;
+  return (
+    <ol className="border-t border-doc-ink">
+      {carga.lista.map((entry) => (
+        <li
+          key={entry.id}
+          className="grid gap-1 border-b border-doc-rule-strong py-3 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-4"
+        >
+          <span className={cn(mono, 'text-xs text-doc-ink-muted sm:pt-0.5')}>
+            {formatDateTime(entry.created_at)}
+          </span>
+          <p className="text-sm">
+            <strong>{entry.actor_name ?? 'Sistema'}</strong>{' '}
+            {describe(entry.action)}
+            {entry.actor_email ? (
+              <span className="block text-xs text-doc-ink-muted">
+                {entry.actor_email}
+              </span>
+            ) : null}
+          </p>
+        </li>
+      ))}
+    </ol>
+  );
 }

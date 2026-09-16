@@ -1,46 +1,114 @@
 'use client';
 
-import { BadgeCheck, Check, KeyRound, Loader2, Plus, ShieldCheck, Trash2, UserRound, X } from 'lucide-react';
+import { Check, KeyRound, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 
-import { AccessCredentials, EmptyState, fieldClass, formatDate } from '@/components/company-portal/company-ui';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+  AccessCredentials,
+  formatDate,
+  type Notify,
+} from '@/components/company-portal/company-ui';
+import {
+  Carregando,
+  Confirmar,
+  ErroAoCarregar,
+  SemPermissao,
+  Vazio,
+  botao,
+  botaoPerigo,
+  campo,
+  mono,
+  rotulo,
+} from '@/components/portal/kit';
 import type { CompanyEmployee } from '@/lib/company-types';
-import { createEmployee, deleteEmployee, readEmployees, resetUserPassword, setEmployeeActive } from '@/lib/mock-company-database';
+import {
+  RequestError,
+  createEmployee,
+  deleteEmployee,
+  readEmployees,
+  resetUserPassword,
+  setEmployeeActive,
+} from '@/lib/mock-company-database';
+import { cn } from '@/lib/utils';
 
-export function CompanyTeam({ notify }: { notify: (message: string) => void }) {
-  const [employees, setEmployees] = useState<CompanyEmployee[] | null>(null);
-  const [showForm, setShowForm] = useState(false);
+type Carga =
+  | { estado: 'carregando' }
+  | { estado: 'ok'; lista: CompanyEmployee[] }
+  | { estado: 'erro'; mensagem: string }
+  | { estado: 'restrito'; mensagem: string };
+
+export function CompanyTeam({ notify }: { notify: Notify }) {
+  const [carga, setCarga] = useState<Carga>({ estado: 'carregando' });
+  const [criando, setCriando] = useState(false);
   const [draft, setDraft] = useState({ name: '', email: '' });
-  const [createdAccess, setCreatedAccess] = useState<{ email: string; temporaryPassword: string } | null>(null);
-  const [resetAccess, setResetAccess] = useState<{ name: string; email: string; temporaryPassword: string; active: boolean } | null>(null);
+  const [createdAccess, setCreatedAccess] = useState<{
+    email: string;
+    temporaryPassword: string;
+  } | null>(null);
+  const [resetAccess, setResetAccess] = useState<{
+    name: string;
+    email: string;
+    temporaryPassword: string;
+  } | null>(null);
+  const [confirmando, setConfirmando] = useState<{
+    tipo: 'senha' | 'excluir';
+    employee: CompanyEmployee;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setEmployees(await readEmployees());
+      setCarga({ estado: 'ok', lista: await readEmployees() });
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Erro ao carregar funcionários.');
-      setEmployees([]);
+      const mensagem =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível carregar a equipe.';
+      setCarga(
+        error instanceof RequestError && error.status === 403
+          ? { estado: 'restrito', mensagem }
+          : { estado: 'erro', mensagem },
+      );
     }
-  }, [notify]);
+  }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let ativo = true;
+    readEmployees()
+      .then((lista) => {
+        if (ativo) setCarga({ estado: 'ok', lista });
+      })
+      .catch((error: unknown) => {
+        if (!ativo) return;
+        const mensagem =
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível carregar a equipe.';
+        setCarga(
+          error instanceof RequestError && error.status === 403
+            ? { estado: 'restrito', mensagem }
+            : { estado: 'erro', mensagem },
+        );
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
 
   async function save(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     try {
-      const access = await createEmployee(draft);
-      setCreatedAccess(access);
+      setCreatedAccess(await createEmployee(draft));
       setDraft({ name: '', email: '' });
-      setShowForm(false);
+      setCriando(false);
       notify('Funcionário criado e acesso temporário gerado.');
       await load();
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Erro ao criar funcionário.');
+      notify(
+        error instanceof Error ? error.message : 'Erro ao criar funcionário.',
+      );
     } finally {
       setBusy(false);
     }
@@ -49,53 +117,220 @@ export function CompanyTeam({ notify }: { notify: (message: string) => void }) {
   async function toggle(employee: CompanyEmployee) {
     try {
       await setEmployeeActive(employee.id, employee.active !== 1);
-      notify(employee.active === 1 ? 'Acesso desativado.' : 'Acesso reativado.');
+      notify(
+        employee.active === 1 ? 'Acesso desativado.' : 'Acesso reativado.',
+      );
       await load();
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Erro ao atualizar o acesso.');
+      notify(
+        error instanceof Error ? error.message : 'Erro ao atualizar o acesso.',
+      );
     }
   }
 
-  async function remove(employee: CompanyEmployee) {
-    if (!window.confirm(`Excluir definitivamente a conta de "${employee.name}"? Esta ação não pode ser desfeita.`)) return;
+  async function confirmar() {
+    if (!confirmando) return;
+    const { tipo, employee } = confirmando;
+    setConfirmando(null);
     try {
-      await deleteEmployee(employee.id);
-      notify('Funcionário excluído.');
+      if (tipo === 'excluir') {
+        await deleteEmployee(employee.id);
+        notify('Funcionário excluído.');
+      } else {
+        setResetAccess(await resetUserPassword({ userId: employee.id }));
+        notify('Senha temporária gerada.');
+      }
       await load();
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Erro ao excluir o funcionário.');
+      notify(
+        error instanceof Error
+          ? error.message
+          : tipo === 'excluir'
+            ? 'Erro ao excluir o funcionário.'
+            : 'Erro ao redefinir a senha.',
+      );
     }
   }
 
-  async function resetPassword(employee: CompanyEmployee) {
-    if (!window.confirm(`Gerar uma nova senha temporária para "${employee.name}"? A senha atual deixa de funcionar imediatamente.`)) return;
-    try {
-      setResetAccess(await resetUserPassword({ userId: employee.id }));
-      notify('Senha temporária gerada.');
-      await load();
-    } catch (error) {
-      notify(error instanceof Error ? error.message : 'Erro ao redefinir a senha.');
-    }
-  }
+  if (carga.estado === 'carregando') return <Carregando />;
+  if (carga.estado === 'restrito')
+    return <SemPermissao texto="A equipe é gerida só pelo dono da conta." />;
+  if (carga.estado === 'erro')
+    return (
+      <ErroAoCarregar mensagem={carga.mensagem} aoTentar={() => void load()} />
+    );
 
-  return <div className="space-y-6">
-    <div className="flex flex-col gap-3 border-l-4 border-[#f2ad19] bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-[#8a6107]" /><p className="text-xs leading-relaxed text-[#555]">Cada funcionário entra com o <strong>próprio login</strong>. Toda ação fica registrada com o nome de quem fez, na aba <strong>Atividade</strong>.</p></div>
-      <Button type="button" onClick={() => setShowForm((value) => !value)} className="h-12 shrink-0 rounded-none bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-black hover:bg-[#ff9900]">{showForm ? <X className="size-4" /> : <Plus className="size-4" />}{showForm ? 'Fechar' : 'Novo funcionário'}</Button>
+  return (
+    <div className="space-y-6">
+      {createdAccess ? (
+        <AccessCredentials
+          eyebrow="Envie ao funcionário"
+          note="A senha temporária aparece só agora. O funcionário troca no primeiro acesso."
+          email={createdAccess.email}
+          password={createdAccess.temporaryPassword}
+          onDismiss={() => setCreatedAccess(null)}
+        />
+      ) : null}
+      {resetAccess ? (
+        <AccessCredentials
+          eyebrow={`Nova senha de ${resetAccess.name}`}
+          note="Aparece só agora. A senha antiga já não funciona."
+          email={resetAccess.email}
+          password={resetAccess.temporaryPassword}
+          onDismiss={() => setResetAccess(null)}
+        />
+      ) : null}
+      {confirmando ? (
+        <Confirmar
+          perigo={confirmando.tipo === 'excluir'}
+          titulo={
+            confirmando.tipo === 'excluir'
+              ? `Excluir a conta de ${confirmando.employee.name}?`
+              : `Gerar senha temporária para ${confirmando.employee.name}?`
+          }
+          texto={
+            confirmando.tipo === 'excluir'
+              ? 'Não dá para desfazer.'
+              : 'A senha atual deixa de funcionar na hora.'
+          }
+          confirmar={confirmando.tipo === 'excluir' ? 'Excluir' : 'Gerar senha'}
+          aoConfirmar={() => void confirmar()}
+          aoCancelar={() => setConfirmando(null)}
+        />
+      ) : null}
+
+      {criando ? (
+        <form
+          onSubmit={save}
+          className="grid max-w-3xl gap-5 border border-doc-rule-strong bg-doc-sheet p-4 sm:grid-cols-2"
+        >
+          <label>
+            <span className={rotulo}>Nome completo</span>
+            <input
+              required
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              className={campo}
+            />
+          </label>
+          <label>
+            <span className={rotulo}>E-mail de acesso</span>
+            <input
+              required
+              type="email"
+              value={draft.email}
+              onChange={(e) => setDraft({ ...draft, email: e.target.value })}
+              className={campo}
+            />
+          </label>
+          <div className="flex flex-wrap gap-2 sm:col-span-2">
+            <button
+              disabled={busy}
+              type="submit"
+              className={botao({ className: 'disabled:opacity-60' })}
+            >
+              {busy ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Check className="size-4" aria-hidden="true" />
+              )}
+              Criar acesso
+            </button>
+            <button
+              type="button"
+              onClick={() => setCriando(false)}
+              className={botao({ variante: 'contorno' })}
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setCriando(true)}
+          className={botao()}
+        >
+          <Plus className="size-4" aria-hidden="true" />
+          Novo funcionário
+        </button>
+      )}
+
+      {carga.lista.length === 0 ? (
+        <Vazio titulo="Nenhum funcionário ainda" />
+      ) : (
+        <ul className="border-t border-doc-ink">
+          {carga.lista.map((employee) => {
+            const owner = employee.is_owner === 1;
+            const active = employee.active === 1;
+            return (
+              <li
+                key={employee.id}
+                className="flex flex-col gap-3 border-b border-doc-rule-strong py-4 lg:flex-row lg:items-center lg:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold">
+                    {employee.name}{' '}
+                    <span
+                      className={cn(
+                        mono,
+                        'ml-1 text-xs',
+                        !owner && !active ? 'text-doc-error' : 'text-doc-mark',
+                      )}
+                    >
+                      {owner ? 'Dono' : active ? 'Ativo' : 'Desativado'}
+                      {employee.must_reset === 1 && active
+                        ? ' · 1º acesso pendente'
+                        : ''}
+                    </span>
+                  </p>
+                  <p className="text-sm break-all text-doc-ink-muted">
+                    {employee.email}
+                  </p>
+                  <p className={cn(mono, 'text-xs text-doc-ink-muted')}>
+                    Último acesso{' '}
+                    {employee.last_login_at
+                      ? formatDate(employee.last_login_at)
+                      : 'nunca'}{' '}
+                    · criado em {formatDate(employee.created_at)}
+                  </p>
+                </div>
+                {owner ? null : (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void toggle(employee)}
+                      className={active ? botaoPerigo : botao()}
+                    >
+                      {active ? 'Desativar acesso' : 'Reativar acesso'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setConfirmando({ tipo: 'senha', employee })
+                      }
+                      className={botao({ variante: 'contorno' })}
+                    >
+                      <KeyRound className="size-4" aria-hidden="true" />
+                      Redefinir senha
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setConfirmando({ tipo: 'excluir', employee })
+                      }
+                      className={botaoPerigo}
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                      Excluir
+                    </button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
-
-    {createdAccess ? <AccessCredentials eyebrow="Envie ao funcionário" note="Esta senha temporária aparece somente agora. O funcionário deverá trocá-la no primeiro acesso." email={createdAccess.email} password={createdAccess.temporaryPassword} onDismiss={() => setCreatedAccess(null)} /> : null}
-
-    {resetAccess ? <AccessCredentials eyebrow={`Nova senha de ${resetAccess.name}`} note="Anote agora: a senha aparece somente desta vez. A senha antiga já não funciona e, no próximo acesso, o funcionário terá de criar uma nova." email={resetAccess.email} password={resetAccess.temporaryPassword} onDismiss={() => setResetAccess(null)} /> : null}
-
-    {showForm ? <form onSubmit={save} className="border border-black/10 bg-white p-6 md:p-7"><span className="eyebrow text-[#8a6107]">Novo acesso interno</span><h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Funcionário da Space</h2><div className="mt-6 grid gap-4 md:grid-cols-2"><Input required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Nome completo" className={fieldClass} /><Input required type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="E-mail de acesso" className={fieldClass} /></div><Button disabled={busy} type="submit" className="mt-5 h-12 rounded-none bg-black px-5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white hover:bg-[#f2ad19] hover:text-black">{busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Criar acesso</Button></form> : null}
-
-    {employees === null ? <div className="flex min-h-56 items-center justify-center border border-dashed border-black/20 bg-white"><Loader2 className="size-6 animate-spin text-[#8a6107]" /></div> : <div className="grid gap-4 xl:grid-cols-2">{employees.map((employee) => {
-      const owner = employee.is_owner === 1;
-      const active = employee.active === 1;
-      return <article key={employee.id} className="border border-black/10 bg-white p-6"><div className="flex items-start gap-4"><span className="flex size-12 shrink-0 items-center justify-center bg-black text-[#f2ad19]">{owner ? <BadgeCheck className="size-5" /> : <UserRound className="size-5" />}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2">{owner ? <span className="bg-[#f2ad19] px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.12em] text-black">Dono</span> : <span className={`px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.12em] ${active ? 'bg-[#daf2df] text-[#17642d]' : 'bg-[#f3d4d4] text-[#8f1717]'}`}>{active ? 'Ativo' : 'Desativado'}</span>}{employee.must_reset === 1 && active ? <span className="bg-[#fff0d2] px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]">1º acesso pendente</span> : null}</div><h2 className="mt-3 truncate text-xl font-extrabold uppercase tracking-[0.04em]">{employee.name}</h2><p className="mt-1 break-all text-xs text-[#777]">{employee.email}</p></div></div><dl className="mt-5 grid gap-2 text-xs"><div className="flex justify-between gap-4"><dt className="text-[#777]">Último acesso</dt><dd className="text-right font-bold">{employee.last_login_at ? formatDate(employee.last_login_at) : 'Nunca'}</dd></div><div className="flex justify-between gap-4"><dt className="text-[#777]">Criado em</dt><dd className="text-right font-bold">{formatDate(employee.created_at)}</dd></div></dl>{owner ? null : <div className="mt-5 flex flex-wrap gap-2"><Button type="button" onClick={() => void toggle(employee)} className={`h-11 rounded-none px-4 text-[9px] font-extrabold uppercase tracking-[0.12em] ${active ? 'bg-[#f3d4d4] text-[#8f1717] hover:bg-[#e9b9b9]' : 'bg-[#f2ad19] text-black hover:bg-[#ff9900]'}`}>{active ? 'Desativar acesso' : 'Reativar acesso'}</Button><button type="button" onClick={() => void resetPassword(employee)} className="inline-flex h-11 items-center gap-2 border border-black/15 px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#555] hover:border-black hover:bg-black hover:text-white"><KeyRound className="size-3.5" />Redefinir senha</button><button type="button" onClick={() => void remove(employee)} className="inline-flex h-11 items-center gap-2 border border-[#b62525]/40 px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#b62525] hover:bg-[#b62525] hover:text-white"><Trash2 className="size-3.5" />Excluir</button></div>}</article>;
-    })}</div>}
-
-    {employees && employees.length === 0 ? <EmptyState icon={UserRound} title="Nenhum funcionário ainda" text="Crie o primeiro acesso da equipe Space Light." /> : null}
-  </div>;
+  );
 }

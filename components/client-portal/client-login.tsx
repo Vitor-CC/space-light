@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { botao, botaoTexto, campo, rotulo } from '@/components/portal/kit';
+import { botao, botaoTexto, campo, rotulo } from '@/components/portal/estilos';
 
 export type LoginPortal = 'client' | 'instructor' | 'company';
 

@@ -36,7 +36,7 @@ export function InstructorPortal({
   if (data.instructor.status === 'pending') {
     return (
       <CascaDoPortal
-        area="Área do instrutor"
+        area="Instrutor"
         usuario={data.instructor.name}
         itens={[]}
         ativo="agenda"
@@ -65,7 +65,7 @@ export function InstructorPortal({
 
   return (
     <CascaDoPortal
-      area="Área do instrutor"
+      area="Instrutor"
       usuario={data.instructor.name}
       itens={menu}
       ativo={area}
