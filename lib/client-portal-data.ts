@@ -64,9 +64,20 @@ export type ClientOrganization = {
   phone: string;
 };
 
+/** Participante da turma como a empresa vê: nome, função e presença. Sem CPF/RG. */
+export type ClientParticipant = {
+  id: string;
+  trainingId: string;
+  fullName: string;
+  jobTitle: string;
+  daysPresent: number;
+  daysTotal: number;
+};
+
 export type ClientPortalData = {
   organization: ClientOrganization;
   trainings: ClientTraining[];
+  participants: ClientParticipant[];
   photos: ClientPhoto[];
   documents: ClientDocument[];
   certificates: ClientCertificate[];

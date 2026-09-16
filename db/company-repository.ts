@@ -3212,7 +3212,7 @@ export async function getClientPortalData(
     }>();
   if (!organization) return null;
 
-  const [trainingResult, fileResult, certificateResult] = await Promise.all([
+  const [trainingResult, fileResult, certificateResult, participantResult] = await Promise.all([
     d1
       .prepare(
         `SELECT t.id, t.client_id, t.code, t.nr, t.title, t.internal_label, t.training_date,
@@ -3278,6 +3278,23 @@ export async function getClientPortalData(
         generated_at: string;
         participant_count: number;
       }>(),
+    // Só leitura, sem CPF nem RG: a empresa confere quem participou e a presença.
+    d1
+      .prepare(
+        `SELECT p.id, p.training_id, p.full_name, p.job_title, ${COLUNAS_PRESENCA}
+         FROM participants p
+         JOIN trainings t ON t.id = p.training_id
+         WHERE t.client_id = ?`,
+      )
+      .bind(clientId)
+      .all<{
+        id: string;
+        training_id: string;
+        full_name: string;
+        job_title: string;
+        days_present: number;
+        days_total: number;
+      }>(),
   ]);
 
   const trainings: ClientTraining[] = rows(trainingResult).map((item) => ({
@@ -3322,7 +3339,7 @@ export async function getClientPortalData(
       clientId,
       trainingId: item.training_id,
       title: item.name,
-      category: 'Documento do treinamento',
+      category: item.kind === 'attendance' ? 'Lista de presença assinada' : 'Documento do treinamento',
       format: fileFormat(item.content_type, item.name),
       size: formatSize(item.size),
       updatedAt: formatDate(item.created_at),
@@ -3354,6 +3371,16 @@ export async function getClientPortalData(
       phone: organization.contact_phone,
     },
     trainings,
+    participants: rows(participantResult)
+      .map((item) => ({
+        id: item.id,
+        trainingId: item.training_id,
+        fullName: item.full_name,
+        jobTitle: item.job_title ?? '',
+        daysPresent: Number(item.days_present ?? 0),
+        daysTotal: Number(item.days_total ?? 0),
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR')),
     photos,
     documents,
     certificates,
