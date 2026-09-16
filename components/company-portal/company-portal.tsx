@@ -1,341 +1,67 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Activity, Building2, ChevronRight, FileUp, GraduationCap, LayoutDashboard, LogOut, QrCode, RefreshCw, Users, UserRound } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import {
-  CadastrarCliente,
-  FichaDoCliente,
-  ListaDeClientes,
-} from '@/components/company-portal/company-clients';
 import { CompanyAudit } from '@/components/company-portal/company-audit';
-import {
-  CompanyHoje,
-  type Destino,
-} from '@/components/company-portal/company-hoje';
-import {
-  CadastrarInstrutor,
-  FichaDoInstrutor,
-  ListaDeInstrutores,
-  type DocumentoDeInstrutor,
-} from '@/components/company-portal/company-instructors';
+import { CompanyClients } from '@/components/company-portal/company-clients';
+import { CompanyDashboard } from '@/components/company-portal/company-dashboard';
+import { CompanyFiles } from '@/components/company-portal/company-files';
+import { CompanyInstructors } from '@/components/company-portal/company-instructors';
+import { CompanyParticipants } from '@/components/company-portal/company-participants';
 import { CompanyTeam } from '@/components/company-portal/company-team';
-import { TelaDaTurmaGestao } from '@/components/company-portal/company-turma';
-import {
-  CriarTurma,
-  ListaDeTurmas,
-} from '@/components/company-portal/company-turmas';
-import { CascaDoPortal } from '@/components/portal/casca';
-import { Abas, Cabecalho, useAviso } from '@/components/portal/kit';
+import { CompanyTrainings } from '@/components/company-portal/company-trainings';
+import { SectionHeading } from '@/components/company-portal/company-ui';
+import type { CompanySection } from '@/components/company-portal/company-ui';
 import type { CompanyDashboardData } from '@/lib/company-types';
-import {
-  readInstructorDocuments,
-  readMockCompanyDatabase,
-} from '@/lib/mock-company-database';
+import { readMockCompanyDatabase } from '@/lib/mock-company-database';
 
-type Area = 'hoje' | 'turmas' | 'cadastros' | 'configuracao';
+const baseNavigation = [
+  { id: 'dashboard' as const, label: 'Visão geral', shortLabel: 'Visão', icon: LayoutDashboard },
+  { id: 'clients' as const, label: 'Clientes', shortLabel: 'Clientes', icon: Building2 },
+  { id: 'instructors' as const, label: 'Instrutores', shortLabel: 'Instrutores', icon: UserRound },
+  { id: 'trainings' as const, label: 'Treinamentos', shortLabel: 'Turmas', icon: GraduationCap },
+  { id: 'files' as const, label: 'Arquivos', shortLabel: 'Arquivos', icon: FileUp },
+  { id: 'participants' as const, label: 'QR e participantes', shortLabel: 'QR', icon: QrCode },
+];
 
-/** Onde a pessoa está dentro de cada área. */
-type Tela =
-  | { area: 'hoje' }
-  | { area: 'turmas'; turmaId?: string; criar?: boolean }
-  | {
-      area: 'cadastros';
-      aba: 'clientes' | 'instrutores';
-      id?: string;
-      criar?: boolean;
-    }
-  | { area: 'configuracao'; aba: 'equipe' | 'auditoria' };
+const ownerNavigation = [
+  { id: 'team' as const, label: 'Funcionários', shortLabel: 'Equipe', icon: Users },
+  { id: 'audit' as const, label: 'Atividade', shortLabel: 'Log', icon: Activity },
+];
 
-/**
- * Portal da gestão: quatro áreas (Hoje, Turmas, Cadastros, Configuração) no
- * lugar das oito de antes. Tudo o que pertence a uma turma mora dentro dela.
- */
-export function CompanyPortal({
-  initialData,
-}: {
-  initialData: CompanyDashboardData;
-}) {
-  const [data, setData] = useState<CompanyDashboardData>(initialData);
-  const [tela, setTela] = useState<Tela>({ area: 'hoje' });
-  const [documentos, setDocumentos] = useState<DocumentoDeInstrutor[] | null>(
-    null,
-  );
-  const [aviso, setAviso] = useAviso();
+export function CompanyPortal({ initialData }: { initialData: CompanyDashboardData }) {
+  const [section, setSection] = useState<CompanySection>('dashboard');
+  const [data, setData] = useState<CompanyDashboardData | null>(initialData);
+  const [notice, setNotice] = useState('');
 
-  const reload = useCallback(
-    async () => setData(await readMockCompanyDatabase()),
-    [],
-  );
-  const recarregarDocumentos = useCallback(async () => {
-    try {
-      setDocumentos(await readInstructorDocuments());
-    } catch {
-      setDocumentos([]);
-    }
-  }, []);
+  const reload = useCallback(async () => setData(await readMockCompanyDatabase()), []);
+  useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 6000); return () => window.clearTimeout(timer); }, [notice]);
 
-  useEffect(() => {
-    let ativo = true;
-    readInstructorDocuments()
-      .then((lista) => {
-        if (ativo) setDocumentos(lista);
-      })
-      .catch(() => {
-        if (ativo) setDocumentos([]);
-      });
-    return () => {
-      ativo = false;
-    };
-  }, []);
+  const isOwner = data?.currentUser.isOwner ?? false;
+  const navigation = useMemo(() => (isOwner ? [...baseNavigation, ...ownerNavigation] : baseNavigation), [isOwner]);
 
-  const isOwner = data.currentUser.isOwner;
-  const menu = [
-    { id: 'hoje' as const, rotulo: 'Hoje' },
-    { id: 'turmas' as const, rotulo: 'Turmas' },
-    { id: 'cadastros' as const, rotulo: 'Cadastros' },
-    ...(isOwner
-      ? [{ id: 'configuracao' as const, rotulo: 'Configuração' }]
-      : []),
-  ];
+  const content = useMemo(() => {
+    if (!data) return null;
+    if (section === 'dashboard') return <CompanyDashboard data={data} navigate={setSection} />;
+    if (section === 'clients') return <CompanyClients data={data} reload={reload} notify={setNotice} />;
+    if (section === 'instructors') return <CompanyInstructors data={data} reload={reload} notify={setNotice} />;
+    if (section === 'trainings') return <CompanyTrainings data={data} reload={reload} notify={setNotice} />;
+    if (section === 'files') return <CompanyFiles data={data} reload={reload} notify={setNotice} />;
+    if (section === 'participants') return <CompanyParticipants data={data} reload={reload} notify={setNotice} />;
+    if (section === 'team') return isOwner ? <CompanyTeam notify={setNotice} /> : null;
+    if (section === 'audit') return isOwner ? <CompanyAudit notify={setNotice} /> : null;
+    return null;
+  }, [data, reload, section, isOwner]);
 
-  function navegar(area: Area) {
-    if (area === 'cadastros') setTela({ area, aba: 'clientes' });
-    else if (area === 'configuracao') setTela({ area, aba: 'equipe' });
-    else setTela({ area });
-    window.scrollTo({ top: 0 });
-  }
-
-  function ir(destino: Destino) {
-    if (destino.tipo === 'turma')
-      setTela({ area: 'turmas', turmaId: destino.id });
-    else
-      setTela({
-        area: 'cadastros',
-        aba: destino.tipo === 'cliente' ? 'clientes' : 'instrutores',
-        id: destino.id,
-      });
-    window.scrollTo({ top: 0 });
-  }
-
-  const abrirTurma = (id: string) => ir({ tipo: 'turma', id });
-
-  return (
-    <CascaDoPortal
-      area="Gestão"
-      usuario={data.currentUser.email}
-      itens={menu}
-      ativo={tela.area}
-      aoNavegar={navegar}
-      aoAtualizar={() => {
-        void reload();
-        void recarregarDocumentos();
-      }}
-      aviso={aviso}
-    >
-      {tela.area === 'hoje' ? (
-        <CompanyHoje
-          data={data}
-          documentos={documentos}
-          ir={ir}
-          criarTurma={() => setTela({ area: 'turmas', criar: true })}
-        />
-      ) : null}
-
-      {tela.area === 'turmas' ? (
-        <Turmas
-          data={data}
-          tela={tela}
-          setTela={setTela}
-          reload={reload}
-          notify={setAviso}
-        />
-      ) : null}
-
-      {tela.area === 'cadastros' ? (
-        <Cadastros
-          data={data}
-          tela={tela}
-          setTela={setTela}
-          documentos={documentos}
-          abrirTurma={abrirTurma}
-          reload={reload}
-          recarregarDocumentos={recarregarDocumentos}
-          notify={setAviso}
-        />
-      ) : null}
-
-      {tela.area === 'configuracao' && isOwner ? (
-        <div className="space-y-6">
-          <Cabecalho titulo="Configuração" />
-          <Abas
-            rotuloDaLista="Configuração"
-            ativa={tela.aba}
-            aoMudar={(aba) => setTela({ area: 'configuracao', aba })}
-            abas={[
-              { id: 'equipe', rotulo: 'Equipe' },
-              { id: 'auditoria', rotulo: 'Auditoria' },
-            ]}
-          >
-            {tela.aba === 'equipe' ? (
-              <CompanyTeam notify={setAviso} />
-            ) : (
-              <CompanyAudit />
-            )}
-          </Abas>
-        </div>
-      ) : null}
-    </CascaDoPortal>
-  );
-}
-
-function Turmas({
-  data,
-  tela,
-  setTela,
-  reload,
-  notify,
-}: {
-  data: CompanyDashboardData;
-  tela: Extract<Tela, { area: 'turmas' }>;
-  setTela: (tela: Tela) => void;
-  reload: () => Promise<void>;
-  notify: (texto: string) => void;
-}) {
-  const voltar = () => setTela({ area: 'turmas' });
-  if (tela.criar)
-    return (
-      <CriarTurma
-        data={data}
-        reload={reload}
-        notify={notify}
-        voltar={voltar}
-        aoCriar={(id) => setTela({ area: 'turmas', turmaId: id })}
-      />
-    );
-  const turma = tela.turmaId
-    ? data.trainings.find((item) => item.id === tela.turmaId)
-    : undefined;
-  if (turma)
-    return (
-      <TelaDaTurmaGestao
-        key={turma.id}
-        data={data}
-        training={turma}
-        voltar={voltar}
-        reload={reload}
-        notify={notify}
-        aoExcluir={voltar}
-      />
-    );
-  return (
-    <ListaDeTurmas
-      data={data}
-      abrir={(id) => setTela({ area: 'turmas', turmaId: id })}
-      criar={() => setTela({ area: 'turmas', criar: true })}
-    />
-  );
-}
-
-function Cadastros({
-  data,
-  tela,
-  setTela,
-  documentos,
-  abrirTurma,
-  reload,
-  recarregarDocumentos,
-  notify,
-}: {
-  data: CompanyDashboardData;
-  tela: Extract<Tela, { area: 'cadastros' }>;
-  setTela: (tela: Tela) => void;
-  documentos: DocumentoDeInstrutor[] | null;
-  abrirTurma: (id: string) => void;
-  reload: () => Promise<void>;
-  recarregarDocumentos: () => Promise<void>;
-  notify: (texto: string) => void;
-}) {
-  const voltar = () => setTela({ area: 'cadastros', aba: tela.aba });
-
-  if (tela.aba === 'clientes' && tela.criar)
-    return <CadastrarCliente reload={reload} notify={notify} voltar={voltar} />;
-  if (tela.aba === 'instrutores' && tela.criar)
-    return (
-      <CadastrarInstrutor reload={reload} notify={notify} voltar={voltar} />
-    );
-
-  const cliente =
-    tela.aba === 'clientes' && tela.id
-      ? data.clients.find((item) => item.id === tela.id)
-      : undefined;
-  if (cliente)
-    return (
-      <FichaDoCliente
-        key={cliente.id}
-        data={data}
-        client={cliente}
-        voltar={voltar}
-        abrirTurma={abrirTurma}
-        reload={reload}
-        notify={notify}
-      />
-    );
-  const instrutor =
-    tela.aba === 'instrutores' && tela.id
-      ? data.instructors.find((item) => item.id === tela.id)
-      : undefined;
-  if (instrutor)
-    return (
-      <FichaDoInstrutor
-        key={instrutor.id}
-        data={data}
-        instructor={instrutor}
-        documentos={documentos}
-        voltar={voltar}
-        abrirTurma={abrirTurma}
-        reload={reload}
-        recarregarDocumentos={recarregarDocumentos}
-        notify={notify}
-      />
-    );
-
-  return (
-    <div className="space-y-6">
-      <Cabecalho titulo="Cadastros" />
-      <Abas
-        rotuloDaLista="Cadastros"
-        ativa={tela.aba}
-        aoMudar={(aba) => setTela({ area: 'cadastros', aba })}
-        abas={[
-          { id: 'clientes', rotulo: 'Clientes', contagem: data.clients.length },
-          {
-            id: 'instrutores',
-            rotulo: 'Instrutores',
-            contagem: data.instructors.length,
-          },
-        ]}
-      >
-        {tela.aba === 'clientes' ? (
-          <ListaDeClientes
-            data={data}
-            abrir={(id) => setTela({ area: 'cadastros', aba: 'clientes', id })}
-            cadastrar={() =>
-              setTela({ area: 'cadastros', aba: 'clientes', criar: true })
-            }
-          />
-        ) : (
-          <ListaDeInstrutores
-            data={data}
-            documentos={documentos}
-            abrir={(id) =>
-              setTela({ area: 'cadastros', aba: 'instrutores', id })
-            }
-            cadastrar={() =>
-              setTela({ area: 'cadastros', aba: 'instrutores', criar: true })
-            }
-          />
-        )}
-      </Abas>
+  return <main className="min-h-screen bg-[#efefeb] text-[#0b0b0b]">
+    {notice ? <output className="fixed inset-x-4 top-20 z-[60] max-w-none border-l-4 border-[#f2ad19] bg-black p-4 text-sm text-white shadow-xl sm:inset-x-auto sm:right-4 sm:top-24 sm:max-w-sm">{notice}</output> : null}
+    <header className="sticky top-0 z-50 flex h-[76px] items-center justify-between border-b border-white/10 bg-black px-4 text-white sm:px-7"><div className="flex min-w-0 items-center gap-5"><Link href="/" aria-label="Space Light Engenharia — início" className="shrink-0"><Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={232} height={84} className="h-11 w-auto brightness-0 invert" /></Link><span className="hidden h-8 w-px bg-white/15 sm:block" /><div className="hidden sm:block"><strong className="block text-xs">Gestão Space Light</strong><span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.12em] text-white/40">Área interna protegida</span></div></div><div className="flex gap-2"><button type="button" onClick={() => void reload()} aria-label="Atualizar dados" className="flex size-10 items-center justify-center border border-white/15 text-white/65 hover:border-[#f2ad19] hover:text-white"><RefreshCw className="size-4" /></button><form action="/api/auth/logout" method="post"><button type="submit" aria-label="Sair" className="flex size-10 items-center justify-center border border-white/15 text-white/65 hover:border-[#f2ad19] hover:text-white"><LogOut className="size-4" /></button></form></div></header>
+    <div className="lg:grid lg:grid-cols-[272px_minmax(0,1fr)]">
+      <aside className="hidden min-h-[calc(100vh-76px)] bg-[#171716] p-5 text-white lg:block"><div className="sticky top-[96px]"><span className="eyebrow px-3 text-[#f2ad19]">Operação</span><nav aria-label="Navegação da Área da Empresa" className="mt-5 space-y-1">{navigation.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => setSection(id)} aria-current={section === id ? 'page' : undefined} className={`flex h-12 w-full items-center gap-3 px-3 text-left text-[11px] font-extrabold uppercase tracking-[0.1em] transition ${section === id ? 'bg-[#f2ad19] text-black' : 'text-white/58 hover:bg-white/8 hover:text-white'}`}><Icon className="size-4" />{label}<ChevronRight className={`ml-auto size-4 ${section === id ? 'opacity-100' : 'opacity-25'}`} /></button>)}</nav><div className="mt-7 flex items-center gap-3 border border-white/10 p-4"><UserRound className="size-5 text-[#f2ad19]" /><div className="min-w-0"><strong className="block truncate text-xs">Equipe Space Light</strong><span className="mt-1 block truncate text-[9px] uppercase tracking-[0.12em] text-white/40">{data?.currentUser.email}</span></div></div></div></aside>
+      <div className="min-w-0"><nav aria-label="Navegação móvel da Área da Empresa" className="flex overflow-x-auto border-b border-black/10 bg-white lg:hidden">{navigation.map(({ id, shortLabel, icon: Icon }) => <button key={id} type="button" onClick={() => setSection(id)} aria-current={section === id ? 'page' : undefined} className={`flex shrink-0 flex-col items-center gap-1.5 border-r border-black/8 px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.1em] ${section === id ? 'bg-[#f2ad19] text-black' : 'text-[#666]'}`}><Icon className="size-4" />{shortLabel}</button>)}</nav><section className="p-4 sm:p-6 md:p-8 xl:p-11"><SectionHeading section={section} />{!data ? <div className="flex min-h-[420px] items-center justify-center"><RefreshCw className="size-6 animate-spin text-[#8a6107]" /></div> : <div key={section} className="mt-7">{content}</div>}</section></div>
     </div>
-  );
+  </main>;
 }

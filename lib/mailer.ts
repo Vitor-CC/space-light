@@ -20,18 +20,11 @@ function escapeHtml(value: string) {
     .replace(/"/g, '&quot;');
 }
 
-async function sendEmail(input: {
-  to: string;
-  subject: string;
-  html: string;
-  text: string;
-}) {
+async function sendEmail(input: { to: string; subject: string; html: string; text: string }) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.MAIL_FROM;
   if (!apiKey || !from) {
-    throw new Error(
-      'O envio de e-mail ainda não foi configurado nesta instalação.',
-    );
+    throw new Error('O envio de e-mail ainda não foi configurado nesta instalação.');
   }
   const response = await fetch(RESEND_ENDPOINT, {
     method: 'POST',
@@ -49,17 +42,13 @@ async function sendEmail(input: {
   });
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
-    throw new Error(
-      `Falha ao enviar o e-mail (${response.status}). ${detail.slice(0, 200)}`,
-    );
+    throw new Error(`Falha ao enviar o e-mail (${response.status}). ${detail.slice(0, 200)}`);
   }
 }
 
 export async function sendPasswordResetEmail(input: {
   to: string;
   name: string;
-  /** Nome de usuário da empresa: o mesmo e-mail pode ter várias unidades. */
-  usuario?: string | null;
   link: string;
   minutes: number;
 }) {
@@ -69,7 +58,6 @@ export async function sendPasswordResetEmail(input: {
     greeting,
     '',
     'Recebemos um pedido para redefinir a senha do seu acesso ao portal da Space Light Engenharia.',
-    ...(input.usuario ? ['', `Nome de usuário: ${input.usuario}`] : []),
     '',
     `Abra o link abaixo para criar uma nova senha (vale por ${input.minutes} minutos):`,
     input.link,
@@ -88,7 +76,6 @@ export async function sendPasswordResetEmail(input: {
     <tr><td style="padding:32px 28px">
       <h1 style="margin:0;font-size:22px;line-height:1.2;text-transform:uppercase;letter-spacing:-.02em">Redefinir sua senha</h1>
       <p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:#444">${escapeHtml(greeting)} Recebemos um pedido para redefinir a senha do seu acesso ao portal.</p>
-      ${input.usuario ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.6;color:#444">Nome de usuário: <strong>${escapeHtml(input.usuario)}</strong></p>` : ''}
       <p style="margin:14px 0 0;font-size:14px;line-height:1.6;color:#444">Clique no botão abaixo para criar uma nova senha. O link vale por <strong>${input.minutes} minutos</strong> e só pode ser usado uma vez.</p>
       <p style="margin:26px 0 0">
         <a href="${escapeHtml(input.link)}" style="display:inline-block;background:#f2ad19;color:#0b0b0b;padding:15px 26px;font-size:12px;font-weight:bold;letter-spacing:.12em;text-transform:uppercase;text-decoration:none">Criar nova senha</a>

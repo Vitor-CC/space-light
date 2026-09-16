@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { IBM_Plex_Mono, Open_Sans, Work_Sans } from 'next/font/google';
+import { Open_Sans, Work_Sans } from 'next/font/google';
 
 import { SITE_URL } from '@/lib/site-url';
 import './globals.css';
@@ -13,15 +13,6 @@ const workSans = Work_Sans({
 const openSans = Open_Sans({
   variable: '--font-open-sans',
   subsets: ['latin'],
-  display: 'swap',
-});
-
-// Monoespaçada do site novo: código de norma, numeração, rótulo de margem e
-// dado de tabela — nunca parágrafo. Só declara a variável; nada existente usa.
-const plexMono = IBM_Plex_Mono({
-  variable: '--font-plex-mono',
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
   display: 'swap',
 });
 
@@ -57,9 +48,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
-      <body
-        className={`${workSans.variable} ${openSans.variable} ${plexMono.variable} antialiased`}
-      >
+      <body className={`${workSans.variable} ${openSans.variable} antialiased`}>
         {children}
       </body>
     </html>

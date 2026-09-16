@@ -5,9 +5,7 @@ import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ClientPortalPage({
-  searchParams,
-}: PageProps<'/cliente'>) {
+export default async function ClientPortalPage() {
   const user = await requireUser();
   if (user.must_reset) redirect('/definir-senha');
   if (user.role === 'admin') redirect('/empresa');
@@ -15,13 +13,5 @@ export default async function ClientPortalPage({
   if (!user.client_id) redirect('/cliente/login?status=pending');
   const data = await getClientPortalData(user.client_id);
   if (!data) redirect('/cliente/login?status=pending');
-  // Volta da troca de senha: ?senha=alterada | atual-incorreta | invalida
-  const { senha } = await searchParams;
-  return (
-    <ClientPortal
-      data={data}
-      user={{ name: user.name, email: user.email }}
-      senha={typeof senha === 'string' ? senha : undefined}
-    />
-  );
+  return <ClientPortal data={data} user={{ name: user.name, email: user.email }} />;
 }

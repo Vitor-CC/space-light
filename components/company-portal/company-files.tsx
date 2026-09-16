@@ -1,0 +1,275 @@
+'use client';
+
+import { Download, ExternalLink, FileArchive, FileText, FolderOpen, Images, Loader2, RefreshCw, Trash2, TriangleAlert, UploadCloud } from 'lucide-react';
+import Image from 'next/image';
+import { useMemo, useRef, useState } from 'react';
+
+import { EmptyState, formatDate, formatFileSize, labelClass, selectClass, SubTabs } from '@/components/company-portal/company-ui';
+import { Button } from '@/components/ui/button';
+import type { CompanyDashboardData, CompanyFile } from '@/lib/company-types';
+import { dataDoDia, rotuloDiaDaTurma } from '@/lib/dias-da-turma';
+import { downloadFilesAsZip } from '@/lib/download-zip';
+import { deleteCompanyFile, generateCertificates, uploadCompanyFiles } from '@/lib/mock-company-database';
+
+type Aba = 'photo' | 'document' | 'upload';
+type Kind = 'photo' | 'document';
+
+const kindCopy: Record<Kind, { label: string; plural: string; accept: string; hint: string }> = {
+  photo: {
+    label: 'Foto',
+    plural: 'Fotos',
+    accept: 'image/jpeg,image/png,image/webp,image/heic,image/heif',
+    hint: 'JPG, PNG, WEBP ou HEIC — até 4 MB cada.',
+  },
+  document: {
+    label: 'Documento',
+    plural: 'Documentos',
+    accept: '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt',
+    hint: 'PDF, Word, Excel, CSV ou TXT — até 4 MB cada.',
+  },
+};
+
+/**
+ * A lista de presença assinada é comprovante, então mora em Documentos —
+ * misturá-la com as fotos da aula era o que atrapalhava achar as coisas.
+ */
+function pertence(file: CompanyFile, aba: Kind) {
+  return aba === 'document' ? file.kind === 'document' || file.kind === 'attendance' : file.kind === 'photo';
+}
+
+function FileActions({ file, onDelete }: { file: CompanyFile; onDelete: (file: CompanyFile) => void }) {
+  if (file.status !== 'stored') {
+    return <div className="flex items-center gap-2">
+      <span className="inline-flex h-10 items-center gap-2 border border-[#e0c48a] bg-[#fff8e8] px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]" title="Este registro é anterior ao armazenamento de arquivos: só a ficha foi salva, o arquivo em si não existe."><TriangleAlert className="size-3.5" />Arquivo não salvo</span>
+      <button type="button" onClick={() => onDelete(file)} aria-label={`Excluir ${file.name}`} className="inline-flex size-10 items-center justify-center border border-black/10 text-[#999] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-3.5" /></button>
+    </div>;
+  }
+  return <div className="flex items-center gap-2">
+    <a href={`/api/files/${file.id}`} target="_blank" rel="noopener" className="inline-flex h-10 items-center gap-2 border border-black/15 px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] hover:bg-black hover:text-white"><ExternalLink className="size-3.5" />Abrir</a>
+    <a href={`/api/files/${file.id}?download=1`} className="inline-flex h-10 items-center gap-2 border border-black/15 px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] hover:bg-black hover:text-white"><Download className="size-3.5" />Baixar</a>
+    <button type="button" onClick={() => onDelete(file)} aria-label={`Excluir ${file.name}`} className="inline-flex size-10 items-center justify-center border border-black/10 text-[#999] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-3.5" /></button>
+  </div>;
+}
+
+function PhotoCard({ file, onDelete }: { file: CompanyFile; onDelete: (file: CompanyFile) => void }) {
+  return <article className="border border-black/10 bg-white">
+    <div className="relative aspect-[4/3] bg-[#f7f7f4]">
+      {file.status === 'stored'
+        ? <Image src={`/api/files/${file.id}`} alt={file.name} fill unoptimized sizes="(min-width:1280px) 25vw, (min-width:640px) 50vw, 100vw" className="object-cover" />
+        : <span className="flex h-full items-center justify-center text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#999]">Sem conteúdo</span>}
+    </div>
+    <div className="p-4">
+      <span className="block text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">{file.client_name} · {file.training_nr}</span>
+      <strong className="mt-1 block truncate text-sm" title={file.name}>{file.name}</strong>
+      <p className="mt-1 text-[11px] text-[#888]">{formatFileSize(file.size)} · {formatDate(file.created_at)}</p>
+      {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[11px] leading-relaxed text-[#8a6107]">Enviado antes do armazenamento entrar no ar: o arquivo em si não foi guardado. Exclua e envie de novo.</p> : null}
+      <div className="mt-3"><FileActions file={file} onDelete={onDelete} /></div>
+    </div>
+  </article>;
+}
+
+function DocumentRow({ file, onDelete }: { file: CompanyFile; onDelete: (file: CompanyFile) => void }) {
+  const ehLista = file.kind === 'attendance';
+  return <article className="grid gap-4 border border-black/10 bg-white p-5 sm:grid-cols-[auto_1fr_auto] sm:items-center">
+    <span className={`flex size-11 items-center justify-center ${ehLista ? 'bg-[#f2ad19] text-black' : 'bg-black text-[#f2ad19]'}`}>{ehLista ? <Images className="size-5" /> : <FileText className="size-5" />}</span>
+    <div className="min-w-0">
+      <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">{file.client_name} · {file.training_nr}{ehLista ? ' · Lista assinada' : ''}</span>
+      <h3 className="mt-1 truncate text-sm font-bold" title={file.name}>{file.name}</h3>
+      <p className="mt-1 text-[11px] text-[#888]">{file.training_title} · {formatFileSize(file.size)} · {formatDate(file.created_at)}</p>
+      {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[11px] leading-relaxed text-[#8a6107]">Enviado antes do armazenamento entrar no ar: o arquivo em si não foi guardado. Exclua este registro e envie o arquivo de novo.</p> : null}
+    </div>
+    <FileActions file={file} onDelete={onDelete} />
+  </article>;
+}
+
+export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardData; reload: () => Promise<void>; notify: (message: string) => void }) {
+  const [aba, setAba] = useState<Aba>('photo');
+  const [uploadKind, setUploadKind] = useState<Kind>('photo');
+  const [clientId, setClientId] = useState(data.clients[0]?.id ?? '');
+  const [trainingId, setTrainingId] = useState('');
+  const [queue, setQueue] = useState<File[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [zipping, setZipping] = useState('');
+  const [gerando, setGerando] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const clientTrainings = useMemo(
+    () => data.trainings.filter((training) => training.client_id === clientId),
+    [data.trainings, clientId],
+  );
+
+  // Sem turma escolhida, a lista mostra tudo do cliente.
+  const scoped = useMemo(
+    () => data.files.filter((file) => (trainingId ? file.training_id === trainingId : file.client_id === clientId)),
+    [data.files, clientId, trainingId],
+  );
+
+  const counts = useMemo(() => ({
+    photo: scoped.filter((file) => pertence(file, 'photo')).length,
+    document: scoped.filter((file) => pertence(file, 'document')).length,
+  }), [scoped]);
+
+  const aberta: Kind = aba === 'upload' ? uploadKind : aba;
+  const visible = useMemo(() => scoped.filter((file) => pertence(file, aberta)), [scoped, aberta]);
+  const downloadable = useMemo(() => visible.filter((file) => file.status === 'stored'), [visible]);
+
+  const selectedTraining = clientTrainings.find((training) => training.id === trainingId);
+  const clientName = data.clients.find((client) => client.id === clientId)?.name ?? '';
+  const copy = kindCopy[aberta];
+
+  function changeClient(value: string) {
+    setClientId(value);
+    setTrainingId('');
+  }
+
+  function addFiles(list: FileList | null) {
+    if (!list) return;
+    setQueue((current) => [...current, ...Array.from(list)]);
+  }
+
+  async function send() {
+    if (!trainingId || queue.length === 0) return;
+    setBusy('Enviando…');
+    try {
+      const result = await uploadCompanyFiles({
+        clientId, trainingId, kind: uploadKind, files: queue,
+        onProgress: (done, total, name) => setBusy(done >= total ? 'Finalizando…' : `Enviando ${done + 1} de ${total}: ${name}`),
+      });
+      setQueue([]);
+      notify(result.rejected.length
+        ? `${result.saved} enviado(s). Recusado(s): ${result.rejected.join(', ')} — tipo não aceito ou acima de 4 MB.`
+        : `${result.saved} arquivo(s) enviado(s).`);
+      await reload();
+      setAba(uploadKind);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao enviar os arquivos.');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function downloadAll() {
+    if (downloadable.length === 0) return;
+    setZipping('Preparando…');
+    try {
+      const rotulo = selectedTraining ? `${selectedTraining.nr}-${selectedTraining.code}` : clientName;
+      const result = await downloadFilesAsZip({
+        entries: downloadable.map((file) => ({ id: file.id, name: file.name })),
+        zipName: `${copy.plural.toLowerCase()}-${rotulo}`.replace(/\s+/g, '-'),
+        onProgress: (done, total) => setZipping(done >= total ? 'Compactando…' : `Baixando ${done + 1} de ${total}`),
+      });
+      notify(result.failed.length
+        ? `${result.zipped} arquivo(s) no zip. Falhou: ${result.failed.join(', ')}.`
+        : `${result.zipped} arquivo(s) baixados em zip.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao montar o zip.');
+    } finally {
+      setZipping('');
+    }
+  }
+
+  async function remove(file: CompanyFile) {
+    if (!window.confirm(`Excluir "${file.name}" definitivamente? O arquivo sai do portal do cliente também.`)) return;
+    try {
+      await deleteCompanyFile(file.id);
+      notify('Arquivo excluído.');
+      await reload();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao excluir o arquivo.');
+    }
+  }
+
+  /** Gera (ou regera) certificados, certificado da empresa e atestado da turma. */
+  async function gerarDocumentos() {
+    if (!selectedTraining) return;
+    setGerando(true);
+    try {
+      const resultado = await generateCertificates(selectedTraining.id);
+      notify(`${resultado.documents.length} documento(s) gerados e arquivados nesta turma.`);
+      await reload();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Erro ao gerar os documentos.');
+    } finally {
+      setGerando(false);
+    }
+  }
+
+  const emitidos = selectedTraining
+    ? data.files.filter((file) => file.training_id === selectedTraining.id && file.kind === 'document').length
+    : 0;
+
+  return <div className="space-y-6">
+    <SubTabs label="Seções de arquivos" active={aba} onChange={setAba} tabs={[
+      { id: 'photo', label: 'Fotos', count: counts.photo },
+      { id: 'document', label: 'Documentos', count: counts.document },
+      { id: 'upload', label: 'Enviar' },
+    ]} />
+
+    {/* Cliente e turma valem para as três sub-abas: escolher uma vez basta. */}
+    <div className="grid gap-4 border border-black/10 bg-white p-5 sm:grid-cols-2">
+      <label htmlFor="arquivos-cliente"><span className={labelClass}>Cliente</span>
+        <select id="arquivos-cliente" value={clientId} onChange={(event) => changeClient(event.target.value)} className={selectClass}>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>
+      </label>
+      <label htmlFor="arquivos-treinamento"><span className={labelClass}>Treinamento</span>
+        <select id="arquivos-treinamento" value={trainingId} onChange={(event) => setTrainingId(event.target.value)} className={selectClass}>
+          <option value="">Todas as turmas deste cliente</option>
+          {clientTrainings.map((training) => <option key={training.id} value={training.id}>{training.nr} · {training.internal_label || training.title} · {formatDate(dataDoDia(training))}{rotuloDiaDaTurma(training)}</option>)}
+        </select>
+      </label>
+    </div>
+
+    {aba === 'upload' ? <section className="max-w-2xl border border-black/10 bg-white p-6 md:p-8">
+      <span className="eyebrow text-[#8a6107]">Envio em lote</span>
+      <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Enviar arquivos</h2>
+      <p className="mt-3 text-xs leading-relaxed text-[#777]">Pode escolher vários de uma vez: eles são enviados um a um, porque cada requisição da Vercel aceita no máximo 4,5 MB.</p>
+
+      <div className="mt-6 flex gap-px bg-black/10">
+        {(['photo', 'document'] as Kind[]).map((option) => <button key={option} type="button" onClick={() => { setUploadKind(option); setQueue([]); }} className={`flex-1 px-4 py-3 text-[11px] font-extrabold uppercase tracking-[0.1em] transition ${uploadKind === option ? 'bg-black text-[#f2ad19]' : 'bg-white text-[#666] hover:bg-[#fff8e8]'}`}>
+          <span className="inline-flex items-center gap-2">{option === 'photo' ? <Images className="size-4" /> : <FileText className="size-4" />}{kindCopy[option].plural}</span>
+        </button>)}
+      </div>
+
+      <input ref={inputRef} type="file" multiple accept={copy.accept} className="sr-only" onChange={(event) => addFiles(event.target.files)} />
+      <button type="button" onClick={() => inputRef.current?.click()} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(event.dataTransfer.files); }} className={`mt-4 flex min-h-48 w-full flex-col items-center justify-center border-2 border-dashed p-6 text-center transition ${dragging ? 'border-[#f2ad19] bg-[#fff8e8]' : 'border-black/18 bg-[#f7f7f4] hover:border-[#f2ad19]'}`}>
+        <span className="flex size-12 items-center justify-center bg-black text-[#f2ad19]"><UploadCloud className="size-5" /></span>
+        <strong className="mt-4 text-sm uppercase tracking-[0.08em]">Arraste {copy.plural.toLowerCase()} aqui</strong>
+        <span className="mt-2 text-xs leading-relaxed text-[#777]">{copy.hint}</span>
+      </button>
+
+      {queue.length > 0 ? <div className="mt-4 border border-black/10">
+        <div className="flex items-center justify-between bg-[#f7f7f4] px-4 py-3"><strong className="text-xs">{queue.length} na fila</strong><button type="button" onClick={() => setQueue([])} className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8f1717]">Limpar</button></div>
+        <div className="max-h-44 divide-y divide-black/8 overflow-y-auto">{queue.slice(0, 40).map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs"><span className="min-w-0 truncate">{file.name}</span><span className="shrink-0 text-[#888]">{formatFileSize(file.size)}</span></div>)}{queue.length > 40 ? <p className="px-4 py-2.5 text-xs text-[#777]">+ {queue.length - 40} arquivos</p> : null}</div>
+      </div> : null}
+
+      <Button type="button" disabled={!trainingId || queue.length === 0 || Boolean(busy)} onClick={() => void send()} className="mt-5 h-13 w-full rounded-none bg-[#f2ad19] text-[11px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900] disabled:opacity-50">{busy ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}{busy || `Enviar ${copy.plural.toLowerCase()}`}</Button>
+      {!trainingId ? <p className="mt-3 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[11px] leading-relaxed text-[#8a6107]">Escolha o treinamento acima: o arquivo é guardado dentro dele e é assim que o cliente enxerga.</p> : null}
+    </section> : <section>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <span className="eyebrow text-[#8a6107]">{selectedTraining ? `${selectedTraining.nr} · ${selectedTraining.internal_label || selectedTraining.title}` : clientName || 'Histórico'}</span>
+          <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">{copy.plural} {selectedTraining ? 'desta turma' : 'do cliente'}</h2>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => void downloadAll()} disabled={downloadable.length === 0 || Boolean(zipping)} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 border border-black/16 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] transition hover:border-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
+            {zipping ? <Loader2 className="size-4 animate-spin" /> : <FileArchive className="size-4" />}
+            {zipping || (downloadable.length === 1 ? 'Baixar 1 em zip' : downloadable.length > 1 ? `Baixar os ${downloadable.length} em zip` : 'Baixar em zip')}
+          </button>
+          {aba === 'document' && selectedTraining ? <button type="button" onClick={() => void gerarDocumentos()} disabled={gerando} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 bg-[#f2ad19] px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-black transition hover:bg-[#ff9900] disabled:opacity-50">
+            {gerando ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}{gerando ? 'Gerando…' : emitidos === 0 ? 'Gerar documentos' : 'Gerar de novo'}
+          </button> : null}
+        </div>
+      </div>
+
+      {aba === 'document' && selectedTraining ? <p className="mb-4 border-l-4 border-[#f2ad19] bg-[#fff8e8] p-4 text-xs leading-relaxed text-[#6b4d06]">
+        Um certificado por aluno, mais o certificado da empresa e o atestado. Se alguém entrou ou saiu da lista de presença depois da emissão, use <strong>Gerar de novo</strong>: os certificados de quem saiu são recolhidos e os que ficaram são regravados.
+      </p> : null}
+
+      {visible.length === 0
+        ? <EmptyState icon={aberta === 'photo' ? Images : FolderOpen} title={`Nenhum${aberta === 'photo' ? 'a foto' : ' documento'} por aqui`} text={selectedTraining ? 'Envie na aba Enviar, ou escolha outra turma.' : 'Escolha uma turma acima ou envie arquivos na aba Enviar.'} />
+        : aberta === 'photo'
+          ? <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">{visible.map((file) => <PhotoCard key={file.id} file={file} onDelete={remove} />)}</div>
+          : <div className="space-y-3">{visible.map((file) => <DocumentRow key={file.id} file={file} onDelete={remove} />)}</div>}
+    </section>}
+  </div>;
+}

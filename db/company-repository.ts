@@ -1,10 +1,5 @@
 import { getD1 } from '@/db';
-import {
-  formatarCpf,
-  formatarRg,
-  problemaCpf,
-  problemaRg,
-} from '@/lib/documentos';
+import { formatarCpf, formatarRg, problemaCpf, problemaRg } from '@/lib/documentos';
 import { INSTRUCTOR_DOCUMENT_CATEGORIES } from '@/lib/instructor-documents';
 import { normalizarUsuario, USUARIO_REGRA, usuarioValido } from '@/lib/usuario';
 import type { DatabaseBinding, DatabaseResult } from '@/db/sqlite-adapter';
@@ -73,7 +68,7 @@ function rows<T>(result: DatabaseResult<T>): T[] {
  * em produção (Turso, pela rede) isso somava ~15 idas em sequência a cada
  * arranque frio da função, antes de qualquer trabalho útil.
  */
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 6;
 
 /** Data no formato do banco e do <input type="date">. */
 const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -105,9 +100,7 @@ async function lerMarcadores(d1: DatabaseBinding) {
     d1.prepare('SELECT key, value FROM schema_meta'),
   ]);
   const mapa = new Map<string, string>();
-  for (const linha of rows<{ key: string; value: string }>(
-    gravados as DatabaseResult<{ key: string; value: string }>,
-  )) {
+  for (const linha of rows<{ key: string; value: string }>(gravados as DatabaseResult<{ key: string; value: string }>)) {
     mapa.set(linha.key, linha.value);
   }
   return mapa;
@@ -117,9 +110,7 @@ export function ensurePortalSchema(): Promise<void> {
   if (schemaPromise) return schemaPromise;
   const d1 = getD1();
   schemaPromise = (async () => {
-    const ownerEmailAtual = (process.env.SPACE_ADMIN_EMAIL ?? '')
-      .trim()
-      .toLowerCase();
+    const ownerEmailAtual = (process.env.SPACE_ADMIN_EMAIL ?? '').trim().toLowerCase();
     const marcadores = await lerMarcadores(d1);
     // Banco já na versão corrente e com o mesmo dono configurado: nada a fazer.
     if (
@@ -304,11 +295,8 @@ export function ensurePortalSchema(): Promise<void> {
       d1.prepare(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_document ON clients(document)',
       ),
-      // v7: o mesmo responsável pode cuidar de várias unidades, então o
-      // e-mail de contato repete entre clientes. Só a busca continua indexada.
-      d1.prepare('DROP INDEX IF EXISTS idx_clients_contact_email'),
       d1.prepare(
-        'CREATE INDEX IF NOT EXISTS idx_clients_contact_email_busca ON clients(contact_email)',
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_contact_email ON clients(contact_email)',
       ),
       d1.prepare(
         'CREATE INDEX IF NOT EXISTS idx_clients_status_created ON clients(status, created_at)',
@@ -328,15 +316,8 @@ export function ensurePortalSchema(): Promise<void> {
       d1.prepare(
         'CREATE INDEX IF NOT EXISTS idx_instructor_documents_instructor_category ON instructor_documents(instructor_id, category)',
       ),
-      // v7: e-mail único só entre equipe e instrutores, que entram por ele.
-      // Conta de empresa entra pelo nome de usuário (único) e pode repetir o
-      // e-mail de outra unidade.
-      d1.prepare('DROP INDEX IF EXISTS idx_users_email'),
       d1.prepare(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_contas ON users(email) WHERE role != 'client'",
-      ),
-      d1.prepare(
-        'CREATE INDEX IF NOT EXISTS idx_users_email_busca ON users(email)',
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)',
       ),
       d1.prepare(
         'CREATE INDEX IF NOT EXISTS idx_users_client_role ON users(client_id, role)',
@@ -397,111 +378,35 @@ export function ensurePortalSchema(): Promise<void> {
     // Colunas acrescentadas depois da criação original das tabelas.
     // Antes cada uma custava um PRAGMA próprio, em sequência, repetindo a mesma
     // tabela até cinco vezes; agora é uma leitura por tabela, em paralelo.
-    const COLUNAS_EXTRAS: { tabela: string; coluna: string; alter: string }[] =
-      [
-        {
-          tabela: 'users',
-          coluna: 'instructor_id',
-          alter: 'ALTER TABLE users ADD COLUMN instructor_id TEXT',
-        },
-        {
-          tabela: 'users',
-          coluna: 'is_owner',
-          alter:
-            'ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0',
-        },
-        // Login da empresa. Guardado já normalizado (minúsculo), então o índice
-        // único comum basta; conta sem nome (NULL) não conflita com outra.
-        {
-          tabela: 'users',
-          coluna: 'username',
-          alter: 'ALTER TABLE users ADD COLUMN username TEXT',
-        },
-        {
-          tabela: 'trainings',
-          coluna: 'instructor_id',
-          alter: 'ALTER TABLE trainings ADD COLUMN instructor_id TEXT',
-        },
-        {
-          tabela: 'trainings',
-          coluna: 'training_dates',
-          alter:
-            "ALTER TABLE trainings ADD COLUMN training_dates TEXT NOT NULL DEFAULT ''",
-        },
-        // Nome interno da turma: serve para diferenciar duas turmas do mesmo
-        // treinamento. NUNCA sai em documento — o certificado usa 'title'.
-        {
-          tabela: 'trainings',
-          coluna: 'internal_label',
-          alter:
-            "ALTER TABLE trainings ADD COLUMN internal_label TEXT NOT NULL DEFAULT ''",
-        },
-        {
-          tabela: 'trainings',
-          coluna: 'content_program',
-          alter:
-            "ALTER TABLE trainings ADD COLUMN content_program TEXT NOT NULL DEFAULT ''",
-        },
-        // Dia do treinamento a que o arquivo pertence (a foto da lista assinada).
-        {
-          tabela: 'files',
-          coluna: 'session_id',
-          alter: 'ALTER TABLE files ADD COLUMN session_id TEXT',
-        },
-        {
-          tabela: 'participants',
-          coluna: 'rg',
-          alter:
-            "ALTER TABLE participants ADD COLUMN rg TEXT NOT NULL DEFAULT ''",
-        },
-        {
-          tabela: 'participants',
-          coluna: 'birth_date',
-          alter:
-            "ALTER TABLE participants ADD COLUMN birth_date TEXT NOT NULL DEFAULT ''",
-        },
-        // Endereço da edificação: sai impresso no atestado de treinamento.
-        {
-          tabela: 'clients',
-          coluna: 'address',
-          alter:
-            "ALTER TABLE clients ADD COLUMN address TEXT NOT NULL DEFAULT ''",
-        },
-        {
-          tabela: 'clients',
-          coluna: 'district',
-          alter:
-            "ALTER TABLE clients ADD COLUMN district TEXT NOT NULL DEFAULT ''",
-        },
-        {
-          tabela: 'clients',
-          coluna: 'city',
-          alter: "ALTER TABLE clients ADD COLUMN city TEXT NOT NULL DEFAULT ''",
-        },
-        {
-          tabela: 'clients',
-          coluna: 'state',
-          alter:
-            "ALTER TABLE clients ADD COLUMN state TEXT NOT NULL DEFAULT ''",
-        },
-        {
-          tabela: 'clients',
-          coluna: 'postal_code',
-          alter:
-            "ALTER TABLE clients ADD COLUMN postal_code TEXT NOT NULL DEFAULT ''",
-        },
-      ];
+    const COLUNAS_EXTRAS: { tabela: string; coluna: string; alter: string }[] = [
+      { tabela: 'users', coluna: 'instructor_id', alter: 'ALTER TABLE users ADD COLUMN instructor_id TEXT' },
+      { tabela: 'users', coluna: 'is_owner', alter: 'ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0' },
+      // Login da empresa. Guardado já normalizado (minúsculo), então o índice
+      // único comum basta; conta sem nome (NULL) não conflita com outra.
+      { tabela: 'users', coluna: 'username', alter: 'ALTER TABLE users ADD COLUMN username TEXT' },
+      { tabela: 'trainings', coluna: 'instructor_id', alter: 'ALTER TABLE trainings ADD COLUMN instructor_id TEXT' },
+      { tabela: 'trainings', coluna: 'training_dates', alter: "ALTER TABLE trainings ADD COLUMN training_dates TEXT NOT NULL DEFAULT ''" },
+      // Nome interno da turma: serve para diferenciar duas turmas do mesmo
+      // treinamento. NUNCA sai em documento — o certificado usa 'title'.
+      { tabela: 'trainings', coluna: 'internal_label', alter: "ALTER TABLE trainings ADD COLUMN internal_label TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'trainings', coluna: 'content_program', alter: "ALTER TABLE trainings ADD COLUMN content_program TEXT NOT NULL DEFAULT ''" },
+      // Dia do treinamento a que o arquivo pertence (a foto da lista assinada).
+      { tabela: 'files', coluna: 'session_id', alter: 'ALTER TABLE files ADD COLUMN session_id TEXT' },
+      { tabela: 'participants', coluna: 'rg', alter: "ALTER TABLE participants ADD COLUMN rg TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'participants', coluna: 'birth_date', alter: "ALTER TABLE participants ADD COLUMN birth_date TEXT NOT NULL DEFAULT ''" },
+      // Endereço da edificação: sai impresso no atestado de treinamento.
+      { tabela: 'clients', coluna: 'address', alter: "ALTER TABLE clients ADD COLUMN address TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'clients', coluna: 'district', alter: "ALTER TABLE clients ADD COLUMN district TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'clients', coluna: 'city', alter: "ALTER TABLE clients ADD COLUMN city TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'clients', coluna: 'state', alter: "ALTER TABLE clients ADD COLUMN state TEXT NOT NULL DEFAULT ''" },
+      { tabela: 'clients', coluna: 'postal_code', alter: "ALTER TABLE clients ADD COLUMN postal_code TEXT NOT NULL DEFAULT ''" },
+    ];
     const tabelas = [...new Set(COLUNAS_EXTRAS.map((item) => item.tabela))];
     const existentes = new Map(
       await Promise.all(
         tabelas.map(async (tabela) => {
-          const info = await d1
-            .prepare(`PRAGMA table_info(${tabela})`)
-            .all<{ name: string }>();
-          return [
-            tabela,
-            new Set(rows(info).map((coluna) => coluna.name)),
-          ] as const;
+          const info = await d1.prepare(`PRAGMA table_info(${tabela})`).all<{ name: string }>();
+          return [tabela, new Set(rows(info).map((coluna) => coluna.name))] as const;
         }),
       ),
     );
@@ -515,9 +420,7 @@ export function ensurePortalSchema(): Promise<void> {
 
     if (ownerEmailAtual) {
       await d1
-        .prepare(
-          `UPDATE users SET is_owner = 1 WHERE lower(email) = ? AND role = 'admin'`,
-        )
+        .prepare(`UPDATE users SET is_owner = 1 WHERE lower(email) = ? AND role = 'admin'`)
         .bind(ownerEmailAtual)
         .run();
     }
@@ -546,9 +449,7 @@ export function ensurePortalSchema(): Promise<void> {
     for (const alteracao of ALTERACOES_APOS_V1) {
       try {
         await d1.prepare(alteracao).run();
-      } catch {
-        /* coluna já existe */
-      }
+      } catch { /* coluna já existe */ }
     }
 
     await criarSessoesDeTurmasAntigas(d1);
@@ -577,11 +478,12 @@ export function ensurePortalSchema(): Promise<void> {
         ON CONFLICT(key) DO NOTHING`),
     ]);
   })().catch((error) => {
-    schemaPromise = null;
-    throw error;
-  });
+      schemaPromise = null;
+      throw error;
+    });
   return schemaPromise;
 }
+
 
 /**
  * Turmas criadas antes da tabela de dias ganham uma sessão por data, todas com
@@ -593,13 +495,7 @@ async function criarSessoesDeTurmasAntigas(d1: DatabaseBinding) {
     .prepare(`SELECT t.id, t.training_date, t.training_dates, t.instructor_id, t.status
       FROM trainings t
       WHERE NOT EXISTS (SELECT 1 FROM training_sessions s WHERE s.training_id = t.id)`)
-    .all<{
-      id: string;
-      training_date: string;
-      training_dates: string;
-      instructor_id: string | null;
-      status: string;
-    }>();
+    .all<{ id: string; training_date: string; training_dates: string; instructor_id: string | null; status: string }>();
   const insercoes = [];
   for (const turma of rows(pendentes)) {
     for (const [indice, data] of datasDaTurma(turma).entries()) {
@@ -608,14 +504,7 @@ async function criarSessoesDeTurmasAntigas(d1: DatabaseBinding) {
           .prepare(`INSERT INTO training_sessions (
             id, training_id, day_number, session_date, start_time, end_time, instructor_id, status
           ) VALUES (?, ?, ?, ?, '', '', ?, ?)`)
-          .bind(
-            makeId('session'),
-            turma.id,
-            indice + 1,
-            data,
-            turma.instructor_id,
-            turma.status,
-          ),
+          .bind(makeId('session'), turma.id, indice + 1, data, turma.instructor_id, turma.status),
       );
     }
   }
@@ -640,20 +529,12 @@ async function registrarPresencaDeInscritosAntigos(d1: DatabaseBinding) {
 }
 
 /** As datas gravadas na turma, em ordem, com recuo para a data principal. */
-function datasDaTurma(turma: {
-  training_date: string;
-  training_dates: string;
-}): string[] {
+function datasDaTurma(turma: { training_date: string; training_dates: string }): string[] {
   let datas: string[] = [];
   try {
-    datas = turma.training_dates
-      ? (JSON.parse(turma.training_dates) as string[])
-      : [];
-  } catch {
-    datas = [];
-  }
-  if (!Array.isArray(datas) || datas.length === 0)
-    datas = [turma.training_date];
+    datas = turma.training_dates ? (JSON.parse(turma.training_dates) as string[]) : [];
+  } catch { datas = []; }
+  if (!Array.isArray(datas) || datas.length === 0) datas = [turma.training_date];
   return datas.filter(Boolean);
 }
 
@@ -691,9 +572,7 @@ export type TrainingSessionRow = {
   status: string;
 };
 
-export async function listTrainingSessions(
-  trainingId: string,
-): Promise<TrainingSessionRow[]> {
+export async function listTrainingSessions(trainingId: string): Promise<TrainingSessionRow[]> {
   const result = await getD1()
     .prepare(`SELECT s.id, s.training_id, s.day_number, s.session_date, s.start_time,
       s.end_time, s.instructor_id, i.name AS instructor_name, s.status
@@ -716,8 +595,7 @@ export async function listTrainingSessions(
 export async function sincronizarTurma(trainingId: string) {
   const d1 = getD1();
   const sessoes = await listTrainingSessions(trainingId);
-  if (sessoes.length === 0)
-    return { concluiuAgora: false, status: 'scheduled' as const };
+  if (sessoes.length === 0) return { concluiuAgora: false, status: 'scheduled' as const };
 
   const anterior = await d1
     .prepare('SELECT status FROM trainings WHERE id = ? LIMIT 1')
@@ -725,19 +603,15 @@ export async function sincronizarTurma(trainingId: string) {
     .first<{ status: string }>();
 
   const concluidas = sessoes.filter((dia) => dia.status === 'completed');
-  const status =
-    concluidas.length === sessoes.length
-      ? 'completed'
-      : sessoes.some((dia) => dia.status !== 'scheduled')
-        ? 'in_progress'
-        : 'scheduled';
+  const status = concluidas.length === sessoes.length
+    ? 'completed'
+    : sessoes.some((dia) => dia.status !== 'scheduled') ? 'in_progress' : 'scheduled';
 
   // Quem assina é o instrutor do último dia dado. Enquanto nenhum dia terminou,
   // vale o último dia que já tem instrutor escalado.
-  const referencia =
-    [...concluidas].reverse().find((dia) => dia.instructor_id) ??
-    [...sessoes].reverse().find((dia) => dia.instructor_id) ??
-    null;
+  const referencia = [...concluidas].reverse().find((dia) => dia.instructor_id)
+    ?? [...sessoes].reverse().find((dia) => dia.instructor_id)
+    ?? null;
 
   const datas = sessoes.map((dia) => dia.session_date);
   await d1
@@ -753,18 +627,13 @@ export async function sincronizarTurma(trainingId: string) {
     )
     .run();
 
-  return {
-    concluiuAgora: status === 'completed' && anterior?.status !== 'completed',
-    status,
-  };
+  return { concluiuAgora: status === 'completed' && anterior?.status !== 'completed', status };
 }
 
 /** Existe foto da lista assinada arquivada nesta turma? */
 export async function temListaAssinada(trainingId: string) {
   const linha = await getD1()
-    .prepare(
-      "SELECT count(*) AS total FROM files WHERE training_id = ? AND kind = 'attendance'",
-    )
+    .prepare("SELECT count(*) AS total FROM files WHERE training_id = ? AND kind = 'attendance'")
     .bind(trainingId)
     .first<{ total: number }>();
   return (linha?.total ?? 0) > 0;
@@ -777,30 +646,9 @@ export async function findUserByEmail(
   return getD1()
     .prepare(`SELECT id, client_id, instructor_id, name, email, password_hash, password_salt,
       role, is_owner, active, must_reset, username
-      FROM users WHERE lower(email) = ?
-      ORDER BY CASE WHEN role = 'client' THEN 1 ELSE 0 END, created_at ASC
-      LIMIT 1`)
+      FROM users WHERE lower(email) = ? LIMIT 1`)
     .bind(normalizeEmail(email))
     .first<StoredUser>();
-}
-
-/**
- * Contas de empresa com este e-mail. Um responsável pode ter várias unidades,
- * cada uma com o próprio nome de usuário: a recuperação de senha manda um link
- * para cada uma.
- */
-export async function findClientUsersByEmail(
-  email: string,
-): Promise<StoredUser[]> {
-  await ensurePortalSchema();
-  const result = await getD1()
-    .prepare(`SELECT id, client_id, instructor_id, name, email, password_hash, password_salt,
-      role, is_owner, active, must_reset, username
-      FROM users WHERE lower(email) = ? AND role = 'client' AND active = 1
-      ORDER BY created_at ASC`)
-    .bind(normalizeEmail(email))
-    .all<StoredUser>();
-  return rows(result);
 }
 
 /** Empresa entra pelo nome de usuário, e só contas de cliente têm um. */
@@ -816,7 +664,9 @@ export async function findClientUserByUsername(
     .first<StoredUser>();
 }
 
-export async function findUserById(userId: string): Promise<StoredUser | null> {
+export async function findUserById(
+  userId: string,
+): Promise<StoredUser | null> {
   await ensurePortalSchema();
   return getD1()
     .prepare(`SELECT id, client_id, instructor_id, name, email, password_hash, password_salt,
@@ -851,7 +701,9 @@ export async function bootstrapAdmin(input: {
 export async function recordLogin(userId: string) {
   await ensurePortalSchema();
   await getD1()
-    .prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`)
+    .prepare(
+      `UPDATE users SET last_login_at = datetime('now') WHERE id = ?`,
+    )
     .bind(userId)
     .run();
   const user = await findUserById(userId);
@@ -885,11 +737,7 @@ async function findUserForReset(target: {
   instructorId?: string;
 }): Promise<StoredUser | null> {
   if (target.userId) return findUserById(target.userId);
-  const column = target.clientId
-    ? 'client_id'
-    : target.instructorId
-      ? 'instructor_id'
-      : null;
+  const column = target.clientId ? 'client_id' : target.instructorId ? 'instructor_id' : null;
   const value = target.clientId ?? target.instructorId;
   if (!column || !value) return null;
   return getD1()
@@ -911,8 +759,7 @@ export async function resetUserPasswordByAdmin(input: {
 }) {
   await ensurePortalSchema();
   const target = await findUserForReset(input);
-  if (!target)
-    throw new Error('Este cadastro ainda não tem uma conta de acesso.');
+  if (!target) throw new Error('Este cadastro ainda não tem uma conta de acesso.');
   if (target.id === input.byUserId) {
     throw new Error('Para trocar a própria senha, use a página Definir senha.');
   }
@@ -944,8 +791,7 @@ export async function resetUserPasswordByAdmin(input: {
 /** Valida o formato e garante que nenhuma outra conta já usa o nome. */
 async function exigirUsuarioLivre(valor: string, exceptoUserId?: string) {
   const username = normalizarUsuario(valor);
-  if (!usuarioValido(username))
-    throw new Error(`Nome de usuário inválido. ${USUARIO_REGRA}`);
+  if (!usuarioValido(username)) throw new Error(`Nome de usuário inválido. ${USUARIO_REGRA}`);
   const dono = await getD1()
     .prepare('SELECT id FROM users WHERE username = ? LIMIT 1')
     .bind(username)
@@ -957,30 +803,16 @@ async function exigirUsuarioLivre(valor: string, exceptoUserId?: string) {
 }
 
 /** A Space define ou troca o nome de usuário da empresa. Sem ele, a empresa não entra. */
-export async function setClientUsername(input: {
-  clientId: string;
-  username: string;
-  byUserId: string;
-}) {
+export async function setClientUsername(input: { clientId: string; username: string; byUserId: string }) {
   await ensurePortalSchema();
   const conta = await findUserForReset({ clientId: input.clientId });
-  if (!conta || conta.role !== 'client')
-    throw new Error('Este cliente ainda não tem uma conta de acesso.');
+  if (!conta || conta.role !== 'client') throw new Error('Este cliente ainda não tem uma conta de acesso.');
   const username = await exigirUsuarioLivre(input.username, conta.id);
-  await getD1()
-    .prepare('UPDATE users SET username = ? WHERE id = ?')
-    .bind(username, conta.id)
-    .run();
-  await writeAudit(
-    input.byUserId,
-    'client.username_set',
-    'client',
-    input.clientId,
-    {
-      username,
-      anterior: conta.username ?? null,
-    },
-  );
+  await getD1().prepare('UPDATE users SET username = ? WHERE id = ?').bind(username, conta.id).run();
+  await writeAudit(input.byUserId, 'client.username_set', 'client', input.clientId, {
+    username,
+    anterior: conta.username ?? null,
+  });
   return { ok: true as const, username };
 }
 
@@ -1147,8 +979,7 @@ export async function selfRegisterInstructor(input: {
       WHERE document = ? OR lower(email) = ? LIMIT 1`)
     .bind(input.document.trim(), email)
     .first<{ id: string }>();
-  if (existing)
-    throw new Error('Já existe um instrutor com este CPF ou e-mail.');
+  if (existing) throw new Error('Já existe um instrutor com este CPF ou e-mail.');
 
   const instructorId = makeId('instructor');
   const userId = makeId('user');
@@ -1232,15 +1063,10 @@ export async function getInstructorDashboardData(
     .first<CompanyInstructor>();
   if (!instructor) return null;
 
-  const [
-    trainingsResult,
-    availabilityResult,
-    participantsResult,
-    documentsResult,
-    sessoes,
-  ] = await Promise.all([
-    d1
-      .prepare(`SELECT t.id, t.client_id, t.instructor_id,
+  const [trainingsResult, availabilityResult, participantsResult, documentsResult, sessoes] =
+    await Promise.all([
+      d1
+        .prepare(`SELECT t.id, t.client_id, t.instructor_id,
           c.name AS client_name, t.code, t.nr, t.title, t.internal_label, t.training_date,
           t.duration, t.location, COALESCE(i.name, t.instructor) AS instructor,
           t.status, t.participant_limit, t.qr_token, t.qr_enabled,
@@ -1252,21 +1078,21 @@ export async function getInstructorDashboardData(
           LEFT JOIN instructors i ON i.id = t.instructor_id
           WHERE ${INSTRUTOR_NA_TURMA}
           ORDER BY t.training_date ASC`)
-      .bind(instructor.id)
-      .all<CompanyTraining>(),
-    // Escalado na data: a disponibilidade some e fica só o treinamento. Se ele
-    // sair do dia, ela volta — por isso filtra aqui em vez de apagar.
-    d1
-      .prepare(`SELECT a.id, a.instructor_id, a.available_date, a.note, a.status, a.created_at
+        .bind(instructor.id)
+        .all<CompanyTraining>(),
+      // Escalado na data: a disponibilidade some e fica só o treinamento. Se ele
+      // sair do dia, ela volta — por isso filtra aqui em vez de apagar.
+      d1
+        .prepare(`SELECT a.id, a.instructor_id, a.available_date, a.note, a.status, a.created_at
           FROM instructor_availability a
           WHERE a.instructor_id = ?
           AND NOT EXISTS (SELECT 1 FROM training_sessions s
             WHERE s.instructor_id = a.instructor_id AND s.session_date = a.available_date)
           ORDER BY a.available_date ASC`)
-      .bind(instructor.id)
-      .all<InstructorAvailability>(),
-    d1
-      .prepare(`SELECT p.id, p.training_id, t.title AS training_title,
+        .bind(instructor.id)
+        .all<InstructorAvailability>(),
+      d1
+        .prepare(`SELECT p.id, p.training_id, t.title AS training_title,
           t.nr AS training_nr, c.name AS client_name, p.full_name,
           p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.created_at,
           ${COLUNAS_PRESENCA}
@@ -1275,24 +1101,21 @@ export async function getInstructorDashboardData(
           JOIN clients c ON c.id = t.client_id
           WHERE ${INSTRUTOR_NA_TURMA}
           ORDER BY p.created_at DESC`)
-      .bind(instructor.id)
-      .all<CompanyParticipant>(),
-    d1
-      .prepare(`SELECT id, instructor_id, name, content_type, size, category,
+        .bind(instructor.id)
+        .all<CompanyParticipant>(),
+      d1
+        .prepare(`SELECT id, instructor_id, name, content_type, size, category,
           status, created_at
           FROM instructor_documents
           WHERE instructor_id = ? ORDER BY created_at DESC`)
-      .bind(instructor.id)
-      .all<CompanyInstructorDocument>(),
-    sessoesPorTurma(d1, instructor.id),
-  ]);
+        .bind(instructor.id)
+        .all<CompanyInstructorDocument>(),
+      sessoesPorTurma(d1, instructor.id),
+    ]);
 
   return {
     instructor,
-    trainings: rows(trainingsResult).map((turma) => ({
-      ...turma,
-      sessions: sessoes.get(turma.id) ?? [],
-    })),
+    trainings: rows(trainingsResult).map((turma) => ({ ...turma, sessions: sessoes.get(turma.id) ?? [] })),
     availability: rows(availabilityResult),
     documents: rows(documentsResult),
     participants: rows(participantsResult),
@@ -1315,15 +1138,10 @@ export async function saveInstructorAvailability(input: {
     throw new Error('Informe uma data válida.');
   }
   const escalado = await getD1()
-    .prepare(
-      'SELECT 1 AS ok FROM training_sessions WHERE instructor_id = ? AND session_date = ? LIMIT 1',
-    )
+    .prepare('SELECT 1 AS ok FROM training_sessions WHERE instructor_id = ? AND session_date = ? LIMIT 1')
     .bind(input.instructorId, input.availableDate)
     .first<{ ok: number }>();
-  if (escalado)
-    throw new Error(
-      'Você já tem treinamento neste dia: ele aparece no calendário como treinamento.',
-    );
+  if (escalado) throw new Error('Você já tem treinamento neste dia: ele aparece no calendário como treinamento.');
   const id = makeId('availability');
   await getD1()
     .prepare(`INSERT INTO instructor_availability (
@@ -1371,9 +1189,7 @@ async function diaDoInstrutor(trainingId: string, instructorId: string) {
   const sessoes = await listTrainingSessions(trainingId);
   const minhas = sessoes.filter((dia) => dia.instructor_id === instructorId);
   if (minhas.length === 0) return null;
-  const atual =
-    minhas.find((dia) => dia.status !== 'completed') ??
-    minhas[minhas.length - 1];
+  const atual = minhas.find((dia) => dia.status !== 'completed') ?? minhas[minhas.length - 1];
   return { atual, sessoes, minhas };
 }
 
@@ -1385,20 +1201,14 @@ export async function startInstructorTraining(input: {
   await ensurePortalSchema();
   const d1 = getD1();
   const training = await d1
-    .prepare(
-      `SELECT t.id, t.qr_token FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`,
-    )
+    .prepare(`SELECT t.id, t.qr_token FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`)
     .bind(input.trainingId, input.instructorId)
     .first<{ id: string; qr_token: string }>();
-  if (!training)
-    throw new Error('Treinamento não encontrado para este instrutor.');
+  if (!training) throw new Error('Treinamento não encontrado para este instrutor.');
   const dia = await diaDoInstrutor(input.trainingId, input.instructorId);
-  if (!dia)
-    throw new Error('Nenhum dia deste treinamento está atribuído a você.');
+  if (!dia) throw new Error('Nenhum dia deste treinamento está atribuído a você.');
   if (dia.atual.status === 'completed') {
-    throw new Error(
-      'Todos os seus dias neste treinamento já foram concluídos.',
-    );
+    throw new Error('Todos os seus dias neste treinamento já foram concluídos.');
   }
   await d1
     .prepare("UPDATE training_sessions SET status = 'in_progress' WHERE id = ?")
@@ -1412,11 +1222,7 @@ export async function startInstructorTraining(input: {
     input.trainingId,
     { dia: dia.atual.day_number },
   );
-  return {
-    qrToken: training.qr_token,
-    status: 'in_progress' as const,
-    day: dia.atual.day_number,
-  };
+  return { qrToken: training.qr_token, status: 'in_progress' as const, day: dia.atual.day_number };
 }
 
 export async function listInstructorTrainingParticipants(input: {
@@ -1473,27 +1279,16 @@ export async function completeInstructorTraining(input: {
     .bind(dia.atual.id)
     .run();
   const { concluiuAgora } = await sincronizarTurma(input.trainingId);
-  await writeAudit(
-    input.userId,
-    'training.day_completed',
-    'training',
-    input.trainingId,
-    {
-      dia: dia.atual.day_number,
-      turmaConcluida: concluiuAgora,
-    },
-  );
+  await writeAudit(input.userId, 'training.day_completed', 'training', input.trainingId, {
+    dia: dia.atual.day_number,
+    turmaConcluida: concluiuAgora,
+  });
 
   if (!concluiuAgora) {
     const restantes = dia.sessoes.filter(
       (outro) => outro.id !== dia.atual.id && outro.status !== 'completed',
     ).length;
-    return {
-      status: 'in_progress' as const,
-      certificates: 0,
-      trainingCompleted: false,
-      remainingDays: restantes,
-    };
+    return { status: 'in_progress' as const, certificates: 0, trainingCompleted: false, remainingDays: restantes };
   }
 
   // Só na virada da turma: quem estava na lista de presença é quem recebe.
@@ -1501,12 +1296,7 @@ export async function completeInstructorTraining(input: {
     trainingId: input.trainingId,
     byUserId: input.userId,
   });
-  return {
-    status: 'completed' as const,
-    certificates: emitidos,
-    trainingCompleted: true,
-    remainingDays: 0,
-  };
+  return { status: 'completed' as const, certificates: emitidos, trainingCompleted: true, remainingDays: 0 };
 }
 
 /**
@@ -1523,32 +1313,21 @@ export async function completeTrainingByAdmin(input: {
   const sessoes = await listTrainingSessions(input.trainingId);
   if (sessoes.length === 0) throw new Error('Treinamento não encontrado.');
   const pendentes = sessoes.filter((dia) => dia.status !== 'completed');
-  if (pendentes.length === 0)
-    throw new Error('Este treinamento já está concluído.');
+  if (pendentes.length === 0) throw new Error('Este treinamento já está concluído.');
 
   const listaEnviada = await temListaAssinada(input.trainingId);
   if (!listaEnviada && !input.semLista) throw new Error('SEM_LISTA');
 
   await d1.batch(
     pendentes.map((dia) =>
-      d1
-        .prepare(
-          "UPDATE training_sessions SET status = 'completed' WHERE id = ?",
-        )
-        .bind(dia.id),
+      d1.prepare("UPDATE training_sessions SET status = 'completed' WHERE id = ?").bind(dia.id),
     ),
   );
   const { concluiuAgora } = await sincronizarTurma(input.trainingId);
-  await writeAudit(
-    input.byUserId,
-    'training.completed_by_company',
-    'training',
-    input.trainingId,
-    {
-      dias: pendentes.map((dia) => dia.day_number),
-      semListaAssinada: !listaEnviada,
-    },
-  );
+  await writeAudit(input.byUserId, 'training.completed_by_company', 'training', input.trainingId, {
+    dias: pendentes.map((dia) => dia.day_number),
+    semListaAssinada: !listaEnviada,
+  });
   const emitidos = await issueCertificateBatch({
     trainingId: input.trainingId,
     byUserId: input.byUserId,
@@ -1576,15 +1355,9 @@ export async function renameTraining(input: {
     .prepare('UPDATE trainings SET internal_label = ? WHERE id = ?')
     .bind(identificacao, input.trainingId)
     .run();
-  await writeAudit(
-    input.byUserId,
-    'training.renamed',
-    'training',
-    input.trainingId,
-    {
-      identificacao,
-    },
-  );
+  await writeAudit(input.byUserId, 'training.renamed', 'training', input.trainingId, {
+    identificacao,
+  });
   return { ok: true as const };
 }
 
@@ -1601,18 +1374,14 @@ export async function updateTrainingSession(input: {
   await ensurePortalSchema();
   const d1 = getD1();
   const atual = await d1
-    .prepare(
-      'SELECT id FROM training_sessions WHERE id = ? AND training_id = ? LIMIT 1',
-    )
+    .prepare('SELECT id FROM training_sessions WHERE id = ? AND training_id = ? LIMIT 1')
     .bind(input.sessionId, input.trainingId)
     .first<{ id: string }>();
   if (!atual) throw new Error('Dia do treinamento não encontrado.');
 
   if (input.instructorId) {
     const instrutor = await d1
-      .prepare(
-        "SELECT id FROM instructors WHERE id = ? AND status IN ('active', 'invited') LIMIT 1",
-      )
+      .prepare("SELECT id FROM instructors WHERE id = ? AND status IN ('active', 'invited') LIMIT 1")
       .bind(input.instructorId)
       .first<{ id: string }>();
     if (!instrutor) throw new Error('Selecione um instrutor aprovado.');
@@ -1623,22 +1392,10 @@ export async function updateTrainingSession(input: {
 
   const campos: string[] = [];
   const valores: (string | null)[] = [];
-  if (input.instructorId !== undefined) {
-    campos.push('instructor_id = ?');
-    valores.push(input.instructorId || null);
-  }
-  if (input.sessionDate !== undefined) {
-    campos.push('session_date = ?');
-    valores.push(input.sessionDate);
-  }
-  if (input.startTime !== undefined) {
-    campos.push('start_time = ?');
-    valores.push(input.startTime.trim());
-  }
-  if (input.endTime !== undefined) {
-    campos.push('end_time = ?');
-    valores.push(input.endTime.trim());
-  }
+  if (input.instructorId !== undefined) { campos.push('instructor_id = ?'); valores.push(input.instructorId || null); }
+  if (input.sessionDate !== undefined) { campos.push('session_date = ?'); valores.push(input.sessionDate); }
+  if (input.startTime !== undefined) { campos.push('start_time = ?'); valores.push(input.startTime.trim()); }
+  if (input.endTime !== undefined) { campos.push('end_time = ?'); valores.push(input.endTime.trim()); }
   if (campos.length === 0) return { ok: true as const };
 
   await d1
@@ -1648,15 +1405,9 @@ export async function updateTrainingSession(input: {
   // Trocar a data pode mudar a ordem: "Dia 1" é sempre o primeiro no calendário.
   if (input.sessionDate !== undefined) await renumerarDias(input.trainingId);
   await sincronizarTurma(input.trainingId);
-  await writeAudit(
-    input.byUserId,
-    'training.session_updated',
-    'training',
-    input.trainingId,
-    {
-      sessionId: input.sessionId,
-    },
-  );
+  await writeAudit(input.byUserId, 'training.session_updated', 'training', input.trainingId, {
+    sessionId: input.sessionId,
+  });
   return { ok: true as const };
 }
 
@@ -1664,10 +1415,7 @@ export async function updateTrainingSession(input: {
  * Congela o lote: a quantidade sai da lista de presença no momento do
  * encerramento. Reencerrar não duplica — o lote é atualizado.
  */
-export async function issueCertificateBatch(input: {
-  trainingId: string;
-  byUserId: string;
-}) {
+export async function issueCertificateBatch(input: { trainingId: string; byUserId: string }) {
   const d1 = getD1();
   const total = await d1
     .prepare(`SELECT count(*) AS total FROM participants p
@@ -1695,15 +1443,9 @@ export async function issueCertificateBatch(input: {
       .bind(makeId('batch'), input.trainingId, quantidade)
       .run();
   }
-  await writeAudit(
-    input.byUserId,
-    'certificates.issued',
-    'training',
-    input.trainingId,
-    {
-      participantes: quantidade,
-    },
-  );
+  await writeAudit(input.byUserId, 'certificates.issued', 'training', input.trainingId, {
+    participantes: quantidade,
+  });
   return quantidade;
 }
 
@@ -1724,9 +1466,7 @@ export async function replaceCertificateDocument(input: {
     .bind(input.trainingId, input.name)
     .all<{ id: string; object_key: string }>();
   await d1
-    .prepare(
-      `DELETE FROM files WHERE training_id = ? AND kind = 'document' AND name = ?`,
-    )
+    .prepare(`DELETE FROM files WHERE training_id = ? AND kind = 'document' AND name = ?`)
     .bind(input.trainingId, input.name)
     .run();
   const id = makeId('file');
@@ -1734,24 +1474,11 @@ export async function replaceCertificateDocument(input: {
     .prepare(`INSERT INTO files (
       id, client_id, training_id, name, object_key, content_type, size, kind, status
     ) VALUES (?, ?, ?, ?, ?, 'application/pdf', ?, 'document', 'stored')`)
-    .bind(
-      id,
-      input.clientId,
-      input.trainingId,
-      input.name,
-      input.objectKey,
-      input.size,
-    )
+    .bind(id, input.clientId, input.trainingId, input.name, input.objectKey, input.size)
     .run();
-  await writeAudit(
-    input.byUserId,
-    'certificates.published',
-    'training',
-    input.trainingId,
-    {
-      arquivo: input.name,
-    },
-  );
+  await writeAudit(input.byUserId, 'certificates.published', 'training', input.trainingId, {
+    arquivo: input.name,
+  });
   return { id, substituidos: rows(anteriores).map((item) => item.object_key) };
 }
 
@@ -1769,43 +1496,23 @@ export async function addParticipantByInstructor(input: {
   instructorId: string;
   trainingId: string;
   userId: string;
-  participant: {
-    fullName: string;
-    documentId: string;
-    rg?: string;
-    birthDate?: string;
-    email: string;
-    phone: string;
-    jobTitle: string;
-  };
+  participant: { fullName: string; documentId: string; rg?: string; birthDate?: string; email: string; phone: string; jobTitle: string };
 }) {
   await ensurePortalSchema();
   const d1 = getD1();
   const training = await d1
-    .prepare(
-      `SELECT t.id FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`,
-    )
+    .prepare(`SELECT t.id FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`)
     .bind(input.trainingId, input.instructorId)
     .first<{ id: string }>();
-  if (!training)
-    throw new Error('Treinamento não encontrado para este instrutor.');
-  if (
-    !input.participant.fullName.trim() ||
-    !input.participant.documentId.trim()
-  ) {
-    throw new Error(
-      'Informe ao menos o nome e o identificador do participante.',
-    );
+  if (!training) throw new Error('Treinamento não encontrado para este instrutor.');
+  if (!input.participant.fullName.trim() || !input.participant.documentId.trim()) {
+    throw new Error('Informe ao menos o nome e o identificador do participante.');
   }
-  const problemaDocumento =
-    problemaCpf(input.participant.documentId) ??
-    problemaRg(input.participant.rg ?? '');
+  const problemaDocumento = problemaCpf(input.participant.documentId) ?? problemaRg(input.participant.rg ?? '');
   if (problemaDocumento) throw new Error(problemaDocumento);
   // Checado antes da regra dos dias: quem já está na lista não é "aluno novo".
   if (await acharInscrito(training.id, input.participant.documentId)) {
-    throw new Error(
-      'Já existe um participante com este identificador nesta turma.',
-    );
+    throw new Error('Já existe um participante com este identificador nesta turma.');
   }
   // Quem entra na lista durante a aula conta como presente no dia aberto — e,
   // como no QR, não entra quem já perdeu um dia anterior.
@@ -1830,23 +1537,11 @@ export async function addParticipantByInstructor(input: {
       )
       .run();
   } catch {
-    throw new Error(
-      'Já existe um participante com este identificador nesta turma.',
-    );
+    throw new Error('Já existe um participante com este identificador nesta turma.');
   }
-  await writeAudit(
-    input.userId,
-    'participant.added_manually',
-    'participant',
-    id,
-    { trainingId: training.id },
-  );
+  await writeAudit(input.userId, 'participant.added_manually', 'participant', id, { trainingId: training.id });
   const checkin = dia
-    ? await registrarCheckin(
-        training.id,
-        { id, full_name: input.participant.fullName.trim() },
-        dia,
-      )
+    ? await registrarCheckin(training.id, { id, full_name: input.participant.fullName.trim() }, dia)
     : null;
   return { id, checkin };
 }
@@ -1867,20 +1562,10 @@ export async function removeParticipantByInstructor(input: {
     .first<{ id: string }>();
   if (!participant) throw new Error('Participante não encontrado.');
   await d1.batch([
-    d1
-      .prepare('DELETE FROM session_attendance WHERE participant_id = ?')
-      .bind(input.participantId),
-    d1
-      .prepare('DELETE FROM participants WHERE id = ?')
-      .bind(input.participantId),
+    d1.prepare('DELETE FROM session_attendance WHERE participant_id = ?').bind(input.participantId),
+    d1.prepare('DELETE FROM participants WHERE id = ?').bind(input.participantId),
   ]);
-  await writeAudit(
-    input.userId,
-    'participant.removed',
-    'participant',
-    input.participantId,
-    { trainingId: input.trainingId },
-  );
+  await writeAudit(input.userId, 'participant.removed', 'participant', input.participantId, { trainingId: input.trainingId });
 }
 
 // ---------------------------------------------------------------------------
@@ -1910,58 +1595,36 @@ export async function updateClientByAdmin(input: {
     contactEmail: normalizeEmail(input.contactEmail ?? ''),
     contactPhone: (input.contactPhone ?? '').trim(),
   };
-  if (
-    !campos.name ||
-    !campos.legalName ||
-    !campos.document ||
-    !campos.unit ||
-    !campos.contactName ||
-    !campos.contactEmail
-  ) {
+  if (!campos.name || !campos.legalName || !campos.document || !campos.unit || !campos.contactName || !campos.contactEmail) {
     throw new Error('Preencha todos os campos obrigatórios.');
   }
-  const existe = await d1
-    .prepare('SELECT id FROM clients WHERE id = ? LIMIT 1')
-    .bind(input.clientId)
-    .first<{ id: string }>();
+  const existe = await d1.prepare('SELECT id FROM clients WHERE id = ? LIMIT 1').bind(input.clientId).first<{ id: string }>();
   if (!existe) throw new Error('Cliente não encontrado.');
   const outroCliente = await d1
-    .prepare('SELECT name FROM clients WHERE document = ? AND id != ? LIMIT 1')
-    .bind(campos.document, input.clientId)
+    .prepare('SELECT name FROM clients WHERE (document = ? OR lower(contact_email) = ?) AND id != ? LIMIT 1')
+    .bind(campos.document, campos.contactEmail, input.clientId)
     .first<{ name: string }>();
-  if (outroCliente)
-    throw new Error(
-      `Já existe outro cliente com este CNPJ (${outroCliente.name}).`,
-    );
-  // O e-mail de contato pode repetir entre unidades (desde a v7); a conta da
-  // empresa entra pelo nome de usuário, que continua único.
+  if (outroCliente) throw new Error(`Já existe outro cliente com este CNPJ ou e-mail (${outroCliente.name}).`);
+  // O e-mail da conta da empresa acompanha o de contato, e não pode ser o de
+  // outra conta (instrutor ou equipe). client_id nulo precisa do IS NULL: a
+  // comparação com NULL não é verdadeira nem falsa e esconderia o conflito.
+  const outraConta = await d1
+    .prepare(`SELECT id FROM users WHERE lower(email) = ?
+      AND (client_id IS NULL OR client_id != ? OR role != 'client') LIMIT 1`)
+    .bind(campos.contactEmail, input.clientId)
+    .first<{ id: string }>();
+  if (outraConta) throw new Error('Este e-mail já é usado por outra conta de acesso.');
   await d1.batch([
     d1
       .prepare(`UPDATE clients SET name = ?, legal_name = ?, document = ?, unit = ?, contact_name = ?,
         contact_email = ?, contact_phone = ?, updated_at = datetime('now') WHERE id = ?`)
-      .bind(
-        campos.name,
-        campos.legalName,
-        campos.document,
-        campos.unit,
-        campos.contactName,
-        campos.contactEmail,
-        campos.contactPhone,
-        input.clientId,
-      ),
+      .bind(campos.name, campos.legalName, campos.document, campos.unit, campos.contactName,
+        campos.contactEmail, campos.contactPhone, input.clientId),
     d1
-      .prepare(
-        "UPDATE users SET email = ?, name = ? WHERE client_id = ? AND role = 'client'",
-      )
+      .prepare("UPDATE users SET email = ?, name = ? WHERE client_id = ? AND role = 'client'")
       .bind(campos.contactEmail, campos.contactName, input.clientId),
   ]);
-  await writeAudit(
-    input.byUserId,
-    'client.updated_by_company',
-    'client',
-    input.clientId,
-    { nome: campos.name },
-  );
+  await writeAudit(input.byUserId, 'client.updated_by_company', 'client', input.clientId, { nome: campos.name });
   return { ok: true as const };
 }
 
@@ -1987,66 +1650,38 @@ export async function updateInstructorByAdmin(input: {
     specialties: (input.specialties ?? '').trim(),
     baseCity: (input.baseCity ?? '').trim(),
   };
-  if (!campos.name || !campos.document || !campos.email)
-    throw new Error('Informe nome, CPF e e-mail do instrutor.');
-  const existe = await d1
-    .prepare('SELECT id FROM instructors WHERE id = ? LIMIT 1')
-    .bind(input.instructorId)
-    .first<{ id: string }>();
+  if (!campos.name || !campos.document || !campos.email) throw new Error('Informe nome, CPF e e-mail do instrutor.');
+  const existe = await d1.prepare('SELECT id FROM instructors WHERE id = ? LIMIT 1').bind(input.instructorId).first<{ id: string }>();
   if (!existe) throw new Error('Instrutor não encontrado.');
   const outroInstrutor = await d1
-    .prepare(
-      'SELECT name FROM instructors WHERE (document = ? OR lower(email) = ?) AND id != ? LIMIT 1',
-    )
+    .prepare('SELECT name FROM instructors WHERE (document = ? OR lower(email) = ?) AND id != ? LIMIT 1')
     .bind(campos.document, campos.email, input.instructorId)
     .first<{ name: string }>();
-  if (outroInstrutor)
-    throw new Error(
-      `Já existe outro instrutor com este CPF ou e-mail (${outroInstrutor.name}).`,
-    );
+  if (outroInstrutor) throw new Error(`Já existe outro instrutor com este CPF ou e-mail (${outroInstrutor.name}).`);
   const outraConta = await d1
     .prepare(`SELECT id FROM users WHERE lower(email) = ?
       AND (instructor_id IS NULL OR instructor_id != ? OR role != 'instructor') LIMIT 1`)
     .bind(campos.email, input.instructorId)
     .first<{ id: string }>();
-  if (outraConta)
-    throw new Error('Este e-mail já é usado por outra conta de acesso.');
+  if (outraConta) throw new Error('Este e-mail já é usado por outra conta de acesso.');
   await d1.batch([
     d1
       .prepare(`UPDATE instructors SET name = ?, document = ?, email = ?, phone = ?, professional_registry = ?,
         specialties = ?, base_city = ?, updated_at = datetime('now') WHERE id = ?`)
-      .bind(
-        campos.name,
-        campos.document,
-        campos.email,
-        campos.phone,
-        campos.professionalRegistry,
-        campos.specialties,
-        campos.baseCity,
-        input.instructorId,
-      ),
+      .bind(campos.name, campos.document, campos.email, campos.phone, campos.professionalRegistry,
+        campos.specialties, campos.baseCity, input.instructorId),
     // O e-mail é o login dele: trocar aqui troca o acesso.
     d1
-      .prepare(
-        "UPDATE users SET name = ?, email = ? WHERE instructor_id = ? AND role = 'instructor'",
-      )
+      .prepare("UPDATE users SET name = ?, email = ? WHERE instructor_id = ? AND role = 'instructor'")
       .bind(campos.name, campos.email, input.instructorId),
   ]);
   // O nome sai impresso nos documentos: as turmas dele pegam o nome novo.
   const turmas = await d1
-    .prepare(
-      'SELECT DISTINCT training_id FROM training_sessions WHERE instructor_id = ?',
-    )
+    .prepare('SELECT DISTINCT training_id FROM training_sessions WHERE instructor_id = ?')
     .bind(input.instructorId)
     .all<{ training_id: string }>();
   for (const linha of rows(turmas)) await sincronizarTurma(linha.training_id);
-  await writeAudit(
-    input.byUserId,
-    'instructor.updated_by_company',
-    'instructor',
-    input.instructorId,
-    { nome: campos.name },
-  );
+  await writeAudit(input.byUserId, 'instructor.updated_by_company', 'instructor', input.instructorId, { nome: campos.name });
   return { ok: true as const };
 }
 
@@ -2070,54 +1705,27 @@ export async function updateTrainingByAdmin(input: {
     location: (input.location ?? '').trim(),
     contentProgram: (input.contentProgram ?? '').trim(),
   };
-  if (
-    !campos.clientId ||
-    !campos.nr ||
-    !campos.title ||
-    !campos.duration ||
-    !campos.location
-  ) {
-    throw new Error(
-      'Preencha cliente, norma, título, carga horária e endereço.',
-    );
+  if (!campos.clientId || !campos.nr || !campos.title || !campos.duration || !campos.location) {
+    throw new Error('Preencha cliente, norma, título, carga horária e endereço.');
   }
   const turma = await d1
     .prepare('SELECT client_id FROM trainings WHERE id = ? LIMIT 1')
     .bind(input.trainingId)
     .first<{ client_id: string }>();
   if (!turma) throw new Error('Treinamento não encontrado.');
-  const cliente = await d1
-    .prepare('SELECT id FROM clients WHERE id = ? LIMIT 1')
-    .bind(campos.clientId)
-    .first<{ id: string }>();
+  const cliente = await d1.prepare('SELECT id FROM clients WHERE id = ? LIMIT 1').bind(campos.clientId).first<{ id: string }>();
   if (!cliente) throw new Error('Cliente não encontrado.');
   await d1.batch([
     d1
       .prepare(`UPDATE trainings SET client_id = ?, nr = ?, title = ?, duration = ?, location = ?,
         content_program = ? WHERE id = ?`)
-      .bind(
-        campos.clientId,
-        campos.nr,
-        campos.title,
-        campos.duration,
-        campos.location,
-        campos.contentProgram,
-        input.trainingId,
-      ),
+      .bind(campos.clientId, campos.nr, campos.title, campos.duration, campos.location, campos.contentProgram, input.trainingId),
     // Arquivos seguem a turma: o cliente novo passa a vê-los no portal dele.
-    d1
-      .prepare('UPDATE files SET client_id = ? WHERE training_id = ?')
-      .bind(campos.clientId, input.trainingId),
+    d1.prepare('UPDATE files SET client_id = ? WHERE training_id = ?').bind(campos.clientId, input.trainingId),
   ]);
-  await writeAudit(
-    input.byUserId,
-    'training.updated',
-    'training',
-    input.trainingId,
-    {
-      clienteTrocado: turma.client_id !== campos.clientId,
-    },
-  );
+  await writeAudit(input.byUserId, 'training.updated', 'training', input.trainingId, {
+    clienteTrocado: turma.client_id !== campos.clientId,
+  });
   return { ok: true as const };
 }
 
@@ -2128,24 +1736,14 @@ export async function updateTrainingByAdmin(input: {
 async function renumerarDias(trainingId: string) {
   const d1 = getD1();
   const result = await d1
-    .prepare(
-      'SELECT id FROM training_sessions WHERE training_id = ? ORDER BY session_date ASC, day_number ASC',
-    )
+    .prepare('SELECT id FROM training_sessions WHERE training_id = ? ORDER BY session_date ASC, day_number ASC')
     .bind(trainingId)
     .all<{ id: string }>();
   const ids = rows(result).map((linha) => linha.id);
   if (ids.length === 0) return;
   await d1.batch([
-    ...ids.map((id, indice) =>
-      d1
-        .prepare('UPDATE training_sessions SET day_number = ? WHERE id = ?')
-        .bind(-(indice + 1), id),
-    ),
-    ...ids.map((id, indice) =>
-      d1
-        .prepare('UPDATE training_sessions SET day_number = ? WHERE id = ?')
-        .bind(indice + 1, id),
-    ),
+    ...ids.map((id, indice) => d1.prepare('UPDATE training_sessions SET day_number = ? WHERE id = ?').bind(-(indice + 1), id)),
+    ...ids.map((id, indice) => d1.prepare('UPDATE training_sessions SET day_number = ? WHERE id = ?').bind(indice + 1, id)),
   ]);
 }
 
@@ -2159,103 +1757,61 @@ export async function addTrainingDayByAdmin(input: {
 }) {
   await ensurePortalSchema();
   const d1 = getD1();
-  if (!DATA_ISO.test(input.date ?? ''))
-    throw new Error('Informe uma data válida para o dia.');
-  const turma = await d1
-    .prepare('SELECT id FROM trainings WHERE id = ? LIMIT 1')
-    .bind(input.trainingId)
-    .first<{ id: string }>();
+  if (!DATA_ISO.test(input.date ?? '')) throw new Error('Informe uma data válida para o dia.');
+  const turma = await d1.prepare('SELECT id FROM trainings WHERE id = ? LIMIT 1').bind(input.trainingId).first<{ id: string }>();
   if (!turma) throw new Error('Treinamento não encontrado.');
   if (input.instructorId) {
     const instrutor = await d1
-      .prepare(
-        "SELECT id FROM instructors WHERE id = ? AND status IN ('active', 'invited') LIMIT 1",
-      )
+      .prepare("SELECT id FROM instructors WHERE id = ? AND status IN ('active', 'invited') LIMIT 1")
       .bind(input.instructorId)
       .first<{ id: string }>();
     if (!instrutor) throw new Error('Selecione um instrutor aprovado.');
   }
   const repetido = await d1
-    .prepare(
-      'SELECT id FROM training_sessions WHERE training_id = ? AND session_date = ? LIMIT 1',
-    )
+    .prepare('SELECT id FROM training_sessions WHERE training_id = ? AND session_date = ? LIMIT 1')
     .bind(input.trainingId, input.date)
     .first<{ id: string }>();
   if (repetido) throw new Error('Esta turma já tem um dia nesta data.');
   const maior = await d1
-    .prepare(
-      'SELECT COALESCE(MAX(day_number), 0) AS n FROM training_sessions WHERE training_id = ?',
-    )
+    .prepare('SELECT COALESCE(MAX(day_number), 0) AS n FROM training_sessions WHERE training_id = ?')
     .bind(input.trainingId)
     .first<{ n: number }>();
   await d1
     .prepare(`INSERT INTO training_sessions (
       id, training_id, day_number, session_date, start_time, end_time, instructor_id, status
     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled')`)
-    .bind(
-      makeId('session'),
-      input.trainingId,
-      Number(maior?.n ?? 0) + 1,
-      input.date,
-      (input.startTime ?? '').trim(),
-      (input.endTime ?? '').trim(),
-      input.instructorId || null,
-    )
+    .bind(makeId('session'), input.trainingId, Number(maior?.n ?? 0) + 1, input.date,
+      (input.startTime ?? '').trim(), (input.endTime ?? '').trim(), input.instructorId || null)
     .run();
   await renumerarDias(input.trainingId);
   await sincronizarTurma(input.trainingId);
-  await writeAudit(
-    input.byUserId,
-    'training.day_added',
-    'training',
-    input.trainingId,
-    { data: input.date },
-  );
+  await writeAudit(input.byUserId, 'training.day_added', 'training', input.trainingId, { data: input.date });
   return { ok: true as const };
 }
 
-export async function removeTrainingDayByAdmin(input: {
-  trainingId: string;
-  sessionId: string;
-  byUserId: string;
-}) {
+export async function removeTrainingDayByAdmin(input: { trainingId: string; sessionId: string; byUserId: string }) {
   await ensurePortalSchema();
   const d1 = getD1();
   const sessoes = await listTrainingSessions(input.trainingId);
   const dia = sessoes.find((item) => item.id === input.sessionId);
   if (!dia) throw new Error('Dia do treinamento não encontrado.');
-  if (sessoes.length === 1)
-    throw new Error(
-      'A turma precisa de pelo menos um dia. Para cancelar tudo, exclua o treinamento.',
-    );
+  if (sessoes.length === 1) throw new Error('A turma precisa de pelo menos um dia. Para cancelar tudo, exclua o treinamento.');
   const presencas = await d1
-    .prepare(
-      'SELECT count(*) AS n FROM session_attendance WHERE session_id = ?',
-    )
+    .prepare('SELECT count(*) AS n FROM session_attendance WHERE session_id = ?')
     .bind(dia.id)
     .first<{ n: number }>();
   await d1.batch([
-    d1
-      .prepare('DELETE FROM session_attendance WHERE session_id = ?')
-      .bind(dia.id),
-    d1
-      .prepare('UPDATE files SET session_id = NULL WHERE session_id = ?')
-      .bind(dia.id),
+    d1.prepare('DELETE FROM session_attendance WHERE session_id = ?').bind(dia.id),
+    d1.prepare('UPDATE files SET session_id = NULL WHERE session_id = ?').bind(dia.id),
     d1.prepare('DELETE FROM training_sessions WHERE id = ?').bind(dia.id),
   ]);
   await renumerarDias(input.trainingId);
   await sincronizarTurma(input.trainingId);
-  await writeAudit(
-    input.byUserId,
-    'training.day_removed',
-    'training',
-    input.trainingId,
-    {
-      dia: dia.day_number,
-      data: dia.session_date,
-      presencasRemovidas: Number(presencas?.n ?? 0),
-    },
-  );
+  await writeAudit(input.byUserId, 'training.day_removed', 'training', input.trainingId, {
+    dia: dia.day_number,
+    data: dia.session_date,
+    presencasRemovidas: Number(presencas?.n ?? 0),
+  });
   return { ok: true as const };
 }
 
@@ -2270,10 +1826,8 @@ type DadosParticipanteGestao = {
 };
 
 function validarParticipante(dados: DadosParticipanteGestao) {
-  if (!(dados.fullName ?? '').trim())
-    throw new Error('Informe o nome completo do participante.');
-  const problema =
-    problemaCpf(dados.documentId ?? '') ?? problemaRg(dados.rg ?? '');
+  if (!(dados.fullName ?? '').trim()) throw new Error('Informe o nome completo do participante.');
+  const problema = problemaCpf(dados.documentId ?? '') ?? problemaRg(dados.rg ?? '');
   if (problema) throw new Error(problema);
 }
 
@@ -2284,10 +1838,7 @@ export async function addParticipantByAdmin(input: {
   participant: DadosParticipanteGestao;
 }) {
   await ensurePortalSchema();
-  const turma = await getD1()
-    .prepare('SELECT id FROM trainings WHERE id = ? LIMIT 1')
-    .bind(input.trainingId)
-    .first<{ id: string }>();
+  const turma = await getD1().prepare('SELECT id FROM trainings WHERE id = ? LIMIT 1').bind(input.trainingId).first<{ id: string }>();
   if (!turma) throw new Error('Treinamento não encontrado.');
   validarParticipante(input.participant);
   if (await acharInscrito(input.trainingId, input.participant.documentId)) {
@@ -2299,25 +1850,10 @@ export async function addParticipantByAdmin(input: {
     .prepare(`INSERT INTO participants (
       id, training_id, full_name, document_id, rg, birth_date, email, phone, job_title, consent
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
-    .bind(
-      id,
-      input.trainingId,
-      dados.fullName.trim(),
-      formatarCpf(dados.documentId),
-      formatarRg(dados.rg, dados.documentId),
-      (dados.birthDate ?? '').trim(),
-      normalizeEmail(dados.email ?? ''),
-      (dados.phone ?? '').trim(),
-      (dados.jobTitle ?? '').trim(),
-    )
+    .bind(id, input.trainingId, dados.fullName.trim(), formatarCpf(dados.documentId), formatarRg(dados.rg, dados.documentId),
+      (dados.birthDate ?? '').trim(), normalizeEmail(dados.email ?? ''), (dados.phone ?? '').trim(), (dados.jobTitle ?? '').trim())
     .run();
-  await writeAudit(
-    input.byUserId,
-    'participant.added_by_company',
-    'participant',
-    id,
-    { trainingId: input.trainingId },
-  );
+  await writeAudit(input.byUserId, 'participant.added_by_company', 'participant', id, { trainingId: input.trainingId });
   return { id };
 }
 
@@ -2333,66 +1869,36 @@ export async function updateParticipantByAdmin(input: {
     .first<{ id: string; training_id: string }>();
   if (!atual) throw new Error('Participante não encontrado.');
   validarParticipante(input.participant);
-  const mesmoCpf = await acharInscrito(
-    atual.training_id,
-    input.participant.documentId,
-  );
-  if (mesmoCpf && mesmoCpf.id !== atual.id)
-    throw new Error('Já existe outro participante com este CPF nesta turma.');
+  const mesmoCpf = await acharInscrito(atual.training_id, input.participant.documentId);
+  if (mesmoCpf && mesmoCpf.id !== atual.id) throw new Error('Já existe outro participante com este CPF nesta turma.');
   const dados = input.participant;
   await getD1()
     .prepare(`UPDATE participants SET full_name = ?, document_id = ?, rg = ?, birth_date = ?, email = ?,
       phone = ?, job_title = ? WHERE id = ?`)
-    .bind(
-      dados.fullName.trim(),
-      formatarCpf(dados.documentId),
-      formatarRg(dados.rg, dados.documentId),
-      (dados.birthDate ?? '').trim(),
-      normalizeEmail(dados.email ?? ''),
-      (dados.phone ?? '').trim(),
-      (dados.jobTitle ?? '').trim(),
-      atual.id,
-    )
+    .bind(dados.fullName.trim(), formatarCpf(dados.documentId), formatarRg(dados.rg, dados.documentId),
+      (dados.birthDate ?? '').trim(), normalizeEmail(dados.email ?? ''), (dados.phone ?? '').trim(),
+      (dados.jobTitle ?? '').trim(), atual.id)
     .run();
-  await writeAudit(
-    input.byUserId,
-    'participant.updated_by_company',
-    'participant',
-    atual.id,
-    { trainingId: atual.training_id },
-  );
+  await writeAudit(input.byUserId, 'participant.updated_by_company', 'participant', atual.id, { trainingId: atual.training_id });
   return { ok: true as const };
 }
 
-export async function removeParticipantByAdmin(input: {
-  participantId: string;
-  byUserId: string;
-}) {
+export async function removeParticipantByAdmin(input: { participantId: string; byUserId: string }) {
   await ensurePortalSchema();
   const d1 = getD1();
   const atual = await d1
-    .prepare(
-      'SELECT id, training_id, full_name FROM participants WHERE id = ? LIMIT 1',
-    )
+    .prepare('SELECT id, training_id, full_name FROM participants WHERE id = ? LIMIT 1')
     .bind(input.participantId)
     .first<{ id: string; training_id: string; full_name: string }>();
   if (!atual) throw new Error('Participante não encontrado.');
   await d1.batch([
-    d1
-      .prepare('DELETE FROM session_attendance WHERE participant_id = ?')
-      .bind(atual.id),
+    d1.prepare('DELETE FROM session_attendance WHERE participant_id = ?').bind(atual.id),
     d1.prepare('DELETE FROM participants WHERE id = ?').bind(atual.id),
   ]);
-  await writeAudit(
-    input.byUserId,
-    'participant.removed_by_company',
-    'participant',
-    atual.id,
-    {
-      trainingId: atual.training_id,
-      nome: atual.full_name,
-    },
-  );
+  await writeAudit(input.byUserId, 'participant.removed_by_company', 'participant', atual.id, {
+    trainingId: atual.training_id,
+    nome: atual.full_name,
+  });
   return { ok: true as const };
 }
 
@@ -2417,30 +1923,20 @@ export async function setAttendanceByAdmin(input: {
   if (!alvo) throw new Error('Participante ou dia não encontrado nesta turma.');
   if (input.present) {
     await d1
-      .prepare(
-        'INSERT OR IGNORE INTO session_attendance (id, session_id, participant_id) VALUES (?, ?, ?)',
-      )
+      .prepare('INSERT OR IGNORE INTO session_attendance (id, session_id, participant_id) VALUES (?, ?, ?)')
       .bind(makeId('attendance'), input.sessionId, input.participantId)
       .run();
   } else {
     await d1
-      .prepare(
-        'DELETE FROM session_attendance WHERE session_id = ? AND participant_id = ?',
-      )
+      .prepare('DELETE FROM session_attendance WHERE session_id = ? AND participant_id = ?')
       .bind(input.sessionId, input.participantId)
       .run();
   }
-  await writeAudit(
-    input.byUserId,
-    'attendance.set_by_company',
-    'participant',
-    input.participantId,
-    {
-      trainingId: alvo.training_id,
-      dia: alvo.day_number,
-      presente: input.present,
-    },
-  );
+  await writeAudit(input.byUserId, 'attendance.set_by_company', 'participant', input.participantId, {
+    trainingId: alvo.training_id,
+    dia: alvo.day_number,
+    presente: input.present,
+  });
   return { ok: true as const };
 }
 
@@ -2462,17 +1958,9 @@ export async function getAttendanceListData(input: {
       WHERE t.id = ? LIMIT 1`)
     .bind(input.user.instructor_id ?? '', input.trainingId)
     .first<{
-      id: string;
-      client_name: string;
-      location: string;
-      duration: string;
-      instructor: string;
-      nr: string;
-      title: string;
-      training_date: string;
-      training_dates: string;
-      content_program: string;
-      instructor_id: string | null;
+      id: string; client_name: string; location: string; duration: string;
+      instructor: string; nr: string; title: string; training_date: string;
+      training_dates: string; content_program: string; instructor_id: string | null;
       meu: number;
     }>();
   if (!training) return null;
@@ -2480,25 +1968,15 @@ export async function getAttendanceListData(input: {
   if (!isAdmin && training.meu !== 1) return null;
   let dates: string[] = [];
   try {
-    dates = training.training_dates
-      ? (JSON.parse(training.training_dates) as string[])
-      : [];
-  } catch {
-    dates = [];
-  }
-  if (!Array.isArray(dates) || dates.length === 0)
-    dates = [training.training_date];
+    dates = training.training_dates ? (JSON.parse(training.training_dates) as string[]) : [];
+  } catch { dates = []; }
+  if (!Array.isArray(dates) || dates.length === 0) dates = [training.training_date];
   const participantsResult = await d1
     .prepare(`SELECT full_name, document_id, rg, birth_date
       FROM participants WHERE training_id = ?
       ORDER BY full_name COLLATE NOCASE ASC`)
     .bind(input.trainingId)
-    .all<{
-      full_name: string;
-      document_id: string;
-      rg: string;
-      birth_date: string;
-    }>();
+    .all<{ full_name: string; document_id: string; rg: string; birth_date: string }>();
   return {
     training: {
       id: training.id,
@@ -2540,17 +2018,9 @@ export async function updateInstructorProfile(input: {
         input.baseCity.trim(),
         input.instructorId,
       ),
-    d1
-      .prepare('UPDATE users SET name = ? WHERE id = ?')
-      .bind(input.name.trim(), input.userId),
+    d1.prepare('UPDATE users SET name = ? WHERE id = ?').bind(input.name.trim(), input.userId),
   ]);
-  await writeAudit(
-    input.userId,
-    'instructor.profile_updated',
-    'instructor',
-    input.instructorId,
-    {},
-  );
+  await writeAudit(input.userId, 'instructor.profile_updated', 'instructor', input.instructorId, {});
 }
 
 /**
@@ -2566,29 +2036,17 @@ export async function updateClientProfile(input: {
   contactPhone: string;
 }) {
   await ensurePortalSchema();
-  if (!input.contactName.trim())
-    throw new Error('Informe o nome do responsável.');
+  if (!input.contactName.trim()) throw new Error('Informe o nome do responsável.');
   if (!input.unit.trim()) throw new Error('Informe a unidade ou cidade.');
   await getD1()
     .prepare(`UPDATE clients
       SET unit = ?, contact_name = ?, contact_phone = ?, updated_at = datetime('now')
       WHERE id = ?`)
-    .bind(
-      input.unit.trim(),
-      input.contactName.trim(),
-      input.contactPhone.trim(),
-      input.clientId,
-    )
+    .bind(input.unit.trim(), input.contactName.trim(), input.contactPhone.trim(), input.clientId)
     .run();
-  await writeAudit(
-    input.userId,
-    'client.profile_updated',
-    'client',
-    input.clientId,
-    {
-      contactName: input.contactName.trim(),
-    },
-  );
+  await writeAudit(input.userId, 'client.profile_updated', 'client', input.clientId, {
+    contactName: input.contactName.trim(),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -2607,9 +2065,7 @@ export type InstructorDocumentRow = {
   created_at: string;
 };
 
-export async function listInstructorDocuments(
-  instructorId: string,
-): Promise<InstructorDocumentRow[]> {
+export async function listInstructorDocuments(instructorId: string): Promise<InstructorDocumentRow[]> {
   await ensurePortalSchema();
   const result = await getD1()
     .prepare(`SELECT id, instructor_id, name, object_key, content_type, size,
@@ -2634,15 +2090,11 @@ export async function replaceInstructorDocument(input: {
   await ensurePortalSchema();
   const d1 = getD1();
   const previous = await d1
-    .prepare(
-      'SELECT id, object_key FROM instructor_documents WHERE instructor_id = ? AND category = ?',
-    )
+    .prepare('SELECT id, object_key FROM instructor_documents WHERE instructor_id = ? AND category = ?')
     .bind(input.instructorId, input.category)
     .all<{ id: string; object_key: string }>();
   await d1
-    .prepare(
-      'DELETE FROM instructor_documents WHERE instructor_id = ? AND category = ?',
-    )
+    .prepare('DELETE FROM instructor_documents WHERE instructor_id = ? AND category = ?')
     .bind(input.instructorId, input.category)
     .run();
   const id = makeId('idoc');
@@ -2650,25 +2102,11 @@ export async function replaceInstructorDocument(input: {
     .prepare(`INSERT INTO instructor_documents (
       id, instructor_id, name, object_key, content_type, size, category, status
     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`)
-    .bind(
-      id,
-      input.instructorId,
-      input.name,
-      input.objectKey,
-      input.contentType,
-      input.size,
-      input.category,
-    )
+    .bind(id, input.instructorId, input.name, input.objectKey, input.contentType, input.size, input.category)
     .run();
-  await writeAudit(
-    input.byUserId,
-    'instructor.document_uploaded',
-    'instructor',
-    input.instructorId,
-    {
-      category: input.category,
-    },
-  );
+  await writeAudit(input.byUserId, 'instructor.document_uploaded', 'instructor', input.instructorId, {
+    category: input.category,
+  });
   return { id, replaced: rows(previous).map((item) => item.object_key) };
 }
 
@@ -2686,10 +2124,7 @@ export async function findInstructorDocumentForUser(input: {
     .first<InstructorDocumentRow>();
   if (!document) return null;
   if (input.user.role === 'admin') return document;
-  if (
-    input.user.role === 'instructor' &&
-    input.user.instructor_id === document.instructor_id
-  ) {
+  if (input.user.role === 'instructor' && input.user.instructor_id === document.instructor_id) {
     return document;
   }
   return null;
@@ -2703,9 +2138,7 @@ export async function setInstructorDocumentStatus(input: {
   await ensurePortalSchema();
   const d1 = getD1();
   const document = await d1
-    .prepare(
-      'SELECT id, instructor_id, category FROM instructor_documents WHERE id = ? LIMIT 1',
-    )
+    .prepare('SELECT id, instructor_id, category FROM instructor_documents WHERE id = ? LIMIT 1')
     .bind(input.documentId)
     .first<{ id: string; instructor_id: string; category: string }>();
   if (!document) throw new Error('Documento não encontrado.');
@@ -2715,9 +2148,7 @@ export async function setInstructorDocumentStatus(input: {
     .run();
   await writeAudit(
     input.byUserId,
-    input.status === 'approved'
-      ? 'instructor.document_approved'
-      : 'instructor.document_rejected',
+    input.status === 'approved' ? 'instructor.document_approved' : 'instructor.document_rejected',
     'instructor',
     document.instructor_id,
     { category: document.category },
@@ -2749,8 +2180,7 @@ export async function activateInstructorIfDocumentsApproved(input: {
       WHERE instructor_id = ? AND status = 'approved' AND category IN (${placeholders})`)
     .bind(input.instructorId, ...INSTRUCTOR_DOCUMENT_CATEGORIES)
     .first<{ total: number }>();
-  if ((aprovados?.total ?? 0) < INSTRUCTOR_DOCUMENT_CATEGORIES.length)
-    return false;
+  if ((aprovados?.total ?? 0) < INSTRUCTOR_DOCUMENT_CATEGORIES.length) return false;
 
   const instrutor = await d1
     .prepare('SELECT status FROM instructors WHERE id = ? LIMIT 1')
@@ -2778,9 +2208,7 @@ export async function activateInstructorIfDocumentsApproved(input: {
   return true;
 }
 
-export async function listAllInstructorDocuments(): Promise<
-  InstructorDocumentRow[]
-> {
+export async function listAllInstructorDocuments(): Promise<InstructorDocumentRow[]> {
   await ensurePortalSchema();
   const result = await getD1()
     .prepare(`SELECT id, instructor_id, name, object_key, content_type, size,
@@ -2816,12 +2244,7 @@ export type CertificateData = {
     signatureDocumentId: string | null;
   };
   /** Só quem fez check-in em todos os dias: é quem recebe certificado. */
-  participants: {
-    fullName: string;
-    rg: string;
-    documentId: string;
-    birthDate: string;
-  }[];
+  participants: { fullName: string; rg: string; documentId: string; birthDate: string }[];
   /** Inscritos que faltaram algum dia e ficaram de fora dos documentos. */
   participantsWithMissingDays: number;
 };
@@ -2847,35 +2270,20 @@ export async function getCertificateData(input: {
       WHERE t.id = ? LIMIT 1`)
     .bind(input.trainingId)
     .first<{
-      id: string;
-      nr: string;
-      title: string;
-      duration: string;
-      training_date: string;
-      training_dates: string;
-      instructor_id: string | null;
-      client_id: string;
-      legal_name: string;
-      client_document: string;
-      address: string;
-      district: string;
-      city: string;
-      state: string;
-      instructor_name: string;
-      instructor_registry: string;
+      id: string; nr: string; title: string; duration: string;
+      training_date: string; training_dates: string; instructor_id: string | null;
+      client_id: string; legal_name: string; client_document: string;
+      address: string; district: string; city: string; state: string;
+      instructor_name: string; instructor_registry: string;
     }>();
   if (!training) return null;
 
+
   let dates: string[] = [];
   try {
-    dates = training.training_dates
-      ? (JSON.parse(training.training_dates) as string[])
-      : [];
-  } catch {
-    dates = [];
-  }
-  if (!Array.isArray(dates) || dates.length === 0)
-    dates = [training.training_date];
+    dates = training.training_dates ? (JSON.parse(training.training_dates) as string[]) : [];
+  } catch { dates = []; }
+  if (!Array.isArray(dates) || dates.length === 0) dates = [training.training_date];
 
   // A assinatura do instrutor é o documento "signature" já aprovado pela Space.
   let signatureDocumentId: string | null = null;
@@ -2897,13 +2305,7 @@ export async function getCertificateData(input: {
       FROM participants p
       WHERE p.training_id = ? ORDER BY p.full_name COLLATE NOCASE ASC`)
     .bind(input.trainingId)
-    .all<{
-      full_name: string;
-      rg: string;
-      document_id: string;
-      birth_date: string;
-      completo: number;
-    }>();
+    .all<{ full_name: string; rg: string; document_id: string; birth_date: string; completo: number }>();
   const inscritos = rows(participantsResult);
   const completos = inscritos.filter((item) => Number(item.completo) === 1);
 
@@ -2951,11 +2353,7 @@ export type ClientAddress = {
 };
 
 export const EMPTY_CLIENT_ADDRESS: ClientAddress = {
-  address: '',
-  district: '',
-  city: '',
-  state: '',
-  postalCode: '',
+  address: '', district: '', city: '', state: '', postalCode: '',
 };
 
 export async function updateClientAddress(input: {
@@ -2978,31 +2376,15 @@ export async function updateClientAddress(input: {
       input.clientId,
     )
     .run();
-  await writeAudit(
-    input.byUserId,
-    'client.address_updated',
-    'client',
-    input.clientId,
-    {},
-  );
+  await writeAudit(input.byUserId, 'client.address_updated', 'client', input.clientId, {});
 }
 
-export async function getClientAddress(
-  clientId: string,
-): Promise<ClientAddress> {
+export async function getClientAddress(clientId: string): Promise<ClientAddress> {
   await ensurePortalSchema();
   const row = await getD1()
-    .prepare(
-      'SELECT address, district, city, state, postal_code FROM clients WHERE id = ? LIMIT 1',
-    )
+    .prepare('SELECT address, district, city, state, postal_code FROM clients WHERE id = ? LIMIT 1')
     .bind(clientId)
-    .first<{
-      address: string;
-      district: string;
-      city: string;
-      state: string;
-      postal_code: string;
-    }>();
+    .first<{ address: string; district: string; city: string; state: string; postal_code: string }>();
   if (!row) return EMPTY_CLIENT_ADDRESS;
   return {
     address: row.address ?? '',
@@ -3017,125 +2399,64 @@ export async function getClientAddress(
 // Exclusões
 // ---------------------------------------------------------------------------
 
-export async function deleteTrainingByAdmin(input: {
-  trainingId: string;
-  byUserId: string;
-}) {
+export async function deleteTrainingByAdmin(input: { trainingId: string; byUserId: string }) {
   await ensurePortalSchema();
   const d1 = getD1();
   // O ON DELETE CASCADE já daria conta, mas depende de foreign_keys ligado —
   // apagar explicitamente evita dia órfão aparecendo na agenda.
   await d1.batch([
     d1
-      .prepare(
-        'DELETE FROM session_attendance WHERE session_id IN (SELECT id FROM training_sessions WHERE training_id = ?)',
-      )
+      .prepare('DELETE FROM session_attendance WHERE session_id IN (SELECT id FROM training_sessions WHERE training_id = ?)')
       .bind(input.trainingId),
-    d1
-      .prepare('DELETE FROM training_sessions WHERE training_id = ?')
-      .bind(input.trainingId),
+    d1.prepare('DELETE FROM training_sessions WHERE training_id = ?').bind(input.trainingId),
     d1.prepare('DELETE FROM trainings WHERE id = ?').bind(input.trainingId),
   ]);
-  await writeAudit(
-    input.byUserId,
-    'training.deleted',
-    'training',
-    input.trainingId,
-    {},
-  );
+  await writeAudit(input.byUserId, 'training.deleted', 'training', input.trainingId, {});
 }
 
-export async function deleteClientByAdmin(input: {
-  clientId: string;
-  byUserId: string;
-}) {
+export async function deleteClientByAdmin(input: { clientId: string; byUserId: string }) {
   await ensurePortalSchema();
   const d1 = getD1();
   await d1.batch([
-    d1
-      .prepare("DELETE FROM users WHERE client_id = ? AND role = 'client'")
-      .bind(input.clientId),
+    d1.prepare("DELETE FROM users WHERE client_id = ? AND role = 'client'").bind(input.clientId),
     d1.prepare('DELETE FROM clients WHERE id = ?').bind(input.clientId),
   ]);
-  await writeAudit(
-    input.byUserId,
-    'client.deleted',
-    'client',
-    input.clientId,
-    {},
-  );
+  await writeAudit(input.byUserId, 'client.deleted', 'client', input.clientId, {});
 }
 
-export async function deleteInstructorByAdmin(input: {
-  instructorId: string;
-  byUserId: string;
-}) {
+export async function deleteInstructorByAdmin(input: { instructorId: string; byUserId: string }) {
   await ensurePortalSchema();
   const d1 = getD1();
   // Os dias dele voltam a ficar sem escala, e o nome sai da turma: deixar o
   // nome de um instrutor excluído gravado sairia impresso nos documentos.
   const afetadas = await d1
-    .prepare(
-      'SELECT DISTINCT training_id FROM training_sessions WHERE instructor_id = ?',
-    )
+    .prepare('SELECT DISTINCT training_id FROM training_sessions WHERE instructor_id = ?')
     .bind(input.instructorId)
     .all<{ training_id: string }>();
   await d1.batch([
-    d1
-      .prepare(
-        'UPDATE training_sessions SET instructor_id = NULL WHERE instructor_id = ?',
-      )
-      .bind(input.instructorId),
-    d1
-      .prepare(
-        "DELETE FROM users WHERE instructor_id = ? AND role = 'instructor'",
-      )
-      .bind(input.instructorId),
+    d1.prepare('UPDATE training_sessions SET instructor_id = NULL WHERE instructor_id = ?').bind(input.instructorId),
+    d1.prepare("DELETE FROM users WHERE instructor_id = ? AND role = 'instructor'").bind(input.instructorId),
     d1.prepare('DELETE FROM instructors WHERE id = ?').bind(input.instructorId),
   ]);
   for (const linha of rows(afetadas)) await sincronizarTurma(linha.training_id);
-  await writeAudit(
-    input.byUserId,
-    'instructor.deleted',
-    'instructor',
-    input.instructorId,
-    {},
-  );
+  await writeAudit(input.byUserId, 'instructor.deleted', 'instructor', input.instructorId, {});
 }
 
-export async function deleteEmployeeByOwner(input: {
-  userId: string;
-  byUserId: string;
-}) {
+export async function deleteEmployeeByOwner(input: { userId: string; byUserId: string }) {
   await ensurePortalSchema();
   const target = await findUserById(input.userId);
-  if (!target || target.role !== 'admin')
-    throw new Error('Funcionário não encontrado.');
-  if (isOwnerByEmailOrFlag(target.email, target.is_owner))
-    throw new Error('A conta do dono não pode ser excluída.');
-  if (target.id === input.byUserId)
-    throw new Error('Você não pode excluir a própria conta.');
-  await getD1()
-    .prepare("DELETE FROM users WHERE id = ? AND role = 'admin'")
-    .bind(input.userId)
-    .run();
-  await writeAudit(
-    input.byUserId,
-    'employee.deleted',
-    'user',
-    input.userId,
-    {},
-  );
+  if (!target || target.role !== 'admin') throw new Error('Funcionário não encontrado.');
+  if (isOwnerByEmailOrFlag(target.email, target.is_owner)) throw new Error('A conta do dono não pode ser excluída.');
+  if (target.id === input.byUserId) throw new Error('Você não pode excluir a própria conta.');
+  await getD1().prepare("DELETE FROM users WHERE id = ? AND role = 'admin'").bind(input.userId).run();
+  await writeAudit(input.byUserId, 'employee.deleted', 'user', input.userId, {});
 }
 
 // ---------------------------------------------------------------------------
 // Equipe Space Light (funcionários) e auditoria
 // ---------------------------------------------------------------------------
 
-export function isOwnerByEmailOrFlag(
-  email: string,
-  isOwnerFlag?: number,
-): boolean {
+export function isOwnerByEmailOrFlag(email: string, isOwnerFlag?: number): boolean {
   if (isOwnerFlag === 1) return true;
   const ownerEmail = (process.env.SPACE_ADMIN_EMAIL ?? '').trim().toLowerCase();
   return Boolean(ownerEmail) && email.trim().toLowerCase() === ownerEmail;
@@ -3171,9 +2492,7 @@ export async function createEmployeeByOwner(input: {
     ) VALUES (?, NULL, NULL, ?, ?, ?, ?, 'admin', 0, 1, 1)`)
     .bind(id, input.name.trim(), email, input.passwordHash, input.passwordSalt)
     .run();
-  await writeAudit(input.createdByUserId, 'employee.created', 'user', id, {
-    email,
-  });
+  await writeAudit(input.createdByUserId, 'employee.created', 'user', id, { email });
   return { userId: id, email };
 }
 
@@ -3233,55 +2552,42 @@ async function sessoesPorTurma(d1: DatabaseBinding, instructorId?: string) {
        LEFT JOIN instructors i ON i.id = s.instructor_id
        ORDER BY s.day_number ASC`;
   const preparada = d1.prepare(consulta);
-  const resultado = await (
-    instructorId ? preparada.bind(instructorId) : preparada
-  ).all<TrainingSessionRow>();
+  const resultado = await (instructorId ? preparada.bind(instructorId) : preparada).all<TrainingSessionRow>();
   const mapa = new Map<string, TrainingSessionRow[]>();
   for (const dia of rows(resultado)) {
     const lista = mapa.get(dia.training_id);
-    if (lista) lista.push(dia);
-    else mapa.set(dia.training_id, [dia]);
+    if (lista) lista.push(dia); else mapa.set(dia.training_id, [dia]);
   }
   return mapa;
 }
 
-export async function getCompanyDashboardData(currentUser: {
-  id: string;
-  email: string;
-  is_owner?: number;
-}): Promise<CompanyDashboardData> {
+export async function getCompanyDashboardData(
+  currentUser: { id: string; email: string; is_owner?: number },
+): Promise<CompanyDashboardData> {
   await ensurePortalSchema();
   const d1 = getD1();
-  const [
-    clientsResult,
-    instructorsResult,
-    instructorAvailabilityResult,
-    trainingsResult,
-    filesResult,
-    participantsResult,
-    sessoes,
-    presencasResult,
-  ] = await Promise.all([
-    d1
-      .prepare(
-        `SELECT id, name, legal_name, document, unit, contact_name,
+  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult] =
+    await Promise.all([
+      d1
+        .prepare(
+          `SELECT id, name, legal_name, document, unit, contact_name,
            contact_email, contact_phone, address, district, city, state,
            postal_code, status, created_at,
            (SELECT u.username FROM users u WHERE u.client_id = clients.id AND u.role = 'client'
             ORDER BY u.created_at ASC LIMIT 1) AS username
            FROM clients ORDER BY name COLLATE NOCASE ASC`,
-      )
-      .all<CompanyClient>(),
-    d1
-      .prepare(
-        `SELECT id, name, document, email, phone, professional_registry,
+        )
+        .all<CompanyClient>(),
+      d1
+        .prepare(
+          `SELECT id, name, document, email, phone, professional_registry,
            specialties, base_city, status, source, created_at
            FROM instructors ORDER BY name COLLATE NOCASE ASC`,
-      )
-      .all<CompanyInstructor>(),
-    d1
-      .prepare(
-        `SELECT a.id, a.instructor_id, i.name AS instructor_name,
+        )
+        .all<CompanyInstructor>(),
+      d1
+        .prepare(
+          `SELECT a.id, a.instructor_id, i.name AS instructor_name,
            a.available_date, a.note, a.status, a.created_at
            FROM instructor_availability a
            JOIN instructors i ON i.id = a.instructor_id
@@ -3289,11 +2595,11 @@ export async function getCompanyDashboardData(currentUser: {
            AND NOT EXISTS (SELECT 1 FROM training_sessions s
              WHERE s.instructor_id = a.instructor_id AND s.session_date = a.available_date)
            ORDER BY a.available_date ASC`,
-      )
-      .all<CompanyInstructorAvailability>(),
-    d1
-      .prepare(
-        `SELECT t.id, t.client_id, t.instructor_id, c.name AS client_name,
+        )
+        .all<CompanyInstructorAvailability>(),
+      d1
+        .prepare(
+          `SELECT t.id, t.client_id, t.instructor_id, c.name AS client_name,
            t.code, t.nr, t.title, t.internal_label, t.training_date, t.duration, t.location, t.content_program,
            COALESCE(i.name, t.instructor) AS instructor,
            t.status, t.participant_limit, t.qr_token, t.qr_enabled,
@@ -3304,22 +2610,22 @@ export async function getCompanyDashboardData(currentUser: {
            JOIN clients c ON c.id = t.client_id
            LEFT JOIN instructors i ON i.id = t.instructor_id
            ORDER BY t.training_date DESC`,
-      )
-      .all<CompanyTraining>(),
-    d1
-      .prepare(
-        `SELECT f.id, f.client_id, c.name AS client_name, f.training_id,
+        )
+        .all<CompanyTraining>(),
+      d1
+        .prepare(
+          `SELECT f.id, f.client_id, c.name AS client_name, f.training_id,
            t.title AS training_title, t.nr AS training_nr, f.name,
            f.object_key, f.content_type, f.size, f.kind, f.session_id, f.status, f.created_at
            FROM files f
            JOIN clients c ON c.id = f.client_id
            JOIN trainings t ON t.id = f.training_id
            ORDER BY f.created_at DESC`,
-      )
-      .all<CompanyFile>(),
-    d1
-      .prepare(
-        `SELECT p.id, p.training_id, t.title AS training_title,
+        )
+        .all<CompanyFile>(),
+      d1
+        .prepare(
+          `SELECT p.id, p.training_id, t.title AS training_title,
            t.nr AS training_nr, c.name AS client_name, p.full_name,
            p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.created_at,
           ${COLUNAS_PRESENCA}
@@ -3327,23 +2633,18 @@ export async function getCompanyDashboardData(currentUser: {
            JOIN trainings t ON t.id = p.training_id
            JOIN clients c ON c.id = t.client_id
            ORDER BY p.created_at DESC`,
-      )
-      .all<CompanyParticipant>(),
-    sessoesPorTurma(d1),
-    // Presença por dia de cada aluno: a gestão marca e desmarca na lista.
-    d1
-      .prepare('SELECT participant_id, session_id FROM session_attendance')
-      .all<{ participant_id: string; session_id: string }>(),
-  ]);
+        )
+        .all<CompanyParticipant>(),
+      sessoesPorTurma(d1),
+      // Presença por dia de cada aluno: a gestão marca e desmarca na lista.
+      d1.prepare('SELECT participant_id, session_id FROM session_attendance').all<{ participant_id: string; session_id: string }>(),
+    ]);
 
   return {
     clients: rows(clientsResult),
     instructors: rows(instructorsResult),
     instructorAvailability: rows(instructorAvailabilityResult),
-    trainings: rows(trainingsResult).map((turma) => ({
-      ...turma,
-      sessions: sessoes.get(turma.id) ?? [],
-    })),
+    trainings: rows(trainingsResult).map((turma) => ({ ...turma, sessions: sessoes.get(turma.id) ?? [] })),
     files: rows(filesResult),
     participants: rows(participantsResult),
     attendance: rows(presencasResult),
@@ -3397,13 +2698,10 @@ export async function createTraining(input: {
     }))
     .filter((dia) => DATA_ISO.test(dia.date))
     .sort((a, b) => a.date.localeCompare(b.date));
-  if (dias.length === 0)
-    throw new Error('Informe ao menos uma data para o treinamento.');
+  if (dias.length === 0) throw new Error('Informe ao menos uma data para o treinamento.');
 
   // Confere de uma vez só os instrutores escalados na criação, se houver.
-  const escalados = [
-    ...new Set(dias.map((dia) => dia.instructorId).filter(Boolean)),
-  ] as string[];
+  const escalados = [...new Set(dias.map((dia) => dia.instructorId).filter(Boolean))] as string[];
   const nomes = new Map<string, string>();
   if (escalados.length > 0) {
     const marcadores = escalados.map(() => '?').join(', ');
@@ -3413,8 +2711,7 @@ export async function createTraining(input: {
       .bind(...escalados)
       .all<{ id: string; name: string }>();
     for (const linha of rows(encontrados)) nomes.set(linha.id, linha.name);
-    if (nomes.size !== escalados.length)
-      throw new Error('Selecione um instrutor aprovado.');
+    if (nomes.size !== escalados.length) throw new Error('Selecione um instrutor aprovado.');
   }
 
   const primaryDate = dias[0].date;
@@ -3445,9 +2742,7 @@ export async function createTraining(input: {
         (input.contentProgram ?? '').trim(),
         input.duration.trim(),
         input.location.trim(),
-        ultimoEscalado
-          ? (nomes.get(ultimoEscalado.instructorId as string) ?? '')
-          : '',
+        ultimoEscalado ? nomes.get(ultimoEscalado.instructorId as string) ?? '' : '',
         qrToken,
       ),
     ...dias.map((dia, indice) =>
@@ -3455,24 +2750,20 @@ export async function createTraining(input: {
         .prepare(`INSERT INTO training_sessions (
           id, training_id, day_number, session_date, start_time, end_time, instructor_id, status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled')`)
-        .bind(
-          makeId('session'),
-          id,
-          indice + 1,
-          dia.date,
-          dia.startTime,
-          dia.endTime,
-          dia.instructorId,
-        ),
+        .bind(makeId('session'), id, indice + 1, dia.date, dia.startTime, dia.endTime, dia.instructorId),
     ),
   ]);
 
-  await writeAudit(input.createdByUserId, 'training.created', 'training', id, {
-    clientId: input.clientId,
-    dias: dias.length,
-  });
+  await writeAudit(
+    input.createdByUserId,
+    'training.created',
+    'training',
+    id,
+    { clientId: input.clientId, dias: dias.length },
+  );
   return { id, code, qrToken };
 }
+
 
 // ---------------------------------------------------------------------------
 // Arquivos com conteúdo real (Vercel Blob)
@@ -3505,13 +2796,7 @@ export async function findTrainingForInstructor(input: {
     .prepare(`SELECT t.id, t.client_id, t.nr, t.title, t.status
       FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`)
     .bind(input.trainingId, input.instructorId)
-    .first<{
-      id: string;
-      client_id: string;
-      nr: string;
-      title: string;
-      status: string;
-    }>();
+    .first<{ id: string; client_id: string; nr: string; title: string; status: string }>();
 }
 
 export async function registerStoredFile(input: {
@@ -3544,36 +2829,23 @@ export async function registerStoredFile(input: {
       input.sessionId ?? null,
     )
     .run();
-  await writeAudit(
-    input.createdByUserId,
-    'file.uploaded',
-    'training',
-    input.trainingId,
-    {
-      fileId: input.fileId,
-      kind: input.kind,
-    },
-  );
+  await writeAudit(input.createdByUserId, 'file.uploaded', 'training', input.trainingId, {
+    fileId: input.fileId,
+    kind: input.kind,
+  });
 }
 
 /** Devolve o arquivo cru para o admin poder apagá-lo do Blob antes da linha. */
 /** Confere que o treinamento é mesmo daquele cliente antes de anexar arquivo. */
-export async function findTrainingForClient(input: {
-  clientId: string;
-  trainingId: string;
-}) {
+export async function findTrainingForClient(input: { clientId: string; trainingId: string }) {
   await ensurePortalSchema();
   return getD1()
-    .prepare(
-      'SELECT id, client_id FROM trainings WHERE id = ? AND client_id = ? LIMIT 1',
-    )
+    .prepare('SELECT id, client_id FROM trainings WHERE id = ? AND client_id = ? LIMIT 1')
     .bind(input.trainingId, input.clientId)
     .first<{ id: string; client_id: string }>();
 }
 
-export async function findFileById(
-  fileId: string,
-): Promise<StoredFileRow | null> {
+export async function findFileById(fileId: string): Promise<StoredFileRow | null> {
   await ensurePortalSchema();
   return getD1()
     .prepare(`SELECT id, client_id, training_id, name, object_key, content_type,
@@ -3583,21 +2855,13 @@ export async function findFileById(
     .first<StoredFileRow>();
 }
 
-export async function deleteFileRow(input: {
-  fileId: string;
-  byUserId: string;
-}) {
+export async function deleteFileRow(input: { fileId: string; byUserId: string }) {
   await ensurePortalSchema();
-  await getD1()
-    .prepare('DELETE FROM files WHERE id = ?')
-    .bind(input.fileId)
-    .run();
+  await getD1().prepare('DELETE FROM files WHERE id = ?').bind(input.fileId).run();
   await writeAudit(input.byUserId, 'file.deleted', 'file', input.fileId, {});
 }
 
-export async function listTrainingFiles(
-  trainingId: string,
-): Promise<StoredFileRow[]> {
+export async function listTrainingFiles(trainingId: string): Promise<StoredFileRow[]> {
   await ensurePortalSchema();
   const result = await getD1()
     .prepare(`SELECT id, client_id, training_id, name, object_key, content_type,
@@ -3635,15 +2899,14 @@ export async function findFileForUser(input: {
     // trabalho dele. Fica arquivada como documento, mas continua acessível.
     if (file.kind !== 'photo' && file.kind !== 'attendance') return null;
     const owned = await getD1()
-      .prepare(
-        `SELECT t.id FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`,
-      )
+      .prepare(`SELECT t.id FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`)
       .bind(file.training_id, user.instructor_id)
       .first<{ id: string }>();
     return owned ? file : null;
   }
   return null;
 }
+
 
 // ---------------------------------------------------------------------------
 // Redefinição de senha por e-mail (token de uso único)
@@ -3676,12 +2939,7 @@ export async function createPasswordResetToken(input: {
   await d1
     .prepare(`INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
       VALUES (?, ?, ?, datetime('now', ?))`)
-    .bind(
-      makeId('reset'),
-      input.userId,
-      input.tokenHash,
-      `+${input.ttlMinutes} minutes`,
-    )
+    .bind(makeId('reset'), input.userId, input.tokenHash, `+${input.ttlMinutes} minutes`)
     .run();
   const created = await d1
     .prepare(`SELECT expires_at FROM password_reset_tokens
@@ -3713,8 +2971,7 @@ export async function consumePasswordResetToken(input: {
 }) {
   await ensurePortalSchema();
   const token = await findValidResetToken(input.tokenHash);
-  if (!token)
-    throw new Error('Este link expirou ou já foi usado. Peça um novo.');
+  if (!token) throw new Error('Este link expirou ou já foi usado. Peça um novo.');
   const d1 = getD1();
   await d1
     .prepare(`UPDATE users SET password_hash = ?, password_salt = ?, must_reset = 0
@@ -3722,20 +2979,12 @@ export async function consumePasswordResetToken(input: {
     .bind(input.passwordHash, input.passwordSalt, token.user_id)
     .run();
   await d1
-    .prepare(
-      `UPDATE password_reset_tokens SET used_at = datetime('now') WHERE id = ?`,
-    )
+    .prepare(`UPDATE password_reset_tokens SET used_at = datetime('now') WHERE id = ?`)
     .bind(token.id)
     .run();
-  await writeAudit(
-    token.user_id,
-    'user.password_self_reset',
-    'user',
-    token.user_id,
-    {
-      email: token.email,
-    },
-  );
+  await writeAudit(token.user_id, 'user.password_self_reset', 'user', token.user_id, {
+    email: token.email,
+  });
   return { userId: token.user_id, email: token.email };
 }
 
@@ -3759,9 +3008,7 @@ export async function findTrainingByToken(token: string) {
 
 /** Hoje no fuso da Space: a função roda em UTC, e à noite já seria amanhã. */
 function hojeEmSaoPaulo() {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-  }).format(new Date());
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 }
 
 /**
@@ -3773,12 +3020,10 @@ async function diaAbertoParaCheckin(trainingId: string) {
   const sessoes = await listTrainingSessions(trainingId);
   const hoje = hojeEmSaoPaulo();
   const iniciados = sessoes.filter((dia) => dia.status === 'in_progress');
-  return (
-    iniciados.find((dia) => dia.session_date === hoje) ??
-    iniciados[iniciados.length - 1] ??
-    sessoes.find((dia) => dia.session_date === hoje) ??
-    null
-  );
+  return iniciados.find((dia) => dia.session_date === hoje)
+    ?? iniciados[iniciados.length - 1]
+    ?? sessoes.find((dia) => dia.session_date === hoje)
+    ?? null;
 }
 
 const SEM_DIA_ABERTO =
@@ -3809,15 +3054,12 @@ async function exigirDiasAnteriores(
     .all<{ day_number: number }>();
   const faltando = rows(result).map((item) => item.day_number);
   if (faltando.length === 0) return;
-  const dias =
-    faltando.length === 1
-      ? `no dia ${faltando[0]}`
-      : `nos dias ${faltando.slice(0, -1).join(', ')} e ${faltando[faltando.length - 1]}`;
-  throw new CheckinBloqueadoError(
-    quem === 'aluno'
-      ? `Você não tem presença ${dias} deste treinamento. Como o certificado exige todos os dias, não é possível fazer check-in nesta turma. Procure a equipe Space Light.`
-      : `Este participante não tem presença ${dias} deste treinamento. Como o certificado exige todos os dias, ele não pode entrar na lista a partir do dia ${dia.day_number}.`,
-  );
+  const dias = faltando.length === 1
+    ? `no dia ${faltando[0]}`
+    : `nos dias ${faltando.slice(0, -1).join(', ')} e ${faltando[faltando.length - 1]}`;
+  throw new CheckinBloqueadoError(quem === 'aluno'
+    ? `Você não tem presença ${dias} deste treinamento. Como o certificado exige todos os dias, não é possível fazer check-in nesta turma. Procure a equipe Space Light.`
+    : `Este participante não tem presença ${dias} deste treinamento. Como o certificado exige todos os dias, ele não pode entrar na lista a partir do dia ${dia.day_number}.`);
 }
 
 /** CPF só com dígitos: "123.456.789-00" e "12345678900" são a mesma pessoa. */
@@ -3835,16 +3077,10 @@ async function acharInscrito(trainingId: string, documentId: string) {
   const alvo = documentoNormalizado(documentId);
   if (!alvo) return null;
   const result = await getD1()
-    .prepare(
-      'SELECT id, full_name, document_id FROM participants WHERE training_id = ?',
-    )
+    .prepare('SELECT id, full_name, document_id FROM participants WHERE training_id = ?')
     .bind(trainingId)
     .all<{ id: string; full_name: string; document_id: string }>();
-  return (
-    rows(result).find(
-      (item) => documentoNormalizado(item.document_id) === alvo,
-    ) ?? null
-  );
+  return rows(result).find((item) => documentoNormalizado(item.document_id) === alvo) ?? null;
 }
 
 /** Grava a presença do aluno no dia. Repetir no mesmo dia só confirma. */
@@ -3855,17 +3091,13 @@ async function registrarCheckin(
 ): Promise<CheckinResult> {
   const d1 = getD1();
   const jaTinha = await d1
-    .prepare(
-      'SELECT 1 AS ok FROM session_attendance WHERE session_id = ? AND participant_id = ? LIMIT 1',
-    )
+    .prepare('SELECT 1 AS ok FROM session_attendance WHERE session_id = ? AND participant_id = ? LIMIT 1')
     .bind(dia.id, participante.id)
     .first<{ ok: number }>();
   if (!jaTinha) {
     await exigirDiasAnteriores(trainingId, participante.id, dia);
     await d1
-      .prepare(
-        'INSERT OR IGNORE INTO session_attendance (id, session_id, participant_id) VALUES (?, ?, ?)',
-      )
+      .prepare('INSERT OR IGNORE INTO session_attendance (id, session_id, participant_id) VALUES (?, ?, ?)')
       .bind(makeId('attendance'), dia.id, participante.id)
       .run();
   }
@@ -3904,10 +3136,7 @@ export async function checkinParticipant(token: string, documentId: string) {
     await exigirDiasAnteriores(training.id, null, dia);
     return { found: false as const, checkin: null };
   }
-  return {
-    found: true as const,
-    checkin: await registrarCheckin(training.id, inscrito, dia),
-  };
+  return { found: true as const, checkin: await registrarCheckin(training.id, inscrito, dia) };
 }
 
 export async function registerParticipant(
@@ -3925,19 +3154,14 @@ export async function registerParticipant(
   const training = await findTrainingByToken(token);
   if (!training) throw new Error('Este formulário não está disponível.');
   // CPF e RG completos, só com números; a pontuação é colocada ao gravar.
-  const problemaDocumento =
-    problemaCpf(input.documentId) ?? problemaRg(input.rg ?? '');
+  const problemaDocumento = problemaCpf(input.documentId) ?? problemaRg(input.rg ?? '');
   if (problemaDocumento) throw new Error(problemaDocumento);
   const dia = await diaAbertoParaCheckin(training.id);
   if (!dia) throw new Error(SEM_DIA_ABERTO);
   // Já inscrito num dia anterior: vale como check-in, sem duplicar o cadastro.
   const inscrito = await acharInscrito(training.id, input.documentId);
   if (inscrito) {
-    return {
-      id: inscrito.id,
-      training,
-      checkin: await registrarCheckin(training.id, inscrito, dia),
-    };
+    return { id: inscrito.id, training, checkin: await registrarCheckin(training.id, inscrito, dia) };
   }
   await exigirDiasAnteriores(training.id, null, dia);
   const id = makeId('participant');
@@ -3960,11 +3184,7 @@ export async function registerParticipant(
   return {
     id,
     training,
-    checkin: await registrarCheckin(
-      training.id,
-      { id, full_name: input.fullName.trim() },
-      dia,
-    ),
+    checkin: await registrarCheckin(training.id, { id, full_name: input.fullName.trim() }, dia),
   };
 }
 
@@ -3992,11 +3212,10 @@ export async function getClientPortalData(
     }>();
   if (!organization) return null;
 
-  const [trainingResult, fileResult, certificateResult, participantResult] =
-    await Promise.all([
-      d1
-        .prepare(
-          `SELECT t.id, t.client_id, t.code, t.nr, t.title, t.internal_label, t.training_date,
+  const [trainingResult, fileResult, certificateResult] = await Promise.all([
+    d1
+      .prepare(
+        `SELECT t.id, t.client_id, t.code, t.nr, t.title, t.internal_label, t.training_date,
          t.training_dates, t.duration, t.location, t.instructor, t.status,
          (SELECT count(*) FROM participants p WHERE p.training_id = t.id) AS participant_count,
          (SELECT count(*) FROM files f WHERE f.training_id = t.id AND f.kind = 'photo') AS photo_count,
@@ -4006,77 +3225,60 @@ export async function getClientPortalData(
           WHERE cb.training_id = t.id) AS certificate_count
          FROM trainings t WHERE t.client_id = ?
          ORDER BY t.training_date DESC`,
-        )
-        .bind(clientId)
-        .all<{
-          id: string;
-          client_id: string;
-          code: string;
-          nr: string;
-          title: string;
-          training_date: string;
-          training_dates: string;
-          duration: string;
-          location: string;
-          instructor: string;
-          status: string;
-          participant_count: number;
-          photo_count: number;
-          document_count: number;
-          certificate_count: number;
-        }>(),
-      d1
-        .prepare(
-          `SELECT id, training_id, name, content_type, size, kind, status, created_at
+      )
+      .bind(clientId)
+      .all<{
+        id: string;
+        client_id: string;
+        code: string;
+        nr: string;
+        title: string;
+        training_date: string;
+        training_dates: string;
+        duration: string;
+        location: string;
+        instructor: string;
+        status: string;
+        participant_count: number;
+        photo_count: number;
+        document_count: number;
+        certificate_count: number;
+      }>(),
+    d1
+      .prepare(
+        `SELECT id, training_id, name, content_type, size, kind, status, created_at
          FROM files WHERE client_id = ? ORDER BY created_at DESC`,
-        )
-        .bind(clientId)
-        .all<{
-          id: string;
-          training_id: string;
-          name: string;
-          content_type: string;
-          size: number;
-          kind: string;
-          status: string;
-          created_at: string;
-        }>(),
-      d1
-        .prepare(
-          `SELECT cb.id, cb.training_id, t.title, t.nr, cb.generated_at,
+      )
+      .bind(clientId)
+      .all<{
+        id: string;
+        training_id: string;
+        name: string;
+        content_type: string;
+        size: number;
+        kind: string;
+        status: string;
+        created_at: string;
+      }>(),
+    d1
+      .prepare(
+        `SELECT cb.id, cb.training_id, t.title, t.nr, cb.generated_at,
          cb.participant_count
          FROM certificate_batches cb
          JOIN trainings t ON t.id = cb.training_id
          WHERE t.client_id = ? AND cb.status = 'generated'
          ORDER BY cb.generated_at DESC`,
-        )
-        .bind(clientId)
-        .all<{
-          id: string;
-          training_id: string;
-          title: string;
-          nr: string;
-          generated_at: string;
-          participant_count: number;
-        }>(),
-      // Só leitura, sem CPF nem RG: a empresa confere quem participou e a presença.
-      d1
-        .prepare(
-          `SELECT p.id, p.training_id, p.full_name, p.job_title, ${COLUNAS_PRESENCA}
-         FROM participants p
-         JOIN trainings t ON t.id = p.training_id
-         WHERE t.client_id = ?`,
-        )
-        .bind(clientId)
-        .all<{
-          id: string;
-          training_id: string;
-          full_name: string;
-          job_title: string;
-          days_present: number;
-          days_total: number;
-        }>(),
-    ]);
+      )
+      .bind(clientId)
+      .all<{
+        id: string;
+        training_id: string;
+        title: string;
+        nr: string;
+        generated_at: string;
+        participant_count: number;
+      }>(),
+  ]);
 
   const trainings: ClientTraining[] = rows(trainingResult).map((item) => ({
     id: item.id,
@@ -4086,9 +3288,7 @@ export async function getClientPortalData(
     title: item.title,
     date: item.training_date,
     // Turma de vários dias mostra todos eles, não só o primeiro.
-    dateLabel: datasDaTurma(item)
-      .map((dia) => formatDate(dia))
-      .join(' · '),
+    dateLabel: datasDaTurma(item).map((dia) => formatDate(dia)).join(' · '),
     duration: item.duration,
     location: item.location,
     instructor: item.instructor,
@@ -4116,20 +3316,13 @@ export async function getClientPortalData(
     }));
 
   const documents: ClientDocument[] = rows(fileResult)
-    .filter(
-      (item) =>
-        (item.kind === 'document' || item.kind === 'attendance') &&
-        item.status === 'stored',
-    )
+    .filter((item) => (item.kind === 'document' || item.kind === 'attendance') && item.status === 'stored')
     .map((item) => ({
       id: item.id,
       clientId,
       trainingId: item.training_id,
       title: item.name,
-      category:
-        item.kind === 'attendance'
-          ? 'Lista de presença assinada'
-          : 'Documento do treinamento',
+      category: 'Documento do treinamento',
       format: fileFormat(item.content_type, item.name),
       size: formatSize(item.size),
       updatedAt: formatDate(item.created_at),
@@ -4161,16 +3354,6 @@ export async function getClientPortalData(
       phone: organization.contact_phone,
     },
     trainings,
-    participants: rows(participantResult)
-      .map((item) => ({
-        id: item.id,
-        trainingId: item.training_id,
-        fullName: item.full_name,
-        jobTitle: item.job_title ?? '',
-        daysPresent: Number(item.days_present ?? 0),
-        daysTotal: Number(item.days_total ?? 0),
-      }))
-      .sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR')),
     photos,
     documents,
     certificates,
