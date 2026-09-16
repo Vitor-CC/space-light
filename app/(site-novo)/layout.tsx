@@ -9,12 +9,9 @@ export const metadata: Metadata = {
     default: 'Space Light Engenharia | Treinamentos em Normas Regulamentadoras',
     template: '%s | Space Light Engenharia',
   },
-  // Site novo em construção, convivendo com o atual: fica fora do Google até
-  // a troca de rota, para não competir com as páginas que estão no ar.
-  robots: { index: false, follow: false },
 };
 
-export default function SiteNovoLayout({ children }: LayoutProps<'/v2'>) {
+export default function SiteNovoLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="doc-ui flex min-h-dvh flex-col bg-doc-paper text-doc-ink">
       <a

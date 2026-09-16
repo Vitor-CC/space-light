@@ -8,10 +8,7 @@ import { SITE_URL } from '@/lib/site-url';
  * Só as páginas que fazem sentido aparecer em busca. O resto do site é portal
  * com login ou página aberta por token de uma turma específica.
  *
- * As páginas do site novo entram sozinhas quando ele assumir a raiz
- * (`SITE_BASE = ''` em lib/site-novo/rotas.ts). Enquanto vivem em /v2 elas
- * têm noindex, e pôr no sitemap página marcada para não indexar só gera aviso
- * no Google e compete com o site que está no ar.
+ * As páginas do site entram quando ele está na raiz (`SITE_BASE = ''`).
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const agora = new Date();
