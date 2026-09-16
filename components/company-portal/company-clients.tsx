@@ -923,7 +923,11 @@ export function CadastrarCliente({
         {campoNovo('document', 'CNPJ')}
         {campoNovo('unit', 'Unidade / cidade')}
         {campoNovo('contactName', 'Responsável na empresa')}
-        {campoNovo('contactEmail', 'E-mail do responsável', { type: 'email' })}
+        {campoNovo(
+          'contactEmail',
+          'E-mail do responsável (pode repetir em outra unidade)',
+          { type: 'email' },
+        )}
         <label>
           <span className={rotulo}>Nome de usuário (login)</span>
           <input
