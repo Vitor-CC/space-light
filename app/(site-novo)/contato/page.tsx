@@ -25,7 +25,7 @@ export const metadata: Metadata = metadadosDaPagina({
 
 export default async function PaginaDeContato({
   searchParams,
-}: PageProps<'/v2/contato'>) {
+}: PageProps<'/contato'>) {
   const parametros = await searchParams;
 
   // `?treinamento=nr-23` chega das páginas de norma e já marca a norma.

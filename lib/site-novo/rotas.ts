@@ -1,8 +1,8 @@
 /**
- * Endereços do site novo. Enquanto ele convive com o site atual, tudo vive sob
- * `/v2`; na troca de rota basta `SITE_BASE = ''`.
+ * Endereços do site. Ele viveu em `/v2` enquanto convivia com o site antigo;
+ * desde a troca (set/2026) está na raiz, com `SITE_BASE = ''`.
  */
-export const SITE_BASE: string = '/v2';
+export const SITE_BASE: string = '';
 
 const inicio = SITE_BASE || '/';
 

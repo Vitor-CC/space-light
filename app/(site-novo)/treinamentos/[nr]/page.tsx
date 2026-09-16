@@ -23,7 +23,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({
   params,
-}: PageProps<'/v2/treinamentos/[nr]'>): Promise<Metadata> {
+}: PageProps<'/treinamentos/[nr]'>): Promise<Metadata> {
   const norma = normaComPagina((await params).nr);
   if (!norma) return {};
   return metadadosDaPagina({
@@ -37,7 +37,7 @@ export async function generateMetadata({
 
 export default async function PaginaDaNormaRota({
   params,
-}: PageProps<'/v2/treinamentos/[nr]'>) {
+}: PageProps<'/treinamentos/[nr]'>) {
   const norma = normaComPagina((await params).nr);
   if (!norma) notFound();
   return (
