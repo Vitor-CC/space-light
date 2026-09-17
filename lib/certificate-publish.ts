@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import {
   findInstructorDocumentForUser,
   deleteFileRow,
@@ -20,6 +22,26 @@ import { certificateSetup } from '@/lib/certificate-config';
 import { prepararAssinatura } from '@/lib/signature-image';
 
 type Assinatura = { bytes: Uint8Array; contentType: string } | null;
+
+/**
+ * Caminho do PDF no Blob, derivado do NOME do documento.
+ *
+ * Já foi derivado da posição na lista (`doc-0`, `doc-1`), e isso quebrava o
+ * "gerar de novo": a linha em `files` é substituída pelo nome, então bastava
+ * alguém entrar ou sair da lista — que sai em ordem alfabética — para o índice
+ * passar a ser de outro documento, e a inserção esbarrar no índice único de
+ * `files.object_key`. Pelo nome, cada documento tem sempre o mesmo caminho.
+ */
+export function chaveDoDocumento(nome: string) {
+  const legivel = nome
+    .replace(/\.pdf$/i, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+  const digest = createHash('sha256').update(nome).digest('hex').slice(0, 8);
+  return `${legivel}-${digest}`;
+}
 
 /** A assinatura do instrutor vive no Blob, como documento aprovado. */
 async function lerAssinaturaDoInstrutor(data: CertificateData, user: StoredUser): Promise<Assinatura> {
@@ -99,11 +121,11 @@ export async function publishCertificateDocument(input: {
   );
 
   const publicados: PublishedDocument[] = [];
-  for (const [indice, documento] of documentos.entries()) {
+  for (const documento of documentos) {
     const { objectKey } = await uploadTrainingFile({
       clientId,
       trainingId: input.trainingId,
-      fileId: `doc-${indice}-${input.trainingId}`,
+      fileId: chaveDoDocumento(documento.nome),
       name: documento.nome,
       contentType: 'application/pdf',
       body: paraArrayBuffer(documento.bytes),
