@@ -1,11 +1,11 @@
 'use client';
 
-import { AlertTriangle, CalendarDays, CalendarPlus, Check, ChevronDown, Clock3, Loader2, MessageCircle, Pencil, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { AlertTriangle, CalendarDays, CalendarPlus, Check, ChevronDown, ChevronRight, Clock3, Loader2, MessageCircle, Pencil, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { ptBR } from 'date-fns/locale';
 
-import { EmptyState, fieldClass, formatDate, formatWindow, labelClass, selectClass, StatusTag, SubTabs } from '@/components/company-portal/company-ui';
+import { dateFromIso, EmptyState, fieldClass, formatDate, formatWindow, isoFromDate, labelClass, selectClass, StatusTag, SubTabs } from '@/components/company-portal/company-ui';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
@@ -21,15 +21,6 @@ type Notify = (message: string) => void;
 type Reload = () => Promise<void>;
 
 const NORMAS = ['NR 05', 'NR 06', 'NR 10', 'NR 11', 'NR 12', 'NR 18', 'NR 20', 'NR 23', 'NR 33', 'NR 34', 'NR 35'];
-
-function isoFromDate(value: Date) {
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-}
-
-function dateFromIso(value: string) {
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, (month ?? 1) - 1, day ?? 1);
-}
 
 /** Só dígitos: o CNPJ é digitado com e sem pontuação, e as duas têm de achar. */
 function digitos(value: string) {
@@ -306,7 +297,7 @@ function TrainingRow({ training, clients, instructors, faltaLista, reload, notif
   const dias = training.sessions ?? [];
   const proxima = proximoDia(training);
   const semInstrutor = dias.filter((dia) => !dia.instructor_id).length;
-  return <article className="border border-black/10 bg-white">
+  return <article id={`turma-${training.id}`} className="border border-black/10 bg-white">
     <button type="button" onClick={alternar} aria-expanded={aberta} className="flex w-full items-center gap-4 p-4 text-left hover:bg-[#fff8e8]">
       <span className="flex size-11 shrink-0 items-center justify-center bg-black font-heading text-xs font-black text-[#f2ad19]">{training.nr}</span>
       <span className="min-w-0 flex-1">
@@ -334,7 +325,7 @@ function TrainingRow({ training, clients, instructors, faltaLista, reload, notif
 // Agenda
 // ---------------------------------------------------------------------------
 
-function Agenda({ data, reload, notify }: { data: CompanyDashboardData; reload: Reload; notify: Notify }) {
+function Agenda({ data, reload, notify, abrirTurma }: { data: CompanyDashboardData; reload: Reload; notify: Notify; abrirTurma: (id: string) => void }) {
   const [selecionada, setSelecionada] = useState<Date | undefined>(new Date());
   const instrutores = data.instructors.filter((item) => item.status === 'active');
 
@@ -380,18 +371,19 @@ function Agenda({ data, reload, notify }: { data: CompanyDashboardData; reload: 
       </div>
       <div className="space-y-4">
         {doDia.map(({ training, session }) => <article key={session.id} className="border border-black/10 bg-white">
-          <div className="flex items-start gap-4 p-5">
+          <button type="button" onClick={() => abrirTurma(training.id)} className="flex w-full items-start gap-4 p-5 text-left transition hover:bg-[#fff8e8]">
             <span className="flex size-12 shrink-0 items-center justify-center bg-black font-heading text-sm font-black text-[#f2ad19]">{training.nr}</span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2"><StatusTag status={session.status} /><span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#999]">Dia {session.day_number} de {training.sessions.length}</span></div>
-              <h3 className="mt-3 text-base font-extrabold uppercase leading-tight tracking-[0.05em]">{training.internal_label || training.title}</h3>
-              <p className="mt-2 text-xs font-bold text-[#8a6107]">{training.client_name}{training.internal_label ? ` · ${training.title}` : ''}</p>
-              <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#666]">
+            <span className="min-w-0 flex-1">
+              <span className="flex flex-wrap items-center gap-2"><StatusTag status={session.status} /><span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#999]">Dia {session.day_number} de {training.sessions.length}</span></span>
+              <strong className="mt-3 block text-base font-extrabold uppercase leading-tight tracking-[0.05em]">{training.internal_label || training.title}</strong>
+              <span className="mt-2 block text-xs font-bold text-[#8a6107]">{training.client_name}{training.internal_label ? ` · ${training.title}` : ''}</span>
+              <span className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#666]">
                 {formatWindow(session) ? <span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" />{formatWindow(session)}</span> : null}
                 <span className="inline-flex items-center gap-1.5">{training.location}</span>
-              </p>
-            </div>
-          </div>
+              </span>
+            </span>
+            <ChevronRight className="mt-1 size-4 shrink-0 text-black/30" />
+          </button>
           <DayRow training={training} session={session} instructors={instrutores} reload={reload} notify={notify} />
         </article>)}
         {doDia.length === 0 ? <EmptyState icon={CalendarDays} title="Nenhuma turma nesta data" text="Escolha outro dia no calendário ou crie um treinamento na aba Criar." /> : null}
@@ -549,12 +541,31 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
 
 // ---------------------------------------------------------------------------
 
-export function CompanyTrainings({ data, reload, notify }: { data: CompanyDashboardData; reload: Reload; notify: Notify }) {
-  const [aba, setAba] = useState<Aba>('agenda');
+export function CompanyTrainings({ data, reload, notify, turmaAlvo = null }: { data: CompanyDashboardData; reload: Reload; notify: Notify; turmaAlvo?: string | null }) {
+  // Quem chega pela Visão geral ou pela agenda já entra na lista com a turma
+  // aberta. A seção remonta ao trocar de aba do portal, então basta o inicial.
+  const [aba, setAba] = useState<Aba>(turmaAlvo ? 'lista' : 'agenda');
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<'todos' | 'scheduled' | 'in_progress' | 'sem_instrutor'>('todos');
-  const [aberta, setAberta] = useState<string | null>(null);
+  const [aberta, setAberta] = useState<string | null>(turmaAlvo);
   const [criada, setCriada] = useState<string | null>(null);
+
+  // Rolar depois que o React pintou a linha; senão o elemento ainda não existe.
+  const rolarAteTurma = (id: string) => {
+    requestAnimationFrame(() => document.getElementById(`turma-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  };
+
+  useEffect(() => {
+    if (turmaAlvo) rolarAteTurma(turmaAlvo);
+  }, [turmaAlvo]);
+
+  const abrirTurma = (id: string) => {
+    setAba('lista');
+    setFiltro('todos');
+    setBusca('');
+    setAberta(id);
+    rolarAteTurma(id);
+  };
 
   const instrutores = data.instructors.filter((item) => item.status === 'active');
   const alvo = busca.trim().toLowerCase();
@@ -609,7 +620,7 @@ export function CompanyTrainings({ data, reload, notify }: { data: CompanyDashbo
       <span className="text-xs font-bold text-[#b62525]">{semEscala === 1 ? '1 turma tem dia sem instrutor escalado.' : `${semEscala} turmas têm dias sem instrutor escalado.`} Ver quais →</span>
     </button> : null}
 
-    {aba === 'agenda' ? <Agenda data={data} reload={reload} notify={notify} /> : null}
+    {aba === 'agenda' ? <Agenda data={data} reload={reload} notify={notify} abrirTurma={abrirTurma} /> : null}
 
     {aba === 'lista' ? <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row">

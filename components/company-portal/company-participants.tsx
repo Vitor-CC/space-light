@@ -1,12 +1,14 @@
 'use client';
 
-import { Check, Copy, Download, FileText, Loader2, Pencil, Plus, QrCode, Trash2, UsersRound, X } from 'lucide-react';
+import { Check, Copy, Download, FileText, Loader2, Pencil, Plus, QrCode, Search, Trash2, UsersRound, X } from 'lucide-react';
 import Image from 'next/image';
 import QRCode from 'qrcode';
 import { useEffect, useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
+import { ptBR } from 'date-fns/locale';
 
-import { EmptyState, formatDate, inputClass, PresencaBadge, selectClass } from '@/components/company-portal/company-ui';
+import { dateFromIso, EmptyState, formatDate, inputClass, isoFromDate, PresencaBadge } from '@/components/company-portal/company-ui';
+import { Calendar } from '@/components/ui/calendar';
 import type { CompanyDashboardData, CompanyParticipant, CompanyTraining } from '@/lib/company-types';
 import { dataDoDia, rotuloDiaDaTurma } from '@/lib/dias-da-turma';
 import { limparDigitacaoCpf, limparDigitacaoRg, problemaCpf, problemaRg } from '@/lib/documentos';
@@ -170,8 +172,92 @@ function ParticipantRow({ participant, training, presentes, reload, notify }: { 
 
 const semPresenca = new Set<string>();
 
+/** Turma que faz sentido abrir primeiro: a de hoje, senão a próxima, senão a última. */
+function turmaInicial(trainings: CompanyTraining[], hoje: string) {
+  const comData = trainings.map((training) => ({ training, dia: dataDoDia(training) }));
+  const hojeMesmo = comData.find((item) => item.dia === hoje);
+  const proxima = comData.filter((item) => item.dia > hoje).sort((a, b) => a.dia.localeCompare(b.dia))[0];
+  const ultima = [...comData].sort((a, b) => b.dia.localeCompare(a.dia))[0];
+  return (hojeMesmo ?? proxima ?? ultima)?.training;
+}
+
+/** Achar a turma pelo calendário, ou pular direto para ela pelo nome/CPF do aluno. */
+function SeletorDeTurma({ data, escolhida, aoEscolher }: { data: CompanyDashboardData; escolhida: CompanyTraining | undefined; aoEscolher: (id: string) => void }) {
+  const [selecionada, setSelecionada] = useState<Date | undefined>(() => dateFromIso(escolhida ? dataDoDia(escolhida) : isoFromDate(new Date())));
+  const [busca, setBusca] = useState('');
+
+  const porData = useMemo(() => {
+    const mapa = new Map<string, CompanyTraining[]>();
+    for (const training of data.trainings) {
+      for (const session of training.sessions ?? []) {
+        const lista = mapa.get(session.session_date);
+        if (!lista) mapa.set(session.session_date, [training]);
+        else if (!lista.some((item) => item.id === training.id)) lista.push(training);
+      }
+    }
+    return mapa;
+  }, [data.trainings]);
+
+  const comTurma = useMemo(() => [...porData.keys()].map(dateFromIso), [porData]);
+  const iso = selecionada ? isoFromDate(selecionada) : '';
+  const doDia = porData.get(iso) ?? [];
+
+  const alvo = busca.trim().toLowerCase();
+  const digitos = alvo.replace(/\D/g, '');
+  const achados = useMemo(() => {
+    if (alvo.length < 2) return [];
+    return data.participants
+      .filter((item) => item.full_name.toLowerCase().includes(alvo) || (digitos.length >= 3 && item.document_id.includes(digitos)))
+      .slice(0, 8);
+  }, [data.participants, alvo, digitos]);
+
+  const linhaTurma = (training: CompanyTraining) => <button key={training.id} type="button" onClick={() => aoEscolher(training.id)}
+    className={`flex w-full items-center gap-3 border p-3 text-left transition hover:bg-[#fff8e8] ${training.id === escolhida?.id ? 'border-[#f2ad19] bg-[#fff8e8]' : 'border-black/10 bg-white'}`}>
+    <span className="flex size-10 shrink-0 items-center justify-center bg-black font-heading text-xs font-black text-[#f2ad19]">{training.nr}</span>
+    <span className="min-w-0 flex-1">
+      <strong className="block truncate text-sm font-extrabold uppercase tracking-[0.04em]">{training.internal_label || training.title}</strong>
+      <span className="mt-1 block truncate text-xs font-bold text-[#8a6107]">{training.client_name}</span>
+    </span>
+    <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.1em] text-[#999]">{training.participant_count} inscrito(s)</span>
+  </button>;
+
+  return <div className="border border-black/10 bg-[#f7f7f4] p-4 sm:p-5">
+    <label className="block">
+      <span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Buscar aluno por nome ou CPF</span>
+      <span className="relative block">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#999]" />
+        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="ex.: Maria Silva ou 12345678900" className={`${inputClass} pl-10`} />
+      </span>
+    </label>
+    {alvo.length >= 2 ? <div className="mt-3 space-y-2">
+      {achados.map((item) => <button key={item.id} type="button" onClick={() => aoEscolher(item.training_id)} aria-label={`Abrir a turma de ${item.full_name}`}
+        className="flex w-full items-center gap-3 border border-black/10 bg-white p-3 text-left transition hover:bg-[#fff8e8]">
+        <span className="min-w-0 flex-1">
+          <strong className="block truncate text-sm font-extrabold">{item.full_name}</strong>
+          <span className="mt-1 block truncate text-xs text-[#777]">{item.training_nr} · {item.client_name} · {item.days_present}/{item.days_total} dia(s)</span>
+        </span>
+      </button>)}
+      {achados.length === 0 ? <p className="text-xs text-[#777]">Nenhum aluno com esse nome ou CPF.</p> : null}
+    </div> : <div className="mt-5 grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)]">
+      <div className="bg-white p-3">
+        <Calendar mode="single" selected={selecionada} onSelect={setSelecionada} locale={ptBR}
+          modifiers={{ turma: comTurma }} modifiersClassNames={{ turma: 'bg-black text-[#f2ad19] font-bold' }}
+          className="mx-auto w-full [--cell-size:--spacing(10)]" />
+      </div>
+      <div>
+        <span className="eyebrow text-[#8a6107]">{selecionada ? formatDate(iso) : 'Escolha uma data'}</span>
+        <div className="mt-3 space-y-2">
+          {doDia.map(linhaTurma)}
+          {doDia.length === 0 ? <p className="text-xs text-[#777]">Nenhuma turma nesta data. Os dias com turma aparecem marcados no calendário.</p> : null}
+        </div>
+      </div>
+    </div>}
+  </div>;
+}
+
 export function CompanyParticipants({ data, reload, notify }: { data: CompanyDashboardData; reload: Reload; notify: Notify }) {
-  const [trainingId, setTrainingId] = useState(data.trainings[0]?.id || '');
+  const [trainingId, setTrainingId] = useState(() => turmaInicial(data.trainings, isoFromDate(new Date()))?.id ?? '');
+  const [trocando, setTrocando] = useState(false);
   const [gerando, setGerando] = useState(false);
   useEffect(() => {
     const timer = window.setInterval(() => void reload(), 5000);
@@ -211,7 +297,16 @@ export function CompanyParticipants({ data, reload, notify }: { data: CompanyDas
   const completos = participants.filter((item) => item.days_total > 0 && item.days_present >= item.days_total).length;
 
   return <div className="space-y-6">
-    <label className="block max-w-xl"><span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[0.12em]">Treinamento</span><select value={training.id} onChange={(e) => setTrainingId(e.target.value)} className={selectClass}>{data.trainings.map((item) => <option key={item.id} value={item.id}>{item.client_name} · {item.nr} · {item.internal_label ? `${item.internal_label} · ` : ''}{formatDate(dataDoDia(item))}{rotuloDiaDaTurma(item)}</option>)}</select></label>
+    {trocando
+      ? <SeletorDeTurma data={data} escolhida={training} aoEscolher={(id) => { setTrainingId(id); setTrocando(false); }} />
+      : <div className="flex flex-wrap items-center gap-4 border border-black/10 bg-white p-4">
+        <span className="flex size-11 shrink-0 items-center justify-center bg-black font-heading text-xs font-black text-[#f2ad19]">{training.nr}</span>
+        <span className="min-w-0 flex-1">
+          <strong className="block truncate text-sm font-extrabold uppercase tracking-[0.04em]">{training.internal_label || training.title}</strong>
+          <span className="mt-1 block truncate text-xs text-[#777]"><span className="font-bold text-[#8a6107]">{training.client_name}</span> · {formatDate(dataDoDia(training))}{rotuloDiaDaTurma(training)}</span>
+        </span>
+        <button type="button" onClick={() => setTrocando(true)} className="inline-flex h-11 shrink-0 items-center gap-2 border border-black/15 px-4 text-[10px] font-extrabold uppercase tracking-[0.12em] hover:bg-black hover:text-white"><Search className="size-4" />Trocar turma</button>
+      </div>}
     <QrPanel training={training} />
     <section className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

@@ -16,11 +16,21 @@ export const sectionCopy: Record<CompanySection, { title: string; description: s
   clients: { title: 'Clientes', description: 'Cadastros corporativos, responsáveis e treinamentos vinculados.' },
   instructors: { title: 'Instrutores', description: 'Cadastros profissionais, aprovações e turmas atribuídas.' },
   trainings: { title: 'Treinamentos', description: 'Agenda por dia, escala de instrutores e criação de novas turmas.' },
-  files: { title: 'Arquivos', description: 'Fotos da aula, documentos da turma e envio em lote, cada um no seu lugar.' },
+  files: { title: 'Documentação', description: 'Fotos da aula, documentos da turma e envio em lote, cada um no seu lugar.' },
   participants: { title: 'QR e participantes', description: 'Compartilhe o formulário, edite a lista de presença e marque a presença de cada dia.' },
   team: { title: 'Funcionários', description: 'Crie e gerencie os acessos da equipe Space Light. Exclusivo do dono da conta.' },
   audit: { title: 'Atividade', description: 'Histórico de ações da equipe: quem fez o quê e quando.' },
 };
+
+/** Data local no formato das colunas do banco (YYYY-MM-DD), sem passar por UTC. */
+export function isoFromDate(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+}
+
+export function dateFromIso(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, (month ?? 1) - 1, day ?? 1);
+}
 
 export function formatDate(value: string) {
   if (!value) return 'Sem data';
