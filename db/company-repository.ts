@@ -545,19 +545,67 @@ function datasDaTurma(turma: { training_date: string; training_dates: string }):
 const INSTRUTOR_NA_TURMA = `EXISTS (SELECT 1 FROM training_sessions s
   WHERE s.training_id = t.id AND s.instructor_id = ?)`;
 
+/** CPF sem pontuação: é o que liga o mesmo aluno entre turmas diferentes. */
+function cpfNu(coluna: string) {
+  return `replace(replace(replace(${coluna}, '.', ''), '-', ''), ' ', '')`;
+}
+
 /**
- * O aluno (alias p) tem check-in em todos os dias da turma. É a condição do
- * certificado: faltou um dia, fica de fora de todos os documentos.
+ * Turmas que valem crédito de dia entre si (a partir da turma do aluno, alias
+ * p): mesma norma, cliente, título, carga horária e mesmo número de dias. O
+ * número de dias entra porque o "dia 2" de uma turma de 2 dias não é o mesmo
+ * conteúdo do "dia 2" de uma de 3.
+ */
+const TURMAS_EQUIVALENTES = `SELECT te.id FROM trainings te
+    JOIN trainings tb ON tb.id = p.training_id
+    WHERE te.nr = tb.nr AND te.client_id = tb.client_id
+      AND te.title = tb.title AND te.duration = tb.duration
+      AND (SELECT count(*) FROM training_sessions s9 WHERE s9.training_id = te.id)
+        = (SELECT count(*) FROM training_sessions s9 WHERE s9.training_id = tb.id)`;
+
+/**
+ * A PESSOA do aluno p (mesmo CPF) tem presença num dia de mesmo número que o
+ * dia `s`, em qualquer turma equivalente. Depende de `s` e `p` estarem no
+ * escopo de quem usa.
+ */
+const PRESENCA_DA_PESSOA_NO_DIA = `SELECT 1 FROM session_attendance a
+    JOIN participants pp ON pp.id = a.participant_id
+    JOIN training_sessions ss ON ss.id = a.session_id
+    WHERE ${cpfNu('pp.document_id')} = ${cpfNu('p.document_id')}
+      AND ss.day_number = s.day_number
+      AND ss.training_id IN (${TURMAS_EQUIVALENTES})`;
+
+/**
+ * Condição do certificado: nenhum dia da turma ficou sem presença da pessoa.
+ * Os dias podem ter sido feitos em turmas equivalentes diferentes — quem fez o
+ * dia 1 numa turma e o dia 2 em outra está completo.
  */
 const PRESENTE_EM_TODOS_OS_DIAS = `NOT EXISTS (SELECT 1 FROM training_sessions s
   WHERE s.training_id = p.training_id
-  AND NOT EXISTS (SELECT 1 FROM session_attendance a
-    WHERE a.session_id = s.id AND a.participant_id = p.id))`;
+  AND NOT EXISTS (${PRESENCA_DA_PESSOA_NO_DIA}))`;
 
-/** Dias com check-in e dias da turma, para as listas de participantes (alias p). */
-const COLUNAS_PRESENCA = `(SELECT count(*) FROM session_attendance a
-    JOIN training_sessions s ON s.id = a.session_id
-    WHERE a.participant_id = p.id AND s.training_id = p.training_id) AS days_present,
+/**
+ * A turma onde a pessoa fez o ÚLTIMO dia (o prático): é ela que certifica e
+ * documenta. Fez o último dia em mais de uma turma equivalente? Vale a mais
+ * recente.
+ */
+const TURMA_QUE_CERTIFICA = `(SELECT ss.training_id FROM session_attendance a
+    JOIN participants pp ON pp.id = a.participant_id
+    JOIN training_sessions ss ON ss.id = a.session_id
+    WHERE ${cpfNu('pp.document_id')} = ${cpfNu('p.document_id')}
+      AND ss.day_number = (SELECT max(s8.day_number) FROM training_sessions s8 WHERE s8.training_id = p.training_id)
+      AND ss.training_id IN (${TURMAS_EQUIVALENTES})
+    ORDER BY ss.session_date DESC, ss.training_id DESC LIMIT 1)`;
+
+/** O aluno entra nos documentos DESTA turma, e não nos da turma equivalente. */
+const CERTIFICA_NESTA_TURMA = `p.training_id = ${TURMA_QUE_CERTIFICA}`;
+
+/**
+ * Dias cumpridos e dias da turma (alias p). Conta os dias da PESSOA entre
+ * turmas equivalentes: senão a gestão veria 1/3 para quem já está completo.
+ */
+const COLUNAS_PRESENCA = `(SELECT count(*) FROM training_sessions s
+    WHERE s.training_id = p.training_id AND EXISTS (${PRESENCA_DA_PESSOA_NO_DIA})) AS days_present,
   (SELECT count(*) FROM training_sessions s WHERE s.training_id = p.training_id) AS days_total`;
 
 export type TrainingSessionRow = {
@@ -1419,7 +1467,7 @@ export async function issueCertificateBatch(input: { trainingId: string; byUserI
   const d1 = getD1();
   const total = await d1
     .prepare(`SELECT count(*) AS total FROM participants p
-      WHERE p.training_id = ? AND ${PRESENTE_EM_TODOS_OS_DIAS}`)
+      WHERE p.training_id = ? AND ${PRESENTE_EM_TODOS_OS_DIAS} AND ${CERTIFICA_NESTA_TURMA}`)
     .bind(input.trainingId)
     .first<{ total: number }>();
   const quantidade = total?.total ?? 0;
@@ -1514,10 +1562,10 @@ export async function addParticipantByInstructor(input: {
   if (await acharInscrito(training.id, input.participant.documentId)) {
     throw new Error('Já existe um participante com este identificador nesta turma.');
   }
-  // Quem entra na lista durante a aula conta como presente no dia aberto — e,
-  // como no QR, não entra quem já perdeu um dia anterior.
+  // Quem entra na lista durante a aula conta como presente no dia aberto. Quem
+  // chega depois do 1º dia entra do mesmo jeito: o que decide o certificado é
+  // ter todos os dias cumpridos, não a porta de entrada.
   const dia = await diaAbertoParaCheckin(training.id);
-  if (dia) await exigirDiasAnteriores(training.id, null, dia, 'instrutor');
   const id = makeId('participant');
   try {
     await d1
@@ -2247,6 +2295,8 @@ export type CertificateData = {
   participants: { fullName: string; rg: string; documentId: string; birthDate: string }[];
   /** Inscritos que faltaram algum dia e ficaram de fora dos documentos. */
   participantsWithMissingDays: number;
+  /** Inscritos completos que se certificam noutra turma, a do último dia deles. */
+  participantsCertifiedElsewhere: number;
 };
 
 /**
@@ -2297,17 +2347,19 @@ export async function getCertificateData(input: {
     signatureDocumentId = assinatura?.id ?? null;
   }
 
-  // Só quem fez check-in em todos os dias. Os demais seguem na lista da turma,
-  // mas não entram em nenhum dos documentos.
+  // Só quem cumpriu todos os dias — podendo tê-los feito em turmas equivalentes
+  // — E que se certifica nesta turma, que é a do último dia. Quem fechou o
+  // treinamento em outra turma sai nos documentos de lá, não nos daqui.
   const participantsResult = await d1
     .prepare(`SELECT p.full_name, p.rg, p.document_id, p.birth_date,
-      ${PRESENTE_EM_TODOS_OS_DIAS} AS completo
+      ${PRESENTE_EM_TODOS_OS_DIAS} AS completo,
+      ${CERTIFICA_NESTA_TURMA} AS certifica_aqui
       FROM participants p
       WHERE p.training_id = ? ORDER BY p.full_name COLLATE NOCASE ASC`)
     .bind(input.trainingId)
-    .all<{ full_name: string; rg: string; document_id: string; birth_date: string; completo: number }>();
+    .all<{ full_name: string; rg: string; document_id: string; birth_date: string; completo: number; certifica_aqui: number }>();
   const inscritos = rows(participantsResult);
-  const completos = inscritos.filter((item) => Number(item.completo) === 1);
+  const completos = inscritos.filter((item) => Number(item.completo) === 1 && Number(item.certifica_aqui) === 1);
 
   return {
     training: {
@@ -2330,7 +2382,8 @@ export async function getCertificateData(input: {
       registry: training.instructor_registry,
       signatureDocumentId,
     },
-    participantsWithMissingDays: inscritos.length - completos.length,
+    participantsWithMissingDays: inscritos.filter((item) => Number(item.completo) !== 1).length,
+    participantsCertifiedElsewhere: inscritos.filter((item) => Number(item.completo) === 1 && Number(item.certifica_aqui) !== 1).length,
     participants: completos.map((item) => ({
       fullName: item.full_name,
       rg: item.rg,
@@ -3029,39 +3082,6 @@ async function diaAbertoParaCheckin(trainingId: string) {
 const SEM_DIA_ABERTO =
   'Nenhum dia deste treinamento está aberto para check-in agora. Fale com o instrutor.';
 
-/** Recusa de check-in de quem faltou um dia anterior. A rota pública responde 403. */
-export class CheckinBloqueadoError extends Error {}
-
-/**
- * Quem faltou um dia anterior ao aberto não segue na turma: o certificado exige
- * todos os dias, então a presença não é gravada — nem o cadastro, se for novo.
- * Decisão do Vitor. `participantId` nulo é aluno sem cadastro, que falta em
- * todos os dias anteriores.
- */
-async function exigirDiasAnteriores(
-  trainingId: string,
-  participantId: string | null,
-  dia: TrainingSessionRow,
-  quem: 'aluno' | 'instrutor' = 'aluno',
-) {
-  const result = await getD1()
-    .prepare(`SELECT s.day_number FROM training_sessions s
-      WHERE s.training_id = ? AND s.day_number < ?
-      AND NOT EXISTS (SELECT 1 FROM session_attendance a
-        WHERE a.session_id = s.id AND a.participant_id = ?)
-      ORDER BY s.day_number ASC`)
-    .bind(trainingId, dia.day_number, participantId ?? '')
-    .all<{ day_number: number }>();
-  const faltando = rows(result).map((item) => item.day_number);
-  if (faltando.length === 0) return;
-  const dias = faltando.length === 1
-    ? `no dia ${faltando[0]}`
-    : `nos dias ${faltando.slice(0, -1).join(', ')} e ${faltando[faltando.length - 1]}`;
-  throw new CheckinBloqueadoError(quem === 'aluno'
-    ? `Você não tem presença ${dias} deste treinamento. Como o certificado exige todos os dias, não é possível fazer check-in nesta turma. Procure a equipe Space Light.`
-    : `Este participante não tem presença ${dias} deste treinamento. Como o certificado exige todos os dias, ele não pode entrar na lista a partir do dia ${dia.day_number}.`);
-}
-
 /** CPF só com dígitos: "123.456.789-00" e "12345678900" são a mesma pessoa. */
 function documentoNormalizado(valor: string) {
   const digitos = valor.replace(/\D/g, '');
@@ -3095,7 +3115,6 @@ async function registrarCheckin(
     .bind(dia.id, participante.id)
     .first<{ ok: number }>();
   if (!jaTinha) {
-    await exigirDiasAnteriores(trainingId, participante.id, dia);
     await d1
       .prepare('INSERT OR IGNORE INTO session_attendance (id, session_id, participant_id) VALUES (?, ?, ?)')
       .bind(makeId('attendance'), dia.id, participante.id)
@@ -3132,8 +3151,7 @@ export async function checkinParticipant(token: string, documentId: string) {
   if (!dia) throw new Error(SEM_DIA_ABERTO);
   const inscrito = await acharInscrito(training.id, documentId);
   if (!inscrito) {
-    // Aluno novo depois do 1º dia: recusa já no CPF, antes de preencher tudo.
-    await exigirDiasAnteriores(training.id, null, dia);
+    // Aluno novo, inclusive depois do 1º dia: segue para o cadastro.
     return { found: false as const, checkin: null };
   }
   return { found: true as const, checkin: await registrarCheckin(training.id, inscrito, dia) };
@@ -3163,7 +3181,6 @@ export async function registerParticipant(
   if (inscrito) {
     return { id: inscrito.id, training, checkin: await registrarCheckin(training.id, inscrito, dia) };
   }
-  await exigirDiasAnteriores(training.id, null, dia);
   const id = makeId('participant');
   await getD1()
     .prepare(`INSERT INTO participants (

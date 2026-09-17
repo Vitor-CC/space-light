@@ -65,9 +65,11 @@ export async function publishCertificateDocument(input: {
   if (data.participants.length === 0) {
     return {
       ok: false,
-      reason: data.participantsWithMissingDays > 0
-        ? 'Nenhum participante tem presença (check-in) em todos os dias do treinamento.'
-        : 'A turma não tem participantes na lista de presença.',
+      reason: data.participantsCertifiedElsewhere > 0
+        ? 'Os participantes com todos os dias cumpridos se certificam na turma em que fizeram o último dia.'
+        : data.participantsWithMissingDays > 0
+          ? 'Nenhum participante tem presença (check-in) em todos os dias do treinamento.'
+          : 'A turma não tem participantes na lista de presença.',
     };
   }
   if (!certificateSetup(data.training.nr)) {

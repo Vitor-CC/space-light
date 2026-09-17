@@ -11,7 +11,7 @@ import { formatDate, inputClass } from '@/components/company-portal/company-ui';
 import type { CheckinResult, CompanyTraining } from '@/lib/company-types';
 import { diaDoCheckin } from '@/lib/dias-da-turma';
 import { limparDigitacaoCpf, limparDigitacaoRg, problemaCpf, problemaRg } from '@/lib/documentos';
-import { checkinParticipant, findMockTrainingByToken, registerMockParticipant, RequestError } from '@/lib/mock-company-database';
+import { checkinParticipant, findMockTrainingByToken, registerMockParticipant } from '@/lib/mock-company-database';
 
 type FormState = {
   fullName: string;
@@ -48,7 +48,6 @@ export function ParticipantForm() {
   const [busy, setBusy] = useState(false);
   const [checkin, setCheckin] = useState<CheckinResult | null>(null);
   // Faltou um dia anterior: a turma segue sem ele e nada é gravado.
-  const [blocked, setBlocked] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -83,8 +82,7 @@ export function ParticipantForm() {
       setCheckin(result.checkin);
       setSubmitted(true);
     } catch (submissionError) {
-      if (submissionError instanceof RequestError && submissionError.status === 403) setBlocked(submissionError.message);
-      else setError(submissionError instanceof Error ? submissionError.message : 'Não foi possível concluir a inscrição.');
+      setError(submissionError instanceof Error ? submissionError.message : 'Não foi possível concluir a inscrição.');
     } finally {
       setBusy(false);
     }
@@ -109,8 +107,7 @@ export function ParticipantForm() {
         setStep('form');
       }
     } catch (checkinError) {
-      if (checkinError instanceof RequestError && checkinError.status === 403) setBlocked(checkinError.message);
-      else setError(checkinError instanceof Error ? checkinError.message : 'Não foi possível registrar a presença.');
+      setError(checkinError instanceof Error ? checkinError.message : 'Não foi possível registrar a presença.');
     } finally {
       setBusy(false);
     }
@@ -122,10 +119,6 @@ export function ParticipantForm() {
 
   if (!training) {
     return <main className="flex min-h-screen items-center justify-center bg-[#efefeb] p-5 text-[#0b0b0b]"><section className="w-full max-w-xl border-t-4 border-[#f2ad19] bg-white p-8 text-center shadow-xl"><Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={232} height={84} className="mx-auto h-14 w-auto" /><h1 className="mt-9 text-3xl font-black uppercase tracking-[0.02em]">Formulário indisponível</h1><p className="mt-4 text-sm leading-relaxed text-[#666]">O link pode ter expirado, estar incorreto ou ter sido desativado. Solicite um novo QR Code à equipe responsável pelo treinamento.</p></section></main>;
-  }
-
-  if (blocked) {
-    return <main className="flex min-h-screen items-center justify-center bg-[#efefeb] p-5 text-[#0b0b0b]"><section className="w-full max-w-xl border-t-4 border-[#b62525] bg-white p-8 text-center shadow-xl"><Image src="/images/branding/space-light-logo-oficial.png" alt="Space Light Engenharia" width={232} height={84} className="mx-auto h-14 w-auto" /><h1 className="mt-9 text-3xl font-black uppercase tracking-[0.02em]">Check-in não permitido</h1><p className="mt-4 text-sm leading-relaxed text-[#666]">{blocked}</p></section></main>;
   }
 
   if (submitted) {

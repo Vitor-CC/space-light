@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { CheckinBloqueadoError, checkinParticipant, findTrainingByToken, listTrainingSessions, registerParticipant } from '@/db/company-repository';
+import { checkinParticipant, findTrainingByToken, listTrainingSessions, registerParticipant } from '@/db/company-repository';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -20,8 +20,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     return NextResponse.json(await registerParticipant(token, input), { status: 201 });
   }
   catch (error) {
-    // 403: faltou um dia anterior e a turma segue sem ele (nada foi gravado).
-    const bloqueado = error instanceof CheckinBloqueadoError;
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Não foi possível concluir a inscrição.', blocked: bloqueado }, { status: bloqueado ? 403 : 400 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Não foi possível concluir a inscrição.' }, { status: 400 });
   }
 }
