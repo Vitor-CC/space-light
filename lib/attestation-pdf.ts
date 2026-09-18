@@ -104,8 +104,17 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   let page = pdf.addPage([PAGE_W, PAGE_H]);
   let y = 0;
 
-  /** Cabeçalho repetido em toda página: selo, logo e faixa amarela. */
-  function abrirPagina() {
+  const corpo = 10.5;
+  const paragrafo = `Atesto, para os devidos fins, que as pessoas abaixo relacionadas participaram com bom aproveitamento do treinamento de "${setup.attestationSubject}", ${setup.attestationLegalBasis} referente à edificação localizada no endereço abaixo e estão aptas ao manuseio dos equipamentos de prevenção e combate a incêndio da edificação:`;
+  const campos: [string, string][] = [
+    ['EMPRESA', caixaAlta(data.client.legalName)],
+    ['CNPJ', data.client.document || '—'],
+    ['ENDEREÇO', [data.client.address, data.client.district].filter(Boolean).join(' - ') || '—'],
+    ['MUNICÍPIO / UF', [data.client.city, data.client.state].filter(Boolean).join(' / ') || '—'],
+  ];
+
+  /** Faixa amarela, selo e logo: a moldura da folha. */
+  function moldura() {
     page.drawRectangle({ x: 0, y: PAGE_H - 6, width: PAGE_W, height: 6, color: AMARELO });
     let topo = PAGE_H - 34;
     if (selo) {
@@ -122,68 +131,70 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
     y = topo - 30;
   }
 
+  /**
+   * Título, texto legal e dados da edificação. Vai em TODA página: o atestado
+   * pode ser destacado folha a folha, e cada uma precisa dizer sozinha de que
+   * treinamento e de qual edificação se trata.
+   */
+  function cabecalhoCompleto() {
+    const titulo = 'ATESTADO';
+    const tituloSize = 22;
+    const larguraTitulo = bold.widthOfTextAtSize(titulo, tituloSize);
+    page.drawText(titulo, { x: MARGIN + (CONTENT - larguraTitulo) / 2, y, size: tituloSize, font: bold, color: PRETO });
+    page.drawRectangle({ x: MARGIN + (CONTENT - 54) / 2, y: y - 10, width: 54, height: 3, color: AMARELO });
+
+    // Parágrafo de abertura, justificado sem esticar linha curta.
+    y -= 40;
+    const linhas = wrap(paragrafo, regular, corpo, CONTENT);
+    linhas.forEach((palavras, indice) => {
+      const texto = palavras.join(' ');
+      const curta = regular.widthOfTextAtSize(texto, corpo) < CONTENT * 0.88;
+      if (indice === linhas.length - 1 || curta || palavras.length === 1) {
+        page.drawText(texto, { x: MARGIN, y, size: corpo, font: regular, color: PRETO });
+      } else {
+        const larguraPalavras = palavras.reduce((soma, w) => soma + regular.widthOfTextAtSize(w, corpo), 0);
+        const espaco = (CONTENT - larguraPalavras) / (palavras.length - 1);
+        let x = MARGIN;
+        for (const palavra of palavras) {
+          page.drawText(palavra, { x, y, size: corpo, font: regular, color: PRETO });
+          x += regular.widthOfTextAtSize(palavra, corpo) + espaco;
+        }
+      }
+      y -= 16;
+    });
+
+    // Caixa com os dados da edificação.
+    y -= 18;
+    const alturaCaixa = campos.length * 17 + 26;
+    page.drawRectangle({ x: MARGIN, y: y - alturaCaixa + 12, width: CONTENT, height: alturaCaixa, color: FUNDO_SUAVE });
+    page.drawRectangle({ x: MARGIN, y: y - alturaCaixa + 12, width: 3, height: alturaCaixa, color: AMARELO });
+    page.drawText('DADOS DA EDIFICAÇÃO', { x: MARGIN + 16, y: y - 2, size: 7.5, font: bold, color: rgb(0.54, 0.38, 0.03) });
+    let campoY = y - 20;
+    for (const [rotulo, valor] of campos) {
+      page.drawText(rotulo, { x: MARGIN + 16, y: campoY, size: 8, font: bold, color: CINZA });
+      page.drawText(fit(valor, regular, corpo - 0.5, CONTENT - 130), {
+        x: MARGIN + 120, y: campoY, size: corpo - 0.5, font: regular, color: PRETO,
+      });
+      campoY -= 17;
+    }
+    y = y - alturaCaixa - 6;
+
+    y -= 18;
+    page.drawText('PARTICIPANTES', { x: MARGIN, y, size: 8, font: bold, color: rgb(0.54, 0.38, 0.03) });
+    y -= 14;
+  }
+
+  function abrirPagina() {
+    moldura();
+    cabecalhoCompleto();
+  }
+
   function novaPagina() {
     page = pdf.addPage([PAGE_W, PAGE_H]);
     abrirPagina();
   }
 
   abrirPagina();
-
-  // Título com sublinhado curto em amarelo.
-  const titulo = 'ATESTADO';
-  const tituloSize = 22;
-  const larguraTitulo = bold.widthOfTextAtSize(titulo, tituloSize);
-  page.drawText(titulo, { x: MARGIN + (CONTENT - larguraTitulo) / 2, y, size: tituloSize, font: bold, color: PRETO });
-  page.drawRectangle({ x: MARGIN + (CONTENT - 54) / 2, y: y - 10, width: 54, height: 3, color: AMARELO });
-
-  // Parágrafo de abertura, justificado sem esticar linha curta.
-  y -= 40;
-  const corpo = 10.5;
-  const paragrafo = `Atesto, para os devidos fins, que as pessoas abaixo relacionadas participaram com bom aproveitamento do treinamento de "${setup.attestationSubject}", ${setup.attestationLegalBasis} referente à edificação localizada no endereço abaixo e estão aptas ao manuseio dos equipamentos de prevenção e combate a incêndio da edificação:`;
-  const linhas = wrap(paragrafo, regular, corpo, CONTENT);
-  linhas.forEach((palavras, indice) => {
-    const texto = palavras.join(' ');
-    const curta = regular.widthOfTextAtSize(texto, corpo) < CONTENT * 0.88;
-    if (indice === linhas.length - 1 || curta || palavras.length === 1) {
-      page.drawText(texto, { x: MARGIN, y, size: corpo, font: regular, color: PRETO });
-    } else {
-      const larguraPalavras = palavras.reduce((soma, w) => soma + regular.widthOfTextAtSize(w, corpo), 0);
-      const espaco = (CONTENT - larguraPalavras) / (palavras.length - 1);
-      let x = MARGIN;
-      for (const palavra of palavras) {
-        page.drawText(palavra, { x, y, size: corpo, font: regular, color: PRETO });
-        x += regular.widthOfTextAtSize(palavra, corpo) + espaco;
-      }
-    }
-    y -= 16;
-  });
-
-  // Caixa com os dados da edificação.
-  y -= 18;
-  const campos: [string, string][] = [
-    ['EMPRESA', caixaAlta(data.client.legalName)],
-    ['CNPJ', data.client.document || '—'],
-    ['ENDEREÇO', [data.client.address, data.client.district].filter(Boolean).join(' - ') || '—'],
-    ['MUNICÍPIO / UF', [data.client.city, data.client.state].filter(Boolean).join(' / ') || '—'],
-  ];
-  const alturaCaixa = campos.length * 17 + 26;
-  page.drawRectangle({ x: MARGIN, y: y - alturaCaixa + 12, width: CONTENT, height: alturaCaixa, color: FUNDO_SUAVE });
-  page.drawRectangle({ x: MARGIN, y: y - alturaCaixa + 12, width: 3, height: alturaCaixa, color: AMARELO });
-  page.drawText('DADOS DA EDIFICAÇÃO', { x: MARGIN + 16, y: y - 2, size: 7.5, font: bold, color: rgb(0.54, 0.38, 0.03) });
-  let campoY = y - 20;
-  for (const [rotulo, valor] of campos) {
-    page.drawText(rotulo, { x: MARGIN + 16, y: campoY, size: 8, font: bold, color: CINZA });
-    page.drawText(fit(valor, regular, corpo - 0.5, CONTENT - 130), {
-      x: MARGIN + 120, y: campoY, size: corpo - 0.5, font: regular, color: PRETO,
-    });
-    campoY -= 17;
-  }
-  y = y - alturaCaixa - 6;
-
-  // Tabela de participantes.
-  y -= 18;
-  page.drawText('PARTICIPANTES', { x: MARGIN, y, size: 8, font: bold, color: rgb(0.54, 0.38, 0.03) });
-  y -= 14;
 
   const colunas: { titulo: string; largura: number; valor: (p: CertificateData['participants'][number]) => string }[] = [
     // Sem coluna de RG: o atestado identifica pelo CPF, como o certificado.
@@ -194,6 +205,10 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   ];
   const alturaLinha = 19;
   const tabelaSize = 7.6;
+  /** A tabela pode descer até quase o rodapé. */
+  const LIMITE_TABELA = 76;
+  /** Espaço da data e das assinaturas, guardado só na página que as recebe. */
+  const RESERVA_ASSINATURA = 248;
 
   function cabecalhoTabela(destino: PDFPage) {
     destino.drawRectangle({ x: MARGIN, y: y - alturaLinha, width: CONTENT, height: alturaLinha, color: PRETO });
@@ -209,7 +224,13 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
 
   cabecalhoTabela(page);
   data.participants.forEach((participante, indice) => {
-    if (y - alturaLinha < 250) {
+    // Enquanto sobrar gente que não cabe junto com as assinaturas, a página é
+    // preenchida até embaixo. Quando o que falta cabe, esta vira a última
+    // página e o espaço das assinaturas passa a ser respeitado.
+    const restantes = data.participants.length - indice;
+    const cabemComAssinatura = Math.floor((y - RESERVA_ASSINATURA) / alturaLinha);
+    const limite = restantes <= cabemComAssinatura ? RESERVA_ASSINATURA : LIMITE_TABELA;
+    if (y - alturaLinha < limite) {
       novaPagina();
       cabecalhoTabela(page);
     }
