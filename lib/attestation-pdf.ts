@@ -203,12 +203,13 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
     { titulo: 'DATA NASC.', largura: CONTENT * 0.14, valor: (p) => formatBirthDate(p.birthDate) },
     { titulo: 'CARGA HORÁRIA', largura: CONTENT * 0.15, valor: () => data.training.duration },
   ];
-  const alturaLinha = 19;
+  const alturaLinha = 13;
   const tabelaSize = 7.6;
-  /** A tabela pode descer até quase o rodapé. */
-  const LIMITE_TABELA = 76;
-  /** Espaço da data e das assinaturas, guardado só na página que as recebe. */
-  const RESERVA_ASSINATURA = 248;
+  /** Data e assinaturas ficam sempre no mesmo lugar, porque vão em toda folha. */
+  const Y_DATA = 214;
+  const Y_ASSINATURA = 104;
+  /** Piso da tabela: acima da data, com folga para a última linha respirar. */
+  const LIMITE_TABELA = 226;
 
   function cabecalhoTabela(destino: PDFPage) {
     destino.drawRectangle({ x: MARGIN, y: y - alturaLinha, width: CONTENT, height: alturaLinha, color: PRETO });
@@ -224,13 +225,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
 
   cabecalhoTabela(page);
   data.participants.forEach((participante, indice) => {
-    // Enquanto sobrar gente que não cabe junto com as assinaturas, a página é
-    // preenchida até embaixo. Quando o que falta cabe, esta vira a última
-    // página e o espaço das assinaturas passa a ser respeitado.
-    const restantes = data.participants.length - indice;
-    const cabemComAssinatura = Math.floor((y - RESERVA_ASSINATURA) / alturaLinha);
-    const limite = restantes <= cabemComAssinatura ? RESERVA_ASSINATURA : LIMITE_TABELA;
-    if (y - alturaLinha < limite) {
+    if (y - alturaLinha < LIMITE_TABELA) {
       novaPagina();
       cabecalhoTabela(page);
     }
@@ -252,16 +247,6 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
     y -= alturaLinha;
   });
 
-  // Data e assinaturas: se não couberem, vão para a página seguinte.
-  if (y < 235) novaPagina();
-  y -= 32;
-  const linhaData = `${issuingCity(data.client)}, ${formatCertificateDates(data.training.dates)}.`;
-  page.drawText(linhaData, {
-    x: PAGE_W - MARGIN - regular.widthOfTextAtSize(linhaData, corpo),
-    y, size: corpo, font: regular, color: PRETO,
-  });
-
-  const baseY = Math.max(y - 112, 104);
   // Mesma ordem dos certificados: responsável técnica à esquerda, instrutor à
   // direita — e o instrutor sem registro válido simplesmente não entra na fila.
   const assinaturas = [
@@ -276,31 +261,42 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
         }]
       : []),
   ];
-  const vao = CONTENT / assinaturas.length;
-  assinaturas.forEach((bloco, indice) => {
-    const meio = MARGIN + vao * indice + vao / 2;
-    const larguraLinha = Math.min(vao - 30, 200);
-    if (bloco.assinatura) {
-      const { width, height } = signatureBox(bloco.assinatura, vao);
-      page.drawImage(bloco.assinatura, { x: meio - width / 2, y: baseY + 3, width, height });
-    }
-    page.drawLine({
-      start: { x: meio - larguraLinha / 2, y: baseY },
-      end: { x: meio + larguraLinha / 2, y: baseY },
-      thickness: 0.8, color: PRETO,
-    });
-    let linhaY = baseY - 12;
-    for (const texto of bloco.linhas.filter(Boolean)) {
-      page.drawText(fit(texto, regular, 8.5, larguraLinha + 40), {
-        x: meio - Math.min(regular.widthOfTextAtSize(texto, 8.5), larguraLinha + 40) / 2,
-        y: linhaY, size: 8.5, font: regular, color: PRETO,
-      });
-      linhaY -= 11;
-    }
-  });
+  const linhaData = `${issuingCity(data.client)}, ${formatCertificateDates(data.training.dates)}.`;
 
-  // Rodapé em todas as páginas.
+  /** Data e assinaturas de uma folha, sempre na mesma altura. */
+  function assinar(destino: PDFPage) {
+    destino.drawText(linhaData, {
+      x: PAGE_W - MARGIN - regular.widthOfTextAtSize(linhaData, corpo),
+      y: Y_DATA, size: corpo, font: regular, color: PRETO,
+    });
+    const vao = CONTENT / assinaturas.length;
+    assinaturas.forEach((bloco, indice) => {
+      const meio = MARGIN + vao * indice + vao / 2;
+      const larguraLinha = Math.min(vao - 30, 200);
+      if (bloco.assinatura) {
+        const { width, height } = signatureBox(bloco.assinatura, vao);
+        destino.drawImage(bloco.assinatura, { x: meio - width / 2, y: Y_ASSINATURA + 3, width, height });
+      }
+      destino.drawLine({
+        start: { x: meio - larguraLinha / 2, y: Y_ASSINATURA },
+        end: { x: meio + larguraLinha / 2, y: Y_ASSINATURA },
+        thickness: 0.8, color: PRETO,
+      });
+      let linhaY = Y_ASSINATURA - 12;
+      for (const texto of bloco.linhas.filter(Boolean)) {
+        destino.drawText(fit(texto, regular, 8.5, larguraLinha + 40), {
+          x: meio - Math.min(regular.widthOfTextAtSize(texto, 8.5), larguraLinha + 40) / 2,
+          y: linhaY, size: 8.5, font: regular, color: PRETO,
+        });
+        linhaY -= 11;
+      }
+    });
+  }
+
+  // Assinatura e rodapé em todas as páginas: cada folha do atestado é
+  // destacável, então nenhuma pode circular sem assinatura.
   for (const pagina of pdf.getPages()) {
+    assinar(pagina);
     pagina.drawLine({
       start: { x: MARGIN, y: 56 }, end: { x: PAGE_W - MARGIN, y: 56 },
       thickness: 0.5, color: LINHA,
