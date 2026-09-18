@@ -12,7 +12,7 @@ import {
   registroValido,
   formatCertificateDates,
 } from '@/lib/certificate-config';
-import { caixaAlta, signatureBox } from '@/lib/certificate-pdf';
+import { caixaAlta } from '@/lib/certificate-pdf';
 
 /** O atestado é A4 retrato: é um documento de texto com tabela. */
 const PAGE_W = 595.28;
@@ -25,6 +25,17 @@ const AMARELO = rgb(0.949, 0.678, 0.098);
 const CINZA = rgb(0.45, 0.45, 0.45);
 const LINHA = rgb(0.82, 0.82, 0.82);
 const FUNDO_SUAVE = rgb(0.965, 0.965, 0.953);
+
+/**
+ * A assinatura aqui é menor que a do certificado: ela se repete em toda folha,
+ * e cada ponto que ela devolve vira nome na lista.
+ */
+const ASSINATURA_ALTURA = 56;
+
+function caixaDaAssinatura(assinatura: PDFImage, vao: number) {
+  const escala = Math.min(ASSINATURA_ALTURA / assinatura.height, (vao - 16) / assinatura.width);
+  return { width: assinatura.width * escala, height: assinatura.height * escala };
+}
 
 async function embedImage(pdf: PDFDocument, relative: string): Promise<PDFImage | null> {
   try {
@@ -116,19 +127,19 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   /** Faixa amarela, selo e logo: a moldura da folha. */
   function moldura() {
     page.drawRectangle({ x: 0, y: PAGE_H - 6, width: PAGE_W, height: 6, color: AMARELO });
-    let topo = PAGE_H - 34;
+    let topo = PAGE_H - 28;
     if (selo) {
-      const altura = 68;
+      const altura = 58;
       page.drawImage(selo, { x: MARGIN, y: topo - altura, width: (selo.width / selo.height) * altura, height: altura });
     }
     if (logo) {
-      const altura = 62;
+      const altura = 52;
       const largura = (logo.width / logo.height) * altura;
       page.drawImage(logo, { x: PAGE_W - MARGIN - largura, y: topo - altura + 3, width: largura, height: altura });
     }
-    topo -= 86;
+    topo -= 72;
     page.drawLine({ start: { x: MARGIN, y: topo }, end: { x: PAGE_W - MARGIN, y: topo }, thickness: 0.6, color: LINHA });
-    y = topo - 30;
+    y = topo - 22;
   }
 
   /**
@@ -138,13 +149,13 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
    */
   function cabecalhoCompleto() {
     const titulo = 'ATESTADO';
-    const tituloSize = 22;
+    const tituloSize = 19;
     const larguraTitulo = bold.widthOfTextAtSize(titulo, tituloSize);
     page.drawText(titulo, { x: MARGIN + (CONTENT - larguraTitulo) / 2, y, size: tituloSize, font: bold, color: PRETO });
-    page.drawRectangle({ x: MARGIN + (CONTENT - 54) / 2, y: y - 10, width: 54, height: 3, color: AMARELO });
+    page.drawRectangle({ x: MARGIN + (CONTENT - 54) / 2, y: y - 9, width: 54, height: 3, color: AMARELO });
 
     // Parágrafo de abertura, justificado sem esticar linha curta.
-    y -= 40;
+    y -= 31;
     const linhas = wrap(paragrafo, regular, corpo, CONTENT);
     linhas.forEach((palavras, indice) => {
       const texto = palavras.join(' ');
@@ -160,28 +171,28 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
           x += regular.widthOfTextAtSize(palavra, corpo) + espaco;
         }
       }
-      y -= 16;
+      y -= 13.5;
     });
 
     // Caixa com os dados da edificação.
-    y -= 18;
-    const alturaCaixa = campos.length * 17 + 26;
+    y -= 13;
+    const alturaCaixa = campos.length * 15 + 22;
     page.drawRectangle({ x: MARGIN, y: y - alturaCaixa + 12, width: CONTENT, height: alturaCaixa, color: FUNDO_SUAVE });
     page.drawRectangle({ x: MARGIN, y: y - alturaCaixa + 12, width: 3, height: alturaCaixa, color: AMARELO });
     page.drawText('DADOS DA EDIFICAÇÃO', { x: MARGIN + 16, y: y - 2, size: 7.5, font: bold, color: rgb(0.54, 0.38, 0.03) });
-    let campoY = y - 20;
+    let campoY = y - 18;
     for (const [rotulo, valor] of campos) {
       page.drawText(rotulo, { x: MARGIN + 16, y: campoY, size: 8, font: bold, color: CINZA });
       page.drawText(fit(valor, regular, corpo - 0.5, CONTENT - 130), {
         x: MARGIN + 120, y: campoY, size: corpo - 0.5, font: regular, color: PRETO,
       });
-      campoY -= 17;
+      campoY -= 15;
     }
-    y = y - alturaCaixa - 6;
+    y = y - alturaCaixa - 4;
 
-    y -= 18;
+    y -= 13;
     page.drawText('PARTICIPANTES', { x: MARGIN, y, size: 8, font: bold, color: rgb(0.54, 0.38, 0.03) });
-    y -= 14;
+    y -= 12;
   }
 
   function abrirPagina() {
@@ -203,13 +214,13 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
     { titulo: 'DATA NASC.', largura: CONTENT * 0.14, valor: (p) => formatBirthDate(p.birthDate) },
     { titulo: 'CARGA HORÁRIA', largura: CONTENT * 0.15, valor: () => data.training.duration },
   ];
-  const alturaLinha = 13;
+  const alturaLinha = 16;
   const tabelaSize = 7.6;
   /** Data e assinaturas ficam sempre no mesmo lugar, porque vão em toda folha. */
-  const Y_DATA = 214;
-  const Y_ASSINATURA = 104;
+  const Y_DATA = 172;
+  const Y_ASSINATURA = 100;
   /** Piso da tabela: acima da data, com folga para a última linha respirar. */
-  const LIMITE_TABELA = 226;
+  const LIMITE_TABELA = 186;
 
   function cabecalhoTabela(destino: PDFPage) {
     destino.drawRectangle({ x: MARGIN, y: y - alturaLinha, width: CONTENT, height: alturaLinha, color: PRETO });
@@ -274,7 +285,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
       const meio = MARGIN + vao * indice + vao / 2;
       const larguraLinha = Math.min(vao - 30, 200);
       if (bloco.assinatura) {
-        const { width, height } = signatureBox(bloco.assinatura, vao);
+        const { width, height } = caixaDaAssinatura(bloco.assinatura, vao);
         destino.drawImage(bloco.assinatura, { x: meio - width / 2, y: Y_ASSINATURA + 3, width, height });
       }
       destino.drawLine({
