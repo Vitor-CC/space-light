@@ -69,6 +69,7 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
   },
   'NR 35': {
     legalBasis: 'de acordo com a NR 35 - Trabalho em Altura,',
+    background: '/images/certificado/fundo-nr35.jpg',
   },
   // Não é NR: a base é norma da ABNT, e por isso entra pelo nome do treinamento.
   'EMERGÊNCIAS QUÍMICAS': {
