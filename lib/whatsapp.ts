@@ -33,8 +33,11 @@ export function trainingScheduleMessage(input: {
   timeLabel?: string;
   duration: string;
   location: string;
+  /** Assunto da turma. Fica de fora da mensagem quando não foi preenchido. */
+  theme?: string;
 }): string {
   const firstName = input.instructorName.trim().split(/\s+/)[0] || '';
+  const tema = (input.theme ?? '').trim();
   // Sem emoji de propósito: dependem da fonte do aparelho e viram "?" em
   // alguns aparelhos e no WhatsApp Web.
   return [
@@ -42,6 +45,7 @@ export function trainingScheduleMessage(input: {
     '',
     `Você foi escalado para o treinamento *${input.nr} - ${input.title}*.`,
     '',
+    ...(tema ? [`Tema: ${tema}`] : []),
     `Data: ${input.dateLabel}${input.timeLabel ? `, ${input.timeLabel}` : ''}`,
     `Carga horária: ${input.duration}`,
     `Local: ${input.location}`,
