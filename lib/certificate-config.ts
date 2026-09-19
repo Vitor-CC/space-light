@@ -5,18 +5,48 @@
  */
 
 export type CertificateSetup = {
-  /** Vai depois de "concluiu com aproveitamento o ..." — texto legal literal. */
+  /** Vai depois de "concluiu com aproveitamento satisfatório o ..." — literal. */
   legalBasis: string;
-  background: string;
+  /** Arte de fundo. Sem ela o certificado sai em fundo branco, sem quebrar. */
+  background?: string;
   seal?: string;
   sealAlt?: string;
-  /** Nome curto do treinamento como aparece no atestado. */
-  attestationSubject: string;
-  /** O atestado cita normas que o certificado não cita (NBR, por exemplo). */
-  attestationLegalBasis: string;
+  /**
+   * Atestado é a peça que vai ao Corpo de Bombeiros, e o fecho dela fala de
+   * combate a incêndio. Só a norma que tem estes dois campos emite atestado;
+   * as demais emitem apenas os certificados.
+   */
+  attestationSubject?: string;
+  attestationLegalBasis?: string;
 };
 
+/**
+ * Base legal transcrita dos certificados do certificador da Space Light
+ * (documentos recebidos em 18/09/2026), com os erros de digitação da origem
+ * corrigidos a pedido do Vitor: "DAREFERIDA NORMA", acentos faltando e caixa
+ * alta corrida. Números de portaria, item e norma não foram tocados.
+ */
 export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
+  'NR 05': {
+    legalBasis: 'de acordo com a Portaria 3214/78 do MTB - NR 05 - CIPAA,',
+  },
+  'NR 10': {
+    legalBasis: 'de acordo com a NR 10, item 10.8 e Anexo III da referida norma,',
+  },
+  'NR 11': {
+    legalBasis:
+      'de acordo com a NR 11 - Transporte, Movimentação, Armazenagem e Manuseio de Materiais,',
+  },
+  'NR 12': {
+    legalBasis:
+      'de acordo com a Portaria 3214/78 - NR 12 - Segurança no Trabalho em Máquinas e Equipamentos,',
+  },
+  'NR 18': {
+    legalBasis: 'de acordo com a NR 18, item 18.12.37,',
+  },
+  'NR 20': {
+    legalBasis: 'de acordo com a Portaria 3214/78 - NR 20,',
+  },
   'NR 23': {
     legalBasis:
       'de acordo com o decreto 69.118, de 09 de dezembro de 2024, – Instrução Técnica 17 de 2025 e Portaria 3214/78 - NR 23,',
@@ -26,6 +56,19 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
     attestationSubject: 'Brigada de Incêndio',
     attestationLegalBasis:
       'de acordo com o Decreto 69.118, de 09 de dezembro de 2024, IT 17 de 2025 do Corpo de Bombeiros do Estado de São Paulo, e NBR 14276 e 14277,',
+  },
+  'NR 31': {
+    legalBasis: 'de acordo com a Portaria 3214/78 - NR 31,',
+  },
+  'NR 33': {
+    legalBasis: 'de acordo com a Portaria 3214/78 - NR 33 - Espaço Confinado,',
+  },
+  'NR 35': {
+    legalBasis: 'de acordo com a NR 35 - Trabalho em Altura,',
+  },
+  // Não é NR: a base é norma da ABNT, e por isso entra pelo nome do treinamento.
+  'EMERGÊNCIAS QUÍMICAS': {
+    legalBasis: 'de acordo com a ABNT NBR 14.064,',
   },
 };
 

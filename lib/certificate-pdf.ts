@@ -323,7 +323,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-  const fundo = await embedImage(pdf, setup.background);
+  const fundo = setup.background ? await embedImage(pdf, setup.background) : null;
   const faixa = await embedImage(pdf, '/images/certificado/faixa-lateral.png');
   const selo = setup.seal ? await embedImage(pdf, setup.seal) : null;
   const logo = await embedImage(pdf, '/images/certificado/logo-space.png');
@@ -404,7 +404,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     // ele deixava a linha anterior terminando curta e abria um vão no meio do
     // texto — a quebra tem que cair onde a medida pedir.
     y -= 26;
-    const paragrafo = `com aproveitamento o "${data.training.title.toUpperCase()}", ${setup.legalBasis} ministrado pela SPACE LIGHT ENGENHARIA.`;
+    const paragrafo = `com aproveitamento satisfatório o "${data.training.title.toUpperCase()}", ${cargaHoraria(data)}${setup.legalBasis} ministrado pela SPACE LIGHT ENGENHARIA.`;
     y = drawJustified(page, wrap(paragrafo, regular, corpo, larguraTexto), {
       x: LEFT, y, size: corpo, font: regular, color: preto,
       maxWidth: larguraTexto, leading: 26,
@@ -470,7 +470,7 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-  const fundo = await embedImage(pdf, setup.background);
+  const fundo = setup.background ? await embedImage(pdf, setup.background) : null;
   const faixa = await embedImage(pdf, '/images/certificado/faixa-lateral.png');
   const selo = setup.seal ? await embedImage(pdf, setup.seal) : null;
   const logo = await embedImage(pdf, '/images/certificado/logo-space.png');
@@ -554,7 +554,7 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
     y -= 26;
   }
   // Igual ao certificado do aluno: o fecho corre junto com o resto do parágrafo.
-  const paragrafo = `concluíram com aproveitamento o "${data.training.title.toUpperCase()}", ${setup.legalBasis} ministrado pela SPACE LIGHT ENGENHARIA.`;
+  const paragrafo = `concluíram com aproveitamento satisfatório o "${data.training.title.toUpperCase()}", ${cargaHoraria(data)}${setup.legalBasis} ministrado pela SPACE LIGHT ENGENHARIA.`;
   y = drawJustified(page, wrap(paragrafo, regular, corpo, larguraTexto), {
     x: LEFT, y, size: corpo, font: regular, color: preto, maxWidth: larguraTexto, leading: 26,
   });
@@ -609,6 +609,16 @@ function semAcento(texto: string) {
 /** Prefixo de cada papel. São disjuntos de propósito: a aba Certificados
  *  encontra os documentos pelo começo do nome, e "certificado-" sozinho pegaria
  *  também o da empresa. */
+/**
+ * "com carga horária de 8 horas, " antes da base legal. Sai do cadastro da
+ * turma, e não fica chumbada por norma: a mesma NR é dada em cargas diferentes.
+ * Turma sem carga horária preenchida simplesmente não mostra o trecho.
+ */
+function cargaHoraria(data: CertificateData) {
+  const valor = (data.training.duration ?? '').trim();
+  return valor ? `com carga horária de ${valor}, ` : '';
+}
+
 export const PREFIXO_CERTIFICADO_ALUNO = 'certificado-aluno-';
 export const PREFIXO_CERTIFICADO_EMPRESA = 'certificado-empresa-';
 

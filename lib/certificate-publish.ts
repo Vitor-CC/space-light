@@ -115,10 +115,18 @@ export async function publishCertificateDocument(input: {
       }),
     });
   }
-  documentos.push(
-    { nome: companyCertificateFileName(data), bytes: await buildCompanyCertificatePdf({ data, instructorSignature }) },
-    { nome: attestationFileName(data), bytes: await buildAttestationPdf({ data, instructorSignature }) },
-  );
+  documentos.push({
+    nome: companyCertificateFileName(data),
+    bytes: await buildCompanyCertificatePdf({ data, instructorSignature }),
+  });
+  // Só a norma com texto de atestado cadastrado gera a peça do Corpo de
+  // Bombeiros; as demais entregam apenas os certificados.
+  if (certificateSetup(data.training.nr)?.attestationSubject) {
+    documentos.push({
+      nome: attestationFileName(data),
+      bytes: await buildAttestationPdf({ data, instructorSignature }),
+    });
+  }
 
   const publicados: PublishedDocument[] = [];
   for (const documento of documentos) {

@@ -20,7 +20,7 @@ type Aba = 'agenda' | 'lista' | 'concluidas' | 'criar';
 type Notify = (message: string) => void;
 type Reload = () => Promise<void>;
 
-const NORMAS = ['NR 05', 'NR 06', 'NR 10', 'NR 11', 'NR 12', 'NR 18', 'NR 20', 'NR 23', 'NR 33', 'NR 34', 'NR 35'];
+const NORMAS = ['NR 05', 'NR 06', 'NR 10', 'NR 11', 'NR 12', 'NR 18', 'NR 20', 'NR 23', 'NR 31', 'NR 33', 'NR 34', 'NR 35', 'EMERGÊNCIAS QUÍMICAS'];
 
 /** Só dígitos: o CNPJ é digitado com e sem pontuação, e as duas têm de achar. */
 function digitos(value: string) {

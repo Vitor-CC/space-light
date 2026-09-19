@@ -95,6 +95,9 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   if (!setup) {
     throw new Error(`A base legal da ${data.training.nr} ainda não foi cadastrada.`);
   }
+  if (!setup.attestationSubject || !setup.attestationLegalBasis) {
+    throw new Error(`A ${data.training.nr} não tem texto de atestado cadastrado.`);
+  }
 
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
