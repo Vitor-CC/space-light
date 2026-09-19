@@ -67,6 +67,13 @@ function rows<T>(result: DatabaseResult<T>): T[] {
  * Existe porque a migração custa uma ida ao banco por verificação de coluna, e
  * em produção (Turso, pela rede) isso somava ~15 idas em sequência a cada
  * arranque frio da função, antes de qualquer trabalho útil.
+ *
+ * ATENÇÃO: a produção está na versão 7, gravada pelo portal novo que ficou
+ * pouco tempo no ar — à frente deste número. Subir daqui não faz a migração
+ * rodar lá, e passar de 7 faria ela rodar inteira e tentar recriar
+ * `idx_users_email` e `idx_clients_contact_email` como UNIQUE, que aquele
+ * portal derrubou de propósito porque o e-mail repete entre clientes.
+ * Coluna nova vai por COLUNAS_POR_MARCADOR, não por este número.
  */
 const SCHEMA_VERSION = 6;
 
@@ -106,12 +113,56 @@ async function lerMarcadores(d1: DatabaseBinding) {
   return mapa;
 }
 
+/**
+ * Colunas que entram por marcador próprio, e não pelo número da versão.
+ *
+ * O número da versão não serve para isto: a produção está numa versão à frente
+ * (ver o comentário de SCHEMA_VERSION), então subir o número não faz a migração
+ * rodar lá — e forçá-la a rodar reexecutaria índices antigos que hoje não valem
+ * mais. Cada coluna tem então o seu próprio marcador, e como os marcadores já
+ * vêm lidos de `schema_meta`, quem já migrou não paga nenhuma ida extra.
+ */
+const COLUNAS_POR_MARCADOR = [
+  // Tema da turma: o assunto que o instrutor precisa saber para se preparar.
+  {
+    marcador: 'col_trainings_theme',
+    tabela: 'trainings',
+    coluna: 'theme',
+    alter: "ALTER TABLE trainings ADD COLUMN theme TEXT NOT NULL DEFAULT ''",
+  },
+];
+
+async function colunasPorMarcador(d1: DatabaseBinding, marcadores: Map<string, string>) {
+  for (const { marcador, tabela, coluna, alter } of COLUNAS_POR_MARCADOR) {
+    if (marcadores.has(marcador)) continue;
+    // Uma por vez e fora de lote: "duplicate column" é esperado em banco novo,
+    // que já nasce com a coluna no CREATE TABLE, e em lote derrubaria o resto.
+    try {
+      await d1.prepare(alter).run();
+    } catch { /* coluna já existe */ }
+    // O marcador só é gravado com a coluna confirmada. Engolir o erro do ALTER
+    // sem conferir gravaria "já fiz" para uma coluna que não existe, e quem
+    // fosse lê-la quebraria para sempre. Sem confirmação, tenta de novo depois.
+    const info = await d1.prepare(`PRAGMA table_info(${tabela})`).all<{ name: string }>();
+    if (!rows(info).some((item) => item.name === coluna)) continue;
+    await d1
+      .prepare(`INSERT INTO schema_meta (key, value) VALUES (?, datetime('now'))
+        ON CONFLICT(key) DO NOTHING`)
+      .bind(marcador)
+      .run();
+    marcadores.set(marcador, 'ok');
+  }
+}
+
 export function ensurePortalSchema(): Promise<void> {
   if (schemaPromise) return schemaPromise;
   const d1 = getD1();
   schemaPromise = (async () => {
     const ownerEmailAtual = (process.env.SPACE_ADMIN_EMAIL ?? '').trim().toLowerCase();
     const marcadores = await lerMarcadores(d1);
+    // Antes do atalho de versão: coluna por marcador precisa chegar também em
+    // banco que já está na versão corrente, que é o caso da produção.
+    await colunasPorMarcador(d1, marcadores);
     // Banco já na versão corrente e com o mesmo dono configurado: nada a fazer.
     if (
       Number(marcadores.get('version') ?? 0) >= SCHEMA_VERSION &&
