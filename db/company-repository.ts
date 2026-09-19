@@ -163,6 +163,11 @@ export function ensurePortalSchema(): Promise<void> {
     // Antes do atalho de versão: coluna por marcador precisa chegar também em
     // banco que já está na versão corrente, que é o caso da produção.
     await colunasPorMarcador(d1, marcadores);
+    // TEMPORÁRIO: confirma no log que a coluna chegou à produção antes de
+    // subir o código que a lê. Sai no commit seguinte.
+    for (const { marcador } of COLUNAS_POR_MARCADOR) {
+      console.log(`[schema] ${marcador} = ${marcadores.has(marcador) ? 'ok' : 'FALTANDO'}`);
+    }
     // Banco já na versão corrente e com o mesmo dono configurado: nada a fazer.
     if (
       Number(marcadores.get('version') ?? 0) >= SCHEMA_VERSION &&
