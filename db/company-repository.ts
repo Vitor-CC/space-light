@@ -163,11 +163,6 @@ export function ensurePortalSchema(): Promise<void> {
     // Antes do atalho de versão: coluna por marcador precisa chegar também em
     // banco que já está na versão corrente, que é o caso da produção.
     await colunasPorMarcador(d1, marcadores);
-    // TEMPORÁRIO: confirma no log que a coluna chegou à produção antes de
-    // subir o código que a lê. Sai no commit seguinte.
-    for (const { marcador } of COLUNAS_POR_MARCADOR) {
-      console.log(`[schema] ${marcador} = ${marcadores.has(marcador) ? 'ok' : 'FALTANDO'}`);
-    }
     // Banco já na versão corrente e com o mesmo dono configurado: nada a fazer.
     if (
       Number(marcadores.get('version') ?? 0) >= SCHEMA_VERSION &&
@@ -246,6 +241,7 @@ export function ensurePortalSchema(): Promise<void> {
         training_date TEXT NOT NULL,
         training_dates TEXT NOT NULL DEFAULT '',
         internal_label TEXT NOT NULL DEFAULT '',
+        theme TEXT NOT NULL DEFAULT '',
         content_program TEXT NOT NULL DEFAULT '',
         duration TEXT NOT NULL,
         location TEXT NOT NULL,
@@ -446,6 +442,10 @@ export function ensurePortalSchema(): Promise<void> {
       // treinamento. NUNCA sai em documento — o certificado usa 'title'.
       { tabela: 'trainings', coluna: 'internal_label', alter: "ALTER TABLE trainings ADD COLUMN internal_label TEXT NOT NULL DEFAULT ''" },
       { tabela: 'trainings', coluna: 'content_program', alter: "ALTER TABLE trainings ADD COLUMN content_program TEXT NOT NULL DEFAULT ''" },
+      // Tema da turma: o assunto que o instrutor precisa saber para se preparar.
+      // Vai na mensagem de escala e não sai em documento nenhum.
+      // trainings.theme não entra aqui: vai por COLUNAS_POR_MARCADOR, porque
+      // esta lista só roda quando a migração roda, e na produção ela não roda.
       // Dia do treinamento a que o arquivo pertence (a foto da lista assinada).
       { tabela: 'files', coluna: 'session_id', alter: 'ALTER TABLE files ADD COLUMN session_id TEXT' },
       { tabela: 'participants', coluna: 'rg', alter: "ALTER TABLE participants ADD COLUMN rg TEXT NOT NULL DEFAULT ''" },
@@ -1798,6 +1798,7 @@ export async function updateTrainingByAdmin(input: {
   duration: string;
   location: string;
   contentProgram: string;
+  theme?: string;
 }) {
   await ensurePortalSchema();
   const d1 = getD1();
@@ -1808,6 +1809,7 @@ export async function updateTrainingByAdmin(input: {
     duration: (input.duration ?? '').trim(),
     location: (input.location ?? '').trim(),
     contentProgram: (input.contentProgram ?? '').trim(),
+    theme: (input.theme ?? '').trim(),
   };
   if (!campos.clientId || !campos.nr || !campos.title || !campos.duration || !campos.location) {
     throw new Error('Preencha cliente, norma, título, carga horária e endereço.');
@@ -1822,8 +1824,8 @@ export async function updateTrainingByAdmin(input: {
   await d1.batch([
     d1
       .prepare(`UPDATE trainings SET client_id = ?, nr = ?, title = ?, duration = ?, location = ?,
-        content_program = ? WHERE id = ?`)
-      .bind(campos.clientId, campos.nr, campos.title, campos.duration, campos.location, campos.contentProgram, input.trainingId),
+        content_program = ?, theme = ? WHERE id = ?`)
+      .bind(campos.clientId, campos.nr, campos.title, campos.duration, campos.location, campos.contentProgram, campos.theme, input.trainingId),
     // Arquivos seguem a turma: o cliente novo passa a vê-los no portal dele.
     d1.prepare('UPDATE files SET client_id = ? WHERE training_id = ?').bind(campos.clientId, input.trainingId),
   ]);
@@ -2709,7 +2711,7 @@ export async function getCompanyDashboardData(
       d1
         .prepare(
           `SELECT t.id, t.client_id, t.instructor_id, c.name AS client_name,
-           t.code, t.nr, t.title, t.internal_label, t.training_date, t.duration, t.location, t.content_program,
+           t.code, t.nr, t.title, t.internal_label, t.theme, t.training_date, t.duration, t.location, t.content_program,
            COALESCE(i.name, t.instructor) AS instructor,
            t.status, t.participant_limit, t.qr_token, t.qr_enabled,
            t.created_at,
@@ -2784,6 +2786,8 @@ export async function createTraining(input: {
   title: string;
   /** Nome interno da turma; nunca sai em documento. */
   internalLabel?: string;
+  /** Assunto da turma, para o instrutor saber o que preparar. */
+  theme?: string;
   days: NovoDiaDeTreinamento[];
   contentProgram: string;
   duration: string;
@@ -2835,9 +2839,9 @@ export async function createTraining(input: {
   await d1.batch([
     d1
       .prepare(`INSERT INTO trainings (
-        id, client_id, instructor_id, code, nr, title, internal_label, training_date, training_dates,
+        id, client_id, instructor_id, code, nr, title, internal_label, theme, training_date, training_dates,
         content_program, duration, location, instructor, status, participant_limit, qr_token, qr_enabled
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, ?, 1)`)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, ?, 1)`)
       .bind(
         id,
         input.clientId,
@@ -2846,6 +2850,7 @@ export async function createTraining(input: {
         input.nr.trim(),
         input.title.trim(),
         (input.internalLabel ?? '').trim(),
+        (input.theme ?? '').trim(),
         primaryDate,
         JSON.stringify(dias.map((dia) => dia.date)),
         (input.contentProgram ?? '').trim(),

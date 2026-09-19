@@ -79,6 +79,8 @@ export type CompanyTraining = {
   title: string;
   /** Nome interno para diferenciar turmas; nunca sai em documento. */
   internal_label: string;
+  /** Assunto da turma, avisado ao instrutor na escala; vem só na gestão. */
+  theme?: string;
   /** Conteúdo programático; vem só nos dados da gestão. */
   content_program?: string;
   training_date: string;

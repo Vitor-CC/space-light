@@ -79,6 +79,7 @@ function DayRow({ training, session, instructors, reload, notify }: { training: 
         timeLabel: scheduleWindow(session.start_time, session.end_time),
         duration: training.duration,
         location: training.location,
+        theme: training.theme,
       }))
     : null;
 
@@ -144,11 +145,11 @@ function AddDay({ training, instructors, reload, notify }: { training: CompanyTr
   </form>;
 }
 
-type DadosTreinamento = { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string };
+type DadosTreinamento = { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string };
 
 /** O que sai no certificado e na lista: cliente, norma, título, carga horária, endereço e conteúdo. */
 function TrainingDetails({ training, clients, reload, notify }: { training: CompanyTraining; clients: CompanyDashboardData['clients']; reload: Reload; notify: Notify }) {
-  const inicial = (): DadosTreinamento => ({ clientId: training.client_id, nr: training.nr, title: training.title, duration: training.duration, location: training.location, contentProgram: training.content_program ?? '' });
+  const inicial = (): DadosTreinamento => ({ clientId: training.client_id, nr: training.nr, title: training.title, duration: training.duration, location: training.location, contentProgram: training.content_program ?? '', theme: training.theme ?? '' });
   const [aberto, setAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [draft, setDraft] = useState<DadosTreinamento>(inicial);
@@ -192,6 +193,10 @@ function TrainingDetails({ training, clients, reload, notify }: { training: Comp
         <Input id={`editar-local-${training.id}`} required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} className={fieldClass} />
       </label>
     </div>
+    <label htmlFor={`editar-tema-${training.id}`}><span className={labelClass}>Tema da turma</span>
+      <Input id={`editar-tema-${training.id}`} value={draft.theme} onChange={(e) => setDraft({ ...draft, theme: e.target.value })} placeholder="Ex.: Reciclagem para a equipe de manutenção" className={fieldClass} />
+      <span className="mt-2 block text-[11px] leading-relaxed text-[#888]">Vai na mensagem de escala do instrutor, para ele saber o que preparar. <strong>Não aparece em nenhum documento.</strong></span>
+    </label>
     <label htmlFor={`editar-conteudo-${training.id}`}><span className={labelClass}>Conteúdo programático (aparece na lista)</span>
       <textarea id={`editar-conteudo-${training.id}`} rows={4} value={draft.contentProgram} onChange={(e) => setDraft({ ...draft, contentProgram: e.target.value })} className="w-full border border-black/16 bg-white p-3 text-sm outline-none focus:border-[#f2ad19] focus:ring-2 focus:ring-[#f2ad19]/30" />
     </label>
@@ -397,7 +402,7 @@ function Agenda({ data, reload, notify, abrirTurma }: { data: CompanyDashboardDa
 // Criação
 // ---------------------------------------------------------------------------
 
-type Draft = { clientId: string; nr: string; title: string; internalLabel: string; days: NovoDia[]; contentProgram: string; duration: string; location: string };
+type Draft = { clientId: string; nr: string; title: string; internalLabel: string; theme: string; days: NovoDia[]; contentProgram: string; duration: string; location: string };
 
 function diaVazio(instructorId: string | null = null): NovoDia {
   return { date: '', startTime: '08:00', endTime: '18:00', instructorId };
@@ -437,6 +442,7 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
     nr: 'NR 23',
     title: '',
     internalLabel: '',
+    theme: '',
     days: [diaVazio()],
     contentProgram: nrInfo('NR 23')?.content ?? '',
     duration: cargaHorariaPadrao('NR 23'),
@@ -479,7 +485,7 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
     try {
       const result = await createMockTraining(draft);
       aoCriar(result.id);
-      setDraft({ ...draft, title: '', internalLabel: '', days: [diaVazio()], contentProgram: nrInfo(draft.nr)?.content ?? '', location: '' });
+      setDraft({ ...draft, title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: nrInfo(draft.nr)?.content ?? '', location: '' });
       notify('Treinamento criado com QR Code próprio.');
       await reload();
     } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao criar treinamento.'); }
@@ -506,6 +512,11 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
       <label htmlFor="training-label"><span className={labelClass}>Identificação da turma</span>
         <Input id="training-label" value={draft.internalLabel} onChange={(e) => setDraft({ ...draft, internalLabel: e.target.value })} placeholder="Ex.: Turma A - manhã" className={fieldClass} />
         <span className="mt-2 block text-[11px] leading-relaxed text-[#888]">Só para vocês separarem duas turmas do mesmo treinamento na agenda e nas listas. <strong>Não aparece em nenhum documento.</strong></span>
+      </label>
+
+      <label htmlFor="training-theme"><span className={labelClass}>Tema da turma</span>
+        <Input id="training-theme" value={draft.theme} onChange={(e) => setDraft({ ...draft, theme: e.target.value })} placeholder="Ex.: Reciclagem para a equipe de manutenção" className={fieldClass} />
+        <span className="mt-2 block text-[11px] leading-relaxed text-[#888]">Vai na mensagem de escala do instrutor, para ele saber o que preparar. <strong>Não aparece em nenhum documento.</strong></span>
       </label>
 
       <fieldset className="border border-black/12 p-4">
