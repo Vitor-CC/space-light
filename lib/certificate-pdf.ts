@@ -201,9 +201,12 @@ function drawSignatureRow(
 }
 
 /** A4 retrato, para as páginas de conteúdo programático. */
-const PROG_W = 595.28;
-const PROG_H = 841.89;
-const PROG_MARGIN = 40;
+// A4 deitado, como o certificado e como os documentos do certificador: a
+// página de conteúdo vinha em pé, e a virada de orientação no meio do PDF
+// deixava a coluna estreita e a metade de baixo vazia.
+const PROG_W = 841.89;
+const PROG_H = 595.28;
+const PROG_MARGIN = 56;
 
 /**
  * Anexa o conteúdo programático da norma. A grade é fixa por NR; a carga
@@ -229,9 +232,9 @@ function appendProgramPages(
     { titulo: 'OBJETIVOS PARTE TEÓRICA', largura: largura * 0.34, campo: 'teorica' as const },
     { titulo: 'OBJETIVOS PARTE PRÁTICA', largura: largura * 0.25, campo: 'pratica' as const },
   ];
-  const corpo = 6.6;
-  const alturaLinhaTexto = 8;
-  const padding = 4;
+  const corpo = 8.5;
+  const alturaLinhaTexto = 10;
+  const padding = 5;
 
   let page = pdf.addPage([PROG_W, PROG_H]);
   let y = PROG_H - PROG_MARGIN;
@@ -240,15 +243,15 @@ function appendProgramPages(
     const t1 = 'CONTEÚDO PROGRAMÁTICO';
     const t2 = `CARGA HORÁRIA: ${options.duration.toUpperCase()}`;
     page.drawText(t1, {
-      x: PROG_MARGIN + (largura - options.bold.widthOfTextAtSize(t1, 12)) / 2,
+      x: PROG_MARGIN + (largura - options.bold.widthOfTextAtSize(t1, 16)) / 2,
+      y, size: 16, font: options.bold, color: preto,
+    });
+    y -= 21;
+    page.drawText(t2, {
+      x: PROG_MARGIN + (largura - options.bold.widthOfTextAtSize(t2, 12)) / 2,
       y, size: 12, font: options.bold, color: preto,
     });
-    y -= 16;
-    page.drawText(t2, {
-      x: PROG_MARGIN + (largura - options.bold.widthOfTextAtSize(t2, 10)) / 2,
-      y, size: 10, font: options.bold, color: preto,
-    });
-    y -= 22;
+    y -= 26;
   }
 
   function cabecalho() {
@@ -280,17 +283,19 @@ function appendProgramPages(
 
   /** Lista de tópicos, com seções quando o curso as tem. */
   function desenharLista(secoes: SecaoDePrograma[]) {
-    const tamanhoItem = 9;
-    const tamanhoSecao = 10;
-    const alturaItem = 12;
-    const recuo = 12;
+    // Perto dos 14pt dos documentos do certificador: o conteúdo é para ser
+    // lido impresso, não para caber no menor espaço possível.
+    const tamanhoItem = 13;
+    const tamanhoSecao = 14.5;
+    const alturaItem = 19;
+    const recuo = 18;
     const larguraItem = largura - padding * 2 - recuo;
 
     for (const secao of secoes) {
       if (secao.titulo) {
         const linhas = wrap(secao.titulo, options.bold, tamanhoSecao, largura - padding * 2);
-        if (y - (linhas.length * alturaItem + 14) < PROG_MARGIN) novaPaginaPrograma();
-        y -= 8;
+        if (y - (linhas.length * alturaItem + 18) < PROG_MARGIN) novaPaginaPrograma();
+        y -= 10;
         for (const palavras of linhas) {
           page.drawText(palavras.join(' '), {
             x: PROG_MARGIN + padding, y: y - tamanhoSecao, size: tamanhoSecao, font: options.bold, color: preto,
@@ -304,7 +309,7 @@ function appendProgramPages(
         if (y - linhas.length * alturaItem < PROG_MARGIN) novaPaginaPrograma();
         linhas.forEach((palavras, indice) => {
           if (indice === 0) {
-            page.drawCircle({ x: PROG_MARGIN + padding + 3, y: y - tamanhoItem + 2.5, size: 1.4, color: preto });
+            page.drawCircle({ x: PROG_MARGIN + padding + 5, y: y - tamanhoItem + 3.5, size: 1.8, color: preto });
           }
           page.drawText(palavras.join(' '), {
             x: PROG_MARGIN + padding + recuo, y: y - tamanhoItem, size: tamanhoItem, font: options.regular, color: preto,
