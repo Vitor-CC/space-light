@@ -214,7 +214,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
       <label htmlFor="arquivos-treinamento"><span className={labelClass}>Treinamento</span>
         <select id="arquivos-treinamento" value={trainingId} onChange={(event) => setTrainingId(event.target.value)} className={selectClass}>
           <option value="">Todas as turmas deste cliente</option>
-          {clientTrainings.map((training) => <option key={training.id} value={training.id}>{training.nr} · {training.internal_label || training.title} · {formatDate(dataDoDia(training))}{rotuloDiaDaTurma(training)}{training.status === 'completed' ? ' · encerrada' : ''}</option>)}
+          {clientTrainings.map((training) => <option key={training.id} value={training.id}>{training.nr} · {training.internal_label || training.title} · {formatDate(dataDoDia(training))}{rotuloDiaDaTurma(training)}</option>)}
         </select>
       </label>
     </div>
@@ -222,7 +222,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
     {aba === 'upload' ? <section className="max-w-2xl border border-black/10 bg-white p-6 md:p-8">
       <span className="eyebrow text-[#8a6107]">Envio em lote</span>
       <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Enviar arquivos</h2>
-      <p className="mt-3 text-xs leading-relaxed text-[#777]">Pode escolher vários de uma vez: eles são enviados um a um, porque cada requisição da Vercel aceita no máximo 4,5 MB. Turma encerrada também recebe arquivo novo, e gerar os documentos de novo não apaga o que foi enviado aqui.</p>
+      <p className="mt-3 text-xs leading-relaxed text-[#777]">Pode escolher vários de uma vez: eles são enviados um a um, porque cada requisição da Vercel aceita no máximo 4,5 MB.</p>
 
       <div className="mt-6 flex gap-px bg-black/10">
         {(['photo', 'document'] as Kind[]).map((option) => <button key={option} type="button" onClick={() => { setUploadKind(option); setQueue([]); }} className={`flex-1 px-4 py-3 text-[11px] font-extrabold uppercase tracking-[0.1em] transition ${uploadKind === option ? 'bg-black text-[#f2ad19]' : 'bg-white text-[#666] hover:bg-[#fff8e8]'}`}>
