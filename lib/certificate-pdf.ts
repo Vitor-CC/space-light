@@ -201,12 +201,124 @@ function drawSignatureRow(
 }
 
 /** A4 retrato, para as páginas de conteúdo programático. */
-// A4 deitado, como o certificado e como os documentos do certificador: a
-// página de conteúdo vinha em pé, e a virada de orientação no meio do PDF
-// deixava a coluna estreita e a metade de baixo vazia.
-const PROG_W = 841.89;
-const PROG_H = 595.28;
-const PROG_MARGIN = 56;
+/** Página da grade da NR 23: A4 em pé. Não muda — o documento já está em uso. */
+const PROG_W = 595.28;
+const PROG_H = 841.89;
+const PROG_MARGIN = 40;
+
+/** Página da lista dos demais cursos: A4 deitado, como os documentos de origem. */
+const LISTA_W = 841.89;
+const LISTA_H = 595.28;
+const LISTA_MARGIN = 52;
+
+type BlocoDeLista = { linhas: string[][]; altura: number; secao: boolean; espacoAntes: number };
+
+/**
+ * Conteúdo programático em lista, numa folha só.
+ *
+ * Duas colunas em A4 deitado, e o corpo do texto é escolhido por medição: tenta
+ * do maior para o menor e fica no primeiro que couber inteiro na página. Curso
+ * curto sai com letra grande; curso longo encolhe o suficiente, mas não vira
+ * segunda folha.
+ */
+function appendListaDePrograma(
+  pdf: PDFDocument,
+  secoes: SecaoDePrograma[],
+  options: { duration: string; regular: PDFFont; bold: PDFFont },
+) {
+  const preto = rgb(0, 0, 0);
+  const largura = LISTA_W - LISTA_MARGIN * 2;
+  const vaoEntreColunas = 36;
+  const larguraColuna = (largura - vaoEntreColunas) / 2;
+  const recuo = 14;
+
+  const page = pdf.addPage([LISTA_W, LISTA_H]);
+  let y = LISTA_H - LISTA_MARGIN;
+
+  const t1 = 'CONTEÚDO PROGRAMÁTICO';
+  const t2 = `CARGA HORÁRIA: ${options.duration.toUpperCase()}`;
+  page.drawText(t1, {
+    x: LISTA_MARGIN + (largura - options.bold.widthOfTextAtSize(t1, 15)) / 2,
+    y, size: 15, font: options.bold, color: preto,
+  });
+  y -= 19;
+  page.drawText(t2, {
+    x: LISTA_MARGIN + (largura - options.bold.widthOfTextAtSize(t2, 11)) / 2,
+    y, size: 11, font: options.bold, color: preto,
+  });
+  y -= 24;
+
+  const topoDasColunas = y;
+  const alturaUtil = topoDasColunas - LISTA_MARGIN;
+
+  function montar(tamanho: number, forcar: boolean) {
+    const entreLinhas = tamanho * 1.34;
+    const blocos: BlocoDeLista[] = [];
+    for (const secao of secoes) {
+      if (secao.titulo) {
+        const linhas = wrap(secao.titulo, options.bold, tamanho + 1, larguraColuna);
+        blocos.push({ linhas, altura: linhas.length * entreLinhas, secao: true, espacoAntes: tamanho });
+      }
+      for (const item of secao.itens) {
+        const linhas = wrap(item, options.regular, tamanho, larguraColuna - recuo);
+        blocos.push({ linhas, altura: linhas.length * entreLinhas, secao: false, espacoAntes: tamanho * 0.3 });
+      }
+    }
+
+    const colunas: BlocoDeLista[][] = [[], []];
+    let atual = 0;
+    let usado = 0;
+    for (let i = 0; i < blocos.length; i += 1) {
+      const bloco = blocos[i];
+      const proximo = blocos[i + 1];
+      // Título de seção não fica órfão no pé da coluna: só entra se o primeiro
+      // item dele couber junto.
+      const necessario = bloco.espacoAntes + bloco.altura
+        + (bloco.secao && proximo ? proximo.espacoAntes + proximo.altura : 0);
+      if (usado > 0 && usado + necessario > alturaUtil) {
+        if (atual === 1 && !forcar) return null;
+        if (atual === 0) { atual = 1; usado = 0; }
+      }
+      const consumo = (usado === 0 ? 0 : bloco.espacoAntes) + bloco.altura;
+      if (consumo > alturaUtil && !forcar) return null;
+      colunas[atual].push(bloco);
+      usado += consumo;
+    }
+    return { colunas, entreLinhas, tamanho };
+  }
+
+  let montagem: ReturnType<typeof montar> = null;
+  for (const tamanho of [12.5, 11.5, 10.5, 9.5, 8.5, 7.5, 7]) {
+    montagem = montar(tamanho, false);
+    if (montagem) break;
+  }
+  montagem ??= montar(6.5, true);
+  if (!montagem) return;
+
+  const { colunas, entreLinhas, tamanho } = montagem;
+  colunas.forEach((blocos, indice) => {
+    const x = LISTA_MARGIN + indice * (larguraColuna + vaoEntreColunas);
+    let cy = topoDasColunas;
+    blocos.forEach((bloco, ordem) => {
+      if (ordem > 0) cy -= bloco.espacoAntes;
+      bloco.linhas.forEach((palavras, linha) => {
+        if (bloco.secao) {
+          page.drawText(palavras.join(' '), {
+            x, y: cy - tamanho, size: tamanho + 1, font: options.bold, color: preto,
+          });
+        } else {
+          if (linha === 0) {
+            page.drawCircle({ x: x + 4, y: cy - tamanho * 0.66, size: tamanho * 0.13, color: preto });
+          }
+          page.drawText(palavras.join(' '), {
+            x: x + recuo, y: cy - tamanho, size: tamanho, font: options.regular, color: preto,
+          });
+        }
+        cy -= entreLinhas;
+      });
+    });
+  });
+}
 
 /**
  * Anexa o conteúdo programático da norma. A grade é fixa por NR; a carga
@@ -216,11 +328,14 @@ function appendProgramPages(
   pdf: PDFDocument,
   options: { nr: string; duration: string; regular: PDFFont; bold: PDFFont },
 ) {
-  const grade = programForNr(options.nr);
   // A NR 23 tem grade de quatro colunas; os demais cursos vieram do
-  // certificador como lista de tópicos, às vezes em seções.
-  const programa = grade && grade.length > 0 ? null : programaDoCurso(options.nr);
-  if ((!grade || grade.length === 0) && !programa) return;
+  // certificador como lista de tópicos, e têm página própria.
+  const grade = programForNr(options.nr);
+  if (!grade || grade.length === 0) {
+    const programa = programaDoCurso(options.nr);
+    if (programa) appendListaDePrograma(pdf, programa.secoes, options);
+    return;
+  }
 
   const preto = rgb(0, 0, 0);
   const linhaCor = rgb(0.72, 0.72, 0.72);
@@ -232,9 +347,9 @@ function appendProgramPages(
     { titulo: 'OBJETIVOS PARTE TEÓRICA', largura: largura * 0.34, campo: 'teorica' as const },
     { titulo: 'OBJETIVOS PARTE PRÁTICA', largura: largura * 0.25, campo: 'pratica' as const },
   ];
-  const corpo = 8.5;
-  const alturaLinhaTexto = 10;
-  const padding = 5;
+  const corpo = 6.6;
+  const alturaLinhaTexto = 8;
+  const padding = 4;
 
   let page = pdf.addPage([PROG_W, PROG_H]);
   let y = PROG_H - PROG_MARGIN;
@@ -243,15 +358,15 @@ function appendProgramPages(
     const t1 = 'CONTEÚDO PROGRAMÁTICO';
     const t2 = `CARGA HORÁRIA: ${options.duration.toUpperCase()}`;
     page.drawText(t1, {
-      x: PROG_MARGIN + (largura - options.bold.widthOfTextAtSize(t1, 16)) / 2,
-      y, size: 16, font: options.bold, color: preto,
-    });
-    y -= 21;
-    page.drawText(t2, {
-      x: PROG_MARGIN + (largura - options.bold.widthOfTextAtSize(t2, 12)) / 2,
+      x: PROG_MARGIN + (largura - options.bold.widthOfTextAtSize(t1, 12)) / 2,
       y, size: 12, font: options.bold, color: preto,
     });
-    y -= 26;
+    y -= 16;
+    page.drawText(t2, {
+      x: PROG_MARGIN + (largura - options.bold.widthOfTextAtSize(t2, 10)) / 2,
+      y, size: 10, font: options.bold, color: preto,
+    });
+    y -= 22;
   }
 
   function cabecalho() {
@@ -276,59 +391,7 @@ function appendProgramPages(
     y -= altura;
   }
 
-  function novaPaginaPrograma() {
-    page = pdf.addPage([PROG_W, PROG_H]);
-    y = PROG_H - PROG_MARGIN;
-  }
-
-  /** Lista de tópicos, com seções quando o curso as tem. */
-  function desenharLista(secoes: SecaoDePrograma[]) {
-    // Perto dos 14pt dos documentos do certificador: o conteúdo é para ser
-    // lido impresso, não para caber no menor espaço possível.
-    const tamanhoItem = 13;
-    const tamanhoSecao = 14.5;
-    const alturaItem = 19;
-    const recuo = 18;
-    const larguraItem = largura - padding * 2 - recuo;
-
-    for (const secao of secoes) {
-      if (secao.titulo) {
-        const linhas = wrap(secao.titulo, options.bold, tamanhoSecao, largura - padding * 2);
-        if (y - (linhas.length * alturaItem + 18) < PROG_MARGIN) novaPaginaPrograma();
-        y -= 10;
-        for (const palavras of linhas) {
-          page.drawText(palavras.join(' '), {
-            x: PROG_MARGIN + padding, y: y - tamanhoSecao, size: tamanhoSecao, font: options.bold, color: preto,
-          });
-          y -= alturaItem;
-        }
-        y -= 4;
-      }
-      for (const item of secao.itens) {
-        const linhas = wrap(item, options.regular, tamanhoItem, larguraItem);
-        if (y - linhas.length * alturaItem < PROG_MARGIN) novaPaginaPrograma();
-        linhas.forEach((palavras, indice) => {
-          if (indice === 0) {
-            page.drawCircle({ x: PROG_MARGIN + padding + 5, y: y - tamanhoItem + 3.5, size: 1.8, color: preto });
-          }
-          page.drawText(palavras.join(' '), {
-            x: PROG_MARGIN + padding + recuo, y: y - tamanhoItem, size: tamanhoItem, font: options.regular, color: preto,
-          });
-          y -= alturaItem;
-        });
-        y -= 2;
-      }
-    }
-  }
-
   titulo();
-
-  if (programa) {
-    desenharLista(programa.secoes);
-    return;
-  }
-  if (!grade) return;
-
   cabecalho();
 
   for (const item of grade) {
