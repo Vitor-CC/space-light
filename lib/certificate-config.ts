@@ -33,6 +33,10 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
   'NR 10': {
     legalBasis: 'de acordo com a NR 10, item 10.8 e Anexo III da referida norma,',
   },
+  // Curso complementar do SEP: mesma base legal da formação, conteúdo próprio.
+  'NR 10 SEP': {
+    legalBasis: 'de acordo com a NR 10, item 10.8 e Anexo III da referida norma,',
+  },
   'NR 11': {
     legalBasis:
       'de acordo com a NR 11 - Transporte, Movimentação, Armazenagem e Manuseio de Materiais,',

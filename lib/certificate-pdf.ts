@@ -13,6 +13,8 @@ import {
   formatCertificateDates,
 } from '@/lib/certificate-config';
 import { programForNr } from '@/lib/nr23-program';
+import { programaDoCurso } from '@/lib/nr-programs';
+import type { SecaoDePrograma } from '@/lib/nr-programs';
 
 /** A4 paisagem em pontos, o mesmo do modelo impresso da Space. */
 const PAGE_W = 842;
@@ -212,7 +214,10 @@ function appendProgramPages(
   options: { nr: string; duration: string; regular: PDFFont; bold: PDFFont },
 ) {
   const grade = programForNr(options.nr);
-  if (!grade || grade.length === 0) return;
+  // A NR 23 tem grade de quatro colunas; os demais cursos vieram do
+  // certificador como lista de tópicos, às vezes em seções.
+  const programa = grade && grade.length > 0 ? null : programaDoCurso(options.nr);
+  if ((!grade || grade.length === 0) && !programa) return;
 
   const preto = rgb(0, 0, 0);
   const linhaCor = rgb(0.72, 0.72, 0.72);
@@ -268,7 +273,57 @@ function appendProgramPages(
     y -= altura;
   }
 
+  function novaPaginaPrograma() {
+    page = pdf.addPage([PROG_W, PROG_H]);
+    y = PROG_H - PROG_MARGIN;
+  }
+
+  /** Lista de tópicos, com seções quando o curso as tem. */
+  function desenharLista(secoes: SecaoDePrograma[]) {
+    const tamanhoItem = 9;
+    const tamanhoSecao = 10;
+    const alturaItem = 12;
+    const recuo = 12;
+    const larguraItem = largura - padding * 2 - recuo;
+
+    for (const secao of secoes) {
+      if (secao.titulo) {
+        const linhas = wrap(secao.titulo, options.bold, tamanhoSecao, largura - padding * 2);
+        if (y - (linhas.length * alturaItem + 14) < PROG_MARGIN) novaPaginaPrograma();
+        y -= 8;
+        for (const palavras of linhas) {
+          page.drawText(palavras.join(' '), {
+            x: PROG_MARGIN + padding, y: y - tamanhoSecao, size: tamanhoSecao, font: options.bold, color: preto,
+          });
+          y -= alturaItem;
+        }
+        y -= 4;
+      }
+      for (const item of secao.itens) {
+        const linhas = wrap(item, options.regular, tamanhoItem, larguraItem);
+        if (y - linhas.length * alturaItem < PROG_MARGIN) novaPaginaPrograma();
+        linhas.forEach((palavras, indice) => {
+          if (indice === 0) {
+            page.drawCircle({ x: PROG_MARGIN + padding + 3, y: y - tamanhoItem + 2.5, size: 1.4, color: preto });
+          }
+          page.drawText(palavras.join(' '), {
+            x: PROG_MARGIN + padding + recuo, y: y - tamanhoItem, size: tamanhoItem, font: options.regular, color: preto,
+          });
+          y -= alturaItem;
+        });
+        y -= 2;
+      }
+    }
+  }
+
   titulo();
+
+  if (programa) {
+    desenharLista(programa.secoes);
+    return;
+  }
+  if (!grade) return;
+
   cabecalho();
 
   for (const item of grade) {

@@ -14,13 +14,14 @@ import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTr
 import type { NovoDia } from '@/lib/mock-company-database';
 import { dataDoDia as dataDaTurma, proximoDiaDaTurma as proximoDia } from '@/lib/dias-da-turma';
 import { nrInfo } from '@/lib/nr-catalog';
+import { cargaHorariaPadrao } from '@/lib/nr-programs';
 import { scheduleWindow, trainingReminderMessage, trainingScheduleMessage, whatsappLink } from '@/lib/whatsapp';
 
 type Aba = 'agenda' | 'lista' | 'concluidas' | 'criar';
 type Notify = (message: string) => void;
 type Reload = () => Promise<void>;
 
-const NORMAS = ['NR 05', 'NR 06', 'NR 10', 'NR 11', 'NR 12', 'NR 18', 'NR 20', 'NR 23', 'NR 31', 'NR 33', 'NR 34', 'NR 35', 'EMERGÊNCIAS QUÍMICAS'];
+const NORMAS = ['NR 05', 'NR 06', 'NR 10', 'NR 10 SEP', 'NR 11', 'NR 12', 'NR 18', 'NR 20', 'NR 23', 'NR 31', 'NR 33', 'NR 34', 'NR 35', 'EMERGÊNCIAS QUÍMICAS'];
 
 /** Só dígitos: o CNPJ é digitado com e sem pontuação, e as duas têm de achar. */
 function digitos(value: string) {
@@ -438,7 +439,7 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
     internalLabel: '',
     days: [diaVazio()],
     contentProgram: nrInfo('NR 23')?.content ?? '',
-    duration: '8 horas',
+    duration: cargaHorariaPadrao('NR 23'),
     location: '',
   });
 
@@ -446,7 +447,15 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
     setDraft((current) => {
       const previous = nrInfo(current.nr)?.content ?? '';
       const custom = current.contentProgram.trim() !== '' && current.contentProgram !== previous;
-      return { ...current, nr, contentProgram: custom ? current.contentProgram : (nrInfo(nr)?.content ?? '') };
+      // A carga horária sugerida acompanha a norma, mas nunca sobrescreve o que
+      // a gestão já digitou à mão.
+      const cargaIntocada = current.duration === cargaHorariaPadrao(current.nr);
+      return {
+        ...current,
+        nr,
+        contentProgram: custom ? current.contentProgram : (nrInfo(nr)?.content ?? ''),
+        duration: cargaIntocada ? cargaHorariaPadrao(nr) : current.duration,
+      };
     });
   }
   function setDia(index: number, campos: Partial<NovoDia>) {
