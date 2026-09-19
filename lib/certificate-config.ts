@@ -44,6 +44,7 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
   'NR 12': {
     legalBasis:
       'de acordo com a Portaria 3214/78 - NR 12 - Segurança no Trabalho em Máquinas e Equipamentos,',
+    background: '/images/certificado/fundo-nr12.jpg',
   },
   'NR 18': {
     legalBasis: 'de acordo com a NR 18, item 18.12.37,',
@@ -63,6 +64,7 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
   },
   'NR 31': {
     legalBasis: 'de acordo com a Portaria 3214/78 - NR 31,',
+    background: '/images/certificado/fundo-nr31.jpg',
   },
   'NR 33': {
     legalBasis: 'de acordo com a Portaria 3214/78 - NR 33 - Espaço Confinado,',
@@ -74,6 +76,7 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
   // Não é NR: a base é norma da ABNT, e por isso entra pelo nome do treinamento.
   'EMERGÊNCIAS QUÍMICAS': {
     legalBasis: 'de acordo com a ABNT NBR 14.064,',
+    background: '/images/certificado/fundo-emergencias-quimicas.jpg',
   },
 };
 
