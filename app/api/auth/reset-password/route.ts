@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { baseDoPedido } from '@/lib/safe-redirect';
+
 import { consumePasswordResetToken } from '@/db/company-repository';
 import { hashPassword, hashResetToken } from '@/lib/password-auth';
 
@@ -10,11 +12,11 @@ export async function POST(request: Request) {
   const confirmation = String(form.get('passwordConfirmation') ?? '');
 
   if (!token) {
-    return NextResponse.redirect(new URL('/esqueci-senha?status=expired', request.url), 303);
+    return NextResponse.redirect(new URL('/esqueci-senha?status=expired', baseDoPedido(request)), 303);
   }
   const back = (status: string) =>
     NextResponse.redirect(
-      new URL(`/redefinir-senha?token=${encodeURIComponent(token)}&status=${status}`, request.url),
+      new URL(`/redefinir-senha?token=${encodeURIComponent(token)}&status=${status}`, baseDoPedido(request)),
       303,
     );
   if (password.length < 10 || password !== confirmation) return back('invalid');
@@ -25,8 +27,8 @@ export async function POST(request: Request) {
       tokenHash: await hashResetToken(token),
       ...credentials,
     });
-    return NextResponse.redirect(new URL('/entrar?status=password-updated', request.url), 303);
+    return NextResponse.redirect(new URL('/entrar?status=password-updated', baseDoPedido(request)), 303);
   } catch {
-    return NextResponse.redirect(new URL('/esqueci-senha?status=expired', request.url), 303);
+    return NextResponse.redirect(new URL('/esqueci-senha?status=expired', baseDoPedido(request)), 303);
   }
 }

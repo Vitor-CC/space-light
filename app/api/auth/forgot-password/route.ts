@@ -1,4 +1,4 @@
-import { redirectInterno } from '@/lib/safe-redirect';
+import { baseDoPedido, redirectInterno } from '@/lib/safe-redirect';
 
 import { createPasswordResetToken, findUserByEmail } from '@/db/company-repository';
 import { isMailerConfigured, sendPasswordResetEmail } from '@/lib/mailer';
@@ -11,7 +11,7 @@ import {
 function baseUrl(request: Request) {
   const configured = process.env.APP_URL?.trim();
   if (configured) return configured.replace(/\/$/, '');
-  return new URL(request.url).origin;
+  return baseDoPedido(request).origin;
 }
 
 export async function POST(request: Request) {

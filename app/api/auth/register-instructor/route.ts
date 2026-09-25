@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { redirectInterno } from '@/lib/safe-redirect';
+import { baseDoPedido, redirectInterno } from '@/lib/safe-redirect';
 
 import { selfRegisterInstructor } from '@/db/company-repository';
 import { hashPassword } from '@/lib/password-auth';
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const credentials = await hashPassword(password);
     await selfRegisterInstructor({ ...input, ...credentials });
     return NextResponse.redirect(
-      new URL('/instrutor/login?status=registered', request.url),
+      new URL('/instrutor/login?status=registered', baseDoPedido(request)),
       303,
     );
   } catch {
