@@ -40,7 +40,7 @@ function pertence(file: CompanyFile, aba: Kind) {
 function FileActions({ file, onDelete }: { file: CompanyFile; onDelete: (file: CompanyFile) => void }) {
   if (file.status !== 'stored') {
     return <div className="flex items-center gap-2">
-      <span className="inline-flex h-10 items-center gap-2 border border-[#e0c48a] bg-[#fff8e8] px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]" title="Este registro é anterior ao armazenamento de arquivos: só a ficha foi salva, o arquivo em si não existe."><TriangleAlert className="size-3.5" />Arquivo não salvo</span>
+      <span className="inline-flex h-10 items-center gap-2 border border-[#e0c48a] bg-[#fff8e8] px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]" title="Só a ficha deste arquivo existe: o conteúdo não está no armazenamento."><TriangleAlert className="size-3.5" />Arquivo não salvo</span>
       <button type="button" onClick={() => onDelete(file)} aria-label={`Excluir ${file.name}`} className="inline-flex size-10 items-center justify-center border border-black/10 text-[#999] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-3.5" /></button>
     </div>;
   }
@@ -62,7 +62,7 @@ function PhotoCard({ file, onDelete }: { file: CompanyFile; onDelete: (file: Com
       <span className="block text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">{file.client_name} · {file.training_nr}</span>
       <strong className="mt-1 block truncate text-sm" title={file.name}>{file.name}</strong>
       <p className="mt-1 text-[11px] text-[#888]">{formatFileSize(file.size)} · {formatDate(file.created_at)}</p>
-      {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[11px] leading-relaxed text-[#8a6107]">Enviado antes do armazenamento entrar no ar: o arquivo em si não foi guardado. Exclua e envie de novo.</p> : null}
+      {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[11px] leading-relaxed text-[#8a6107]">Só a ficha ficou: o conteúdo não está no armazenamento. Exclua e envie de novo.</p> : null}
       <div className="mt-3"><FileActions file={file} onDelete={onDelete} /></div>
     </div>
   </article>;
@@ -76,7 +76,7 @@ function DocumentRow({ file, onDelete }: { file: CompanyFile; onDelete: (file: C
       <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">{file.client_name} · {file.training_nr}{ehLista ? ' · Lista assinada' : ''}</span>
       <h3 className="mt-1 truncate text-sm font-bold" title={file.name}>{file.name}</h3>
       <p className="mt-1 text-[11px] text-[#888]">{file.training_title} · {formatFileSize(file.size)} · {formatDate(file.created_at)}</p>
-      {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[11px] leading-relaxed text-[#8a6107]">Enviado antes do armazenamento entrar no ar: o arquivo em si não foi guardado. Exclua este registro e envie o arquivo de novo.</p> : null}
+      {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[11px] leading-relaxed text-[#8a6107]">Só a ficha ficou: o conteúdo não está no armazenamento. Exclua este registro e envie o arquivo de novo.</p> : null}
     </div>
     <FileActions file={file} onDelete={onDelete} />
   </article>;

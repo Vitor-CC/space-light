@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
   if (file.status !== 'stored') {
     return NextResponse.json(
-      { error: 'Este registro é anterior ao armazenamento de arquivos e não tem conteúdo salvo.' },
+      { error: 'Só a ficha deste arquivo existe: o conteúdo não está no armazenamento.' },
       { status: 410 },
     );
   }
