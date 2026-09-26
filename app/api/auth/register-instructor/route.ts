@@ -4,6 +4,7 @@ import { baseDoPedido, redirectInterno } from '@/lib/safe-redirect';
 
 import { selfRegisterInstructor } from '@/db/company-repository';
 import { hashPassword } from '@/lib/password-auth';
+import { senhaValida } from '@/lib/regras-senha';
 
 function back(request: Request, status: string) {
   return redirectInterno(request, `/instrutor/cadastro?status=${encodeURIComponent(status)}`);
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const password = String(form.get('password') ?? '');
   const confirmation = String(form.get('passwordConfirmation') ?? '');
-  if (password.length < 10) return back(request, 'weak');
+  if (!senhaValida(password)) return back(request, 'weak');
   if (password !== confirmation) return back(request, 'mismatch');
 
   const input = {

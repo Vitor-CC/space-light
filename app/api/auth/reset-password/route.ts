@@ -4,6 +4,7 @@ import { baseDoPedido } from '@/lib/safe-redirect';
 
 import { consumePasswordResetToken } from '@/db/company-repository';
 import { hashPassword, hashResetToken } from '@/lib/password-auth';
+import { senhaValida } from '@/lib/regras-senha';
 
 export async function POST(request: Request) {
   const form = await request.formData();
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
       new URL(`/redefinir-senha?token=${encodeURIComponent(token)}&status=${status}`, baseDoPedido(request)),
       303,
     );
-  if (password.length < 10 || password !== confirmation) return back('invalid');
+  if (!senhaValida(password) || password !== confirmation) return back('invalid');
 
   try {
     const credentials = await hashPassword(password);

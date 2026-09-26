@@ -3,9 +3,10 @@ import Link from 'next/link';
 
 import { MolduraAcesso, TituloAcesso } from '@/components/auth/moldura-acesso';
 import { botaoClasses, Campo, campoClasses, Faixa } from '@/components/ds/base';
+import { AJUDA_SENHA } from '@/lib/regras-senha';
 
 const messages: Record<string, string> = {
-  weak: 'Crie uma senha com pelo menos 10 caracteres.',
+  weak: AJUDA_SENHA,
   mismatch: 'As duas senhas precisam ser iguais.',
   required: 'Preencha todos os campos obrigatórios.',
   exists: 'Já existe um cadastro com este CPF ou e-mail. Fale com a Space Light.',
@@ -33,8 +34,8 @@ export default async function InstructorRegistrationPage({ searchParams }: { sea
           <input name={name} type={type} required autoComplete={auto} placeholder={placeholder} className={campoClasses} />
         </Campo>)}
         <Campo rotulo="Especialidades / NRs" className="sm:col-span-2"><input name="specialties" required placeholder="Ex.: NR 10, NR 33, NR 35" className={campoClasses} /></Campo>
-        <Campo rotulo="Crie uma senha" ajuda="Mínimo de 10 caracteres."><input name="password" type="password" minLength={10} required autoComplete="new-password" placeholder="••••••••••" className={campoClasses} /></Campo>
-        <Campo rotulo="Repita a senha"><input name="passwordConfirmation" type="password" minLength={10} required autoComplete="new-password" placeholder="••••••••••" className={campoClasses} /></Campo>
+        <Campo rotulo="Crie uma senha" ajuda={AJUDA_SENHA}><input name="password" type="password" minLength={8} required autoComplete="new-password" placeholder="••••••••••" className={campoClasses} /></Campo>
+        <Campo rotulo="Repita a senha"><input name="passwordConfirmation" type="password" minLength={8} required autoComplete="new-password" placeholder="••••••••••" className={campoClasses} /></Campo>
         <button type="submit" className={botaoClasses('primario', 'L', 'w-full sm:col-span-2')}>Enviar para aprovação</button>
       </form>
       <Link href="/instrutor/login" className="inline-flex w-fit items-center gap-2 ds-body-s font-medium text-ds-texto hover:underline underline-offset-4"><ArrowLeft className="size-4" />Voltar para o login</Link>
