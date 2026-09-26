@@ -12,13 +12,15 @@ import { Segmentado } from '@/components/ds/interativo';
 import type { CompanyParticipant } from '@/lib/company-types';
 import { limparDigitacaoCpf, limparDigitacaoRg, problemaCpf, problemaRg } from '@/lib/documentos';
 import type { InstructorDashboardData } from '@/lib/instructor-types';
+import { clientePedeLogin } from '@/lib/login-do-participante';
 import { LIMITE_UPLOAD_LABEL } from '@/lib/upload-limites';
 import { cn } from '@/lib/utils';
 
 type TrainingFile = { id: string; name: string; kind: string; size: number; contentType: string; createdAt: string; stored: boolean };
 type Aba = 'chamada' | 'qr' | 'fotos' | 'checklist';
 const ACEITA_IMAGEM = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
-const manualVazio = { fullName: '', documentId: '', rg: '', birthDate: '', jobTitle: '', email: '', phone: '' };
+// A função saiu do cadastro em 26/09/2026; o login só existe para cliente Amazon.
+const manualVazio = { fullName: '', documentId: '', rg: '', birthDate: '', employeeLogin: '', email: '', phone: '' };
 
 export function Sala({ data, selectedId, selectTraining, reload, notify }: { data: InstructorDashboardData; selectedId: string; selectTraining: (id: string) => void; reload: () => Promise<void>; notify: (message: string) => void }) {
   const training = data.trainings.find((item) => item.id === selectedId) || data.trainings.find((item) => item.status === 'in_progress') || data.trainings[0];
@@ -182,8 +184,11 @@ export function Sala({ data, selectedId, selectTraining, reload, notify }: { dat
 
   function exportCsv() {
     if (!training) return;
-    const header = ['Nome', 'Identificador', 'Presença (dias)', 'Função', 'E-mail', 'Telefone', 'Entrada'];
-    const body = participants.map((p) => [p.full_name, p.document_id, `${p.days_present}/${p.days_total}`, p.job_title, p.email, p.phone, new Date(p.created_at).toLocaleString('pt-BR')]
+    // Login e função só entram quando alguém da turma tem o dado.
+    const temLogin = participants.some((p) => p.employee_login);
+    const temFuncao = participants.some((p) => p.job_title);
+    const header = ['Nome', 'Identificador', ...(temLogin ? ['Login'] : []), 'Presença (dias)', ...(temFuncao ? ['Função'] : []), 'E-mail', 'Telefone', 'Entrada'];
+    const body = participants.map((p) => [p.full_name, p.document_id, ...(temLogin ? [p.employee_login ?? ''] : []), `${p.days_present}/${p.days_total}`, ...(temFuncao ? [p.job_title] : []), p.email, p.phone, new Date(p.created_at).toLocaleString('pt-BR')]
       .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(';'));
     const csv = '﻿' + [header.join(';'), ...body].join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -265,7 +270,7 @@ export function Sala({ data, selectedId, selectTraining, reload, notify }: { dat
         <Campo rotulo="CPF *"><input required value={manual.documentId} onChange={(e) => setManual({ ...manual, documentId: limparDigitacaoCpf(e.target.value) })} inputMode="numeric" placeholder="Só números" className={campoClasses} /></Campo>
         <Campo rotulo="RG *" ajuda="Sem lembrar, use o CPF."><input required value={manual.rg} onChange={(e) => setManual({ ...manual, rg: limparDigitacaoRg(e.target.value) })} className={campoClasses} /></Campo>
         <Campo rotulo="Data de nascimento"><input type="date" value={manual.birthDate} onChange={(e) => setManual({ ...manual, birthDate: e.target.value })} className={campoClasses} /></Campo>
-        <Campo rotulo="Função"><input value={manual.jobTitle} onChange={(e) => setManual({ ...manual, jobTitle: e.target.value })} className={campoClasses} /></Campo>
+        {clientePedeLogin([training.client_name, training.client_legal_name]) ? <Campo rotulo="Login da Amazon"><input value={manual.employeeLogin} onChange={(e) => setManual({ ...manual, employeeLogin: e.target.value.trim() })} autoCapitalize="none" spellCheck={false} className={campoClasses} /></Campo> : null}
         <Campo rotulo="E-mail"><input value={manual.email} onChange={(e) => setManual({ ...manual, email: e.target.value })} className={campoClasses} /></Campo>
         <Campo rotulo="Telefone"><input value={manual.phone} onChange={(e) => setManual({ ...manual, phone: e.target.value })} className={campoClasses} /></Campo>
         <div className="sm:col-span-2"><Botao type="submit" disabled={savingManual}>{savingManual ? <Loader2 className="animate-spin" /> : <Check />}Adicionar à lista</Botao></div>
@@ -276,7 +281,7 @@ export function Sala({ data, selectedId, selectTraining, reload, notify }: { dat
         return <li key={p.id} className="flex items-center gap-2.5 border-b border-ds-borda py-3 pr-3 pl-4 last:border-b-0">
           <div className="min-w-0 flex-1">
             <p className="truncate ds-body-s font-medium">{p.full_name}</p>
-            <p className="truncate ds-caption text-ds-texto-2">{p.job_title || 'Sem função'}{p.days_total > 1 ? ` · ${p.days_present}/${p.days_total} dias` : ''}</p>
+            <p className="truncate ds-caption text-ds-texto-2">{[p.employee_login ? `Login ${p.employee_login}` : '', p.job_title, p.days_total > 1 ? `${p.days_present}/${p.days_total} dias` : ''].filter(Boolean).join(' · ') || 'Presença do dia'}</p>
           </div>
           {training.status !== 'completed' ? <BotaoIcone rotulo={`Remover ${p.full_name}`} tom="perigo" className="hidden size-9 sm:inline-flex" onClick={() => void removeParticipant(p)}><Trash2 /></BotaoIcone> : null}
           <button type="button" disabled={bloqueado} onClick={() => void marcar(p, false)} aria-pressed={!presente && ausentes.has(p.id)} aria-label={`${p.full_name}: ausente`} className={cn('flex size-10 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors ds-foco disabled:cursor-not-allowed', !presente && ausentes.has(p.id) ? 'border-ds-perigo bg-ds-perigo text-ds-texto-inv' : 'border-ds-borda text-ds-texto hover:border-ds-borda-forte', bloqueado && 'opacity-60')}><X className="size-[18px]" /></button>

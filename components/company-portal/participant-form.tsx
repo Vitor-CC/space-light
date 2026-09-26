@@ -18,7 +18,8 @@ type FormState = {
   documentId: string;
   rg: string;
   birthDate: string;
-  jobTitle: string;
+  /** Só cliente Amazon pede (decisão de 26/09/2026). */
+  employeeLogin: string;
   email: string;
   phone: string;
   consent: boolean;
@@ -29,7 +30,7 @@ const initialForm: FormState = {
   documentId: '',
   rg: '',
   birthDate: '',
-  jobTitle: '',
+  employeeLogin: '',
   email: '',
   phone: '',
   consent: false,
@@ -174,7 +175,7 @@ export function ParticipantForm() {
           <Campo rotulo="CPF *" ajuda="Os 11 números, sem ponto nem traço."><input required value={form.documentId} onChange={(event) => update('documentId', limparDigitacaoCpf(event.target.value))} className={campoClasses} inputMode="numeric" autoComplete="off" placeholder="Só números" /></Campo>
           <Campo rotulo="RG *" ajuda="Sem ponto nem traço. Não lembra o RG? Digite o CPF."><input required value={form.rg} onChange={(event) => update('rg', limparDigitacaoRg(event.target.value))} className={campoClasses} autoComplete="off" autoCapitalize="characters" placeholder="Só números" /></Campo>
           <Campo rotulo="Data de nascimento *"><input required type="date" value={form.birthDate} onChange={(event) => update('birthDate', event.target.value)} className={campoClasses} /></Campo>
-          <Campo rotulo="Cargo ou função *"><input required value={form.jobTitle} onChange={(event) => update('jobTitle', event.target.value)} className={campoClasses} autoComplete="organization-title" /></Campo>
+          {training.pedeLogin ? <Campo rotulo="Login da Amazon *" ajuda="O mesmo login que você usa no trabalho."><input required value={form.employeeLogin} onChange={(event) => update('employeeLogin', event.target.value.trim())} className={campoClasses} autoComplete="off" autoCapitalize="none" spellCheck={false} /></Campo> : null}
           <Campo rotulo="E-mail"><input type="email" value={form.email} onChange={(event) => update('email', event.target.value)} className={campoClasses} autoComplete="email" /></Campo>
           <Campo rotulo="Telefone"><input type="tel" value={form.phone} onChange={(event) => update('phone', event.target.value)} className={campoClasses} autoComplete="tel" /></Campo>
           <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-ds-borda bg-ds-muted p-4 sm:col-span-2"><input type="checkbox" checked={form.consent} onChange={(event) => update('consent', event.target.checked)} className="mt-0.5 size-4 accent-ds-inverso" /><span className="ds-caption text-ds-texto-2">Autorizo o registro destes dados para controle de presença, emissão de documentos e certificados relacionados a este treinamento. *</span></label>

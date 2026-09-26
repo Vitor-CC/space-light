@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
   const { id } = await params;
   const input = (await request.json()) as {
-    fullName?: string; documentId?: string; rg?: string; birthDate?: string; email?: string; phone?: string; jobTitle?: string;
+    fullName?: string; documentId?: string; rg?: string; birthDate?: string; email?: string; phone?: string; jobTitle?: string; employeeLogin?: string;
   };
   try {
     const result = await addParticipantByInstructor({
@@ -44,7 +44,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         birthDate: input.birthDate ?? '',
         email: input.email ?? '',
         phone: input.phone ?? '',
-        jobTitle: input.jobTitle ?? '',
+        jobTitle: input.jobTitle,
+        employeeLogin: input.employeeLogin,
       },
     });
     return NextResponse.json(result, { status: 201 });

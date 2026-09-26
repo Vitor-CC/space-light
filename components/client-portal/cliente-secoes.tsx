@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { SyntheticEvent } from 'react';
 
-import { BotaoZip, NORMAS_PEDIDO, dataCurta, diasAte, situacaoCertificado, slug, type Secao } from '@/components/client-portal/cliente-util';
+import { BotaoZip, NORMAS_PEDIDO, dataCurta, diasAte, identificacaoDaPessoa, situacaoCertificado, slug, type Secao } from '@/components/client-portal/cliente-util';
 import { areaClasses, botaoClasses, BotaoIcone, Campo, campoClasses, Cartao, CartaoCabecalho, Faixa, LinhaArquivo, selectClasses, tabelaClasses as tb, Tag, TopoDePagina, Vazio } from '@/components/ds/base';
 import { Segmentado } from '@/components/ds/interativo';
 import type { ClientPortalData } from '@/lib/client-portal-data';
@@ -55,7 +55,7 @@ export function Certificados({ data, abrirTurma }: { data: ClientPortalData; abr
           const sit = situacaoCertificado(p, t);
           return <tr key={p.id} className={tb.linha}>
             <td className={tb.td}><input type="checkbox" disabled={!p.certificateFileId} aria-label={`Selecionar ${p.fullName}`} checked={selecionados.has(p.id)} onChange={() => alternar(p.id)} className="size-[18px] accent-ds-inverso disabled:opacity-30" /></td>
-            <td className={cn(tb.td, 'font-medium')}>{p.fullName}<span className="block ds-caption text-ds-texto-2">{p.jobTitle || '—'}</span></td>
+            <td className={cn(tb.td, 'font-medium')}>{p.fullName}<span className="block ds-caption text-ds-texto-2">{identificacaoDaPessoa(p)}</span></td>
             <td className={tb.td}><button type="button" onClick={() => t && abrirTurma(t.id)} className="text-left hover:underline underline-offset-4"><span className="ds-mono text-ds-texto-2">{t?.code}</span> · {t?.nr}</button></td>
             <td className={tb.td}><Tag tom={sit.tom}>{sit.texto}</Tag></td>
             <td className={tb.td}>{p.certificateFileId ? <a href={`/api/files/${p.certificateFileId}?download=1`} aria-label={`Baixar certificado de ${p.fullName}`} className="inline-flex rounded p-1 hover:bg-ds-muted"><Download className="size-[18px]" /></a> : null}</td>

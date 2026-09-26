@@ -73,6 +73,10 @@ export type CompanyTraining = {
   client_id: string;
   instructor_id: string | null;
   client_name: string;
+  /** Razão social; vem só na busca pelo QR, para saber se o cliente pede login. */
+  client_legal_name?: string;
+  /** Página pública do QR: o formulário pede o login da Amazon. */
+  pedeLogin?: boolean;
   code: string;
   nr: string;
   /** Título que sai impresso no certificado. */
@@ -148,6 +152,8 @@ export type CompanyParticipant = {
   email: string;
   phone: string;
   job_title: string;
+  /** Login interno do participante; só cliente Amazon pede (vazio nos demais). */
+  employee_login?: string;
   created_at: string;
   /** Dias da turma com check-in deste aluno. */
   days_present: number;

@@ -12,6 +12,7 @@ import { Calendar } from '@/components/ui/calendar';
 import type { CompanyDashboardData, CompanyParticipant, CompanyTraining } from '@/lib/company-types';
 import { dataDoDia, rotuloDiaDaTurma } from '@/lib/dias-da-turma';
 import { limparDigitacaoCpf, limparDigitacaoRg, problemaCpf, problemaRg } from '@/lib/documentos';
+import { clientePedeLogin } from '@/lib/login-do-participante';
 import { addParticipantByCompany, generateCertificates, removeParticipantByCompany, setParticipantAttendance, updateParticipantByCompany } from '@/lib/mock-company-database';
 import type { DadosParticipante } from '@/lib/mock-company-database';
 
@@ -27,7 +28,7 @@ function QrPanel({ training }: { training: CompanyTraining }) {
   return <div className="rounded-lg grid gap-7 border border-ds-borda bg-ds-superficie p-6 md:grid-cols-[280px_1fr] md:p-8"><div className="flex min-h-[280px] items-center justify-center bg-ds-muted p-4">{image ? <Image src={image} alt={`QR Code do treinamento ${training.nr}`} width={250} height={250} unoptimized className="h-auto w-full max-w-[250px]" /> : <Loader2 className="size-7 animate-spin text-ds-amarelo-texto" />}</div><div className="flex flex-col justify-between"><div><span className="eyebrow text-ds-amarelo-texto">Formulário do treinamento</span><h2 className="mt-3 ds-h4">{training.nr} · {training.title}</h2><p className="mt-2 text-sm font-bold text-ds-amarelo-texto">{training.client_name}</p><p className="mt-5 break-all border-l-4 border-ds-amarelo bg-ds-amarelo-suave p-3 font-mono text-[10px] leading-relaxed">{url}</p></div><div className="mt-6 grid gap-2 sm:grid-cols-3"><button type="button" onClick={copy} className="rounded-md inline-flex h-11 items-center justify-center gap-2 border border-ds-borda ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv">{copied ? <Check className="size-4" /> : <Copy className="size-4" />}{copied ? 'Copiado' : 'Copiar link'}</button><a href={image} download={`qr-${training.code}.png`} className="rounded-md inline-flex h-11 items-center justify-center gap-2 border border-ds-borda ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv"><Download className="size-4" />Baixar QR</a><a href={url} target="_blank" rel="noreferrer" className="rounded-md inline-flex h-11 items-center justify-center gap-2 bg-ds-amarelo ds-botao text-ds-texto hover:bg-[#eab900]">Abrir formulário</a></div></div></div>;
 }
 
-const vazio: DadosParticipante = { fullName: '', documentId: '', rg: '', birthDate: '', email: '', phone: '', jobTitle: '' };
+const vazio: DadosParticipante = { fullName: '', documentId: '', rg: '', birthDate: '', email: '', phone: '', employeeLogin: '' };
 
 /** O formulário trabalha só com números; a pontuação é recolocada ao salvar. */
 function dadosDe(participant: CompanyParticipant): DadosParticipante {
@@ -38,19 +39,19 @@ function dadosDe(participant: CompanyParticipant): DadosParticipante {
     birthDate: participant.birth_date ?? '',
     email: participant.email ?? '',
     phone: participant.phone ?? '',
-    jobTitle: participant.job_title ?? '',
+    employeeLogin: participant.employee_login ?? '',
   };
 }
 
 /** Campos da gestão: os mesmos para incluir e para corrigir um participante. */
-function ParticipantFields({ draft, setDraft }: { draft: DadosParticipante; setDraft: (value: DadosParticipante) => void }) {
+function ParticipantFields({ draft, setDraft, pedeLogin }: { draft: DadosParticipante; setDraft: (value: DadosParticipante) => void; pedeLogin: boolean }) {
   const rotulo = 'mb-1.5 block ds-caps';
   return <>
     <label className="sm:col-span-2 xl:col-span-3"><span className={rotulo}>Nome completo *</span><input required value={draft.fullName} onChange={(e) => setDraft({ ...draft, fullName: e.target.value })} className={inputClass} /></label>
     <label><span className={rotulo}>CPF * (só números)</span><input required inputMode="numeric" value={draft.documentId} onChange={(e) => setDraft({ ...draft, documentId: limparDigitacaoCpf(e.target.value) })} className={inputClass} /></label>
     <label><span className={rotulo}>RG * (sem lembrar: o CPF)</span><input required value={draft.rg} onChange={(e) => setDraft({ ...draft, rg: limparDigitacaoRg(e.target.value) })} className={inputClass} /></label>
     <label><span className={rotulo}>Data de nascimento</span><input type="date" value={draft.birthDate} onChange={(e) => setDraft({ ...draft, birthDate: e.target.value })} className={inputClass} /></label>
-    <label><span className={rotulo}>Cargo ou função</span><input value={draft.jobTitle} onChange={(e) => setDraft({ ...draft, jobTitle: e.target.value })} className={inputClass} /></label>
+    {pedeLogin ? <label><span className={rotulo}>Login da Amazon</span><input value={draft.employeeLogin ?? ''} onChange={(e) => setDraft({ ...draft, employeeLogin: e.target.value.trim() })} autoCapitalize="none" spellCheck={false} className={inputClass} /></label> : null}
     <label><span className={rotulo}>E-mail</span><input type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} className={inputClass} /></label>
     <label><span className={rotulo}>Telefone</span><input type="tel" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} className={inputClass} /></label>
   </>;
@@ -83,7 +84,7 @@ function AddParticipant({ training, reload, notify }: { training: CompanyTrainin
     return <button type="button" onClick={() => setAberto(true)} className="rounded-md inline-flex h-11 items-center gap-2 bg-ds-amarelo px-4 ds-botao text-ds-texto hover:bg-[#eab900]"><Plus className="size-4" />Incluir participante</button>;
   }
   return <form onSubmit={salvar} className="rounded-lg grid gap-3 border border-ds-borda bg-ds-superficie p-4 sm:grid-cols-2 xl:grid-cols-3">
-    <ParticipantFields draft={draft} setDraft={setDraft} />
+    <ParticipantFields draft={draft} setDraft={setDraft} pedeLogin={clientePedeLogin([training.client_name, training.client_legal_name])} />
     <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-3">
       <button type="submit" disabled={salvando} className="rounded-md inline-flex h-11 items-center gap-2 bg-ds-inverso px-4 ds-botao text-white hover:bg-ds-amarelo hover:text-ds-texto disabled:opacity-50">{salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Incluir na lista</button>
       <button type="button" onClick={() => setAberto(false)} className="rounded-md inline-flex h-11 items-center border border-ds-borda px-4 ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv">Cancelar</button>
@@ -140,7 +141,7 @@ function ParticipantRow({ participant, training, presentes, reload, notify }: { 
     }
   }
 
-  const contato = [participant.job_title, participant.email || participant.phone].filter(Boolean).join(' · ');
+  const contato = [participant.employee_login ? `Login ${participant.employee_login}` : '', participant.job_title, participant.email || participant.phone].filter(Boolean).join(' · ');
 
   return <li className="border border-ds-borda bg-ds-superficie">
     <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto] lg:items-center">
@@ -162,7 +163,7 @@ function ParticipantRow({ participant, training, presentes, reload, notify }: { 
       </div>
     </div>
     {editando ? <form onSubmit={salvar} className="grid gap-3 border-t border-ds-borda bg-ds-muted p-4 sm:grid-cols-2 xl:grid-cols-3">
-      <ParticipantFields draft={draft} setDraft={setDraft} />
+      <ParticipantFields draft={draft} setDraft={setDraft} pedeLogin={clientePedeLogin([training.client_name, training.client_legal_name])} />
       <div className="sm:col-span-2 xl:col-span-3">
         <button type="submit" disabled={Boolean(ocupado)} className="rounded-md inline-flex h-11 items-center gap-2 bg-ds-inverso px-4 ds-botao text-white hover:bg-ds-amarelo hover:text-ds-texto disabled:opacity-50">{ocupado === 'salvar' ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar alterações</button>
       </div>

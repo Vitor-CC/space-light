@@ -121,7 +121,7 @@ export function findMockTrainingByToken(token: string) {
   return requestJson<{ training: CompanyTraining | null }>(`/api/public/trainings/${encodeURIComponent(token)}`, { cache: 'no-store' }).then((result) => result.training);
 }
 
-export function registerMockParticipant(token: string, input: { fullName: string; documentId: string; rg: string; birthDate: string; email: string; phone: string; jobTitle: string }) {
+export function registerMockParticipant(token: string, input: { fullName: string; documentId: string; rg: string; birthDate: string; email: string; phone: string; employeeLogin?: string }) {
   return requestJson<{ id: string; training: CompanyTraining; checkin: CheckinResult }>(`/api/public/trainings/${encodeURIComponent(token)}`, { method: 'POST', body: JSON.stringify(input) });
 }
 
@@ -206,7 +206,8 @@ export function saveClientAddress(input: { clientId: string; address: string; di
 
 // --- Edição pela gestão ---
 
-export type DadosParticipante = { fullName: string; documentId: string; rg: string; birthDate: string; email: string; phone: string; jobTitle: string };
+/** A função saiu dos formulários em 26/09/2026; o login só existe para cliente Amazon. */
+export type DadosParticipante = { fullName: string; documentId: string; rg: string; birthDate: string; email: string; phone: string; employeeLogin?: string };
 
 export function updateClient(clientId: string, input: { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string }) {
   return requestJson<{ ok: true }>(`/api/company/clients/${encodeURIComponent(clientId)}`, { method: 'PATCH', body: JSON.stringify(input) });

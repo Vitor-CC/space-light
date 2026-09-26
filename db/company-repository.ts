@@ -1,6 +1,7 @@
 import { getD1 } from '@/db';
 import { formatarCpf, formatarRg, problemaCpf, problemaRg } from '@/lib/documentos';
 import { INSTRUCTOR_DOCUMENT_CATEGORIES } from '@/lib/instructor-documents';
+import { clientePedeLogin } from '@/lib/login-do-participante';
 import { nomeCertificadoAluno, PREFIXO_CERTIFICADO_ALUNO } from '@/lib/nome-certificado';
 import { normalizarUsuario, USUARIO_REGRA, usuarioValido } from '@/lib/usuario';
 import type { DatabaseBinding, DatabaseResult } from '@/db/sqlite-adapter';
@@ -148,6 +149,13 @@ const COLUNAS_POR_MARCADOR = [
     tabela: 'users',
     coluna: 'job_title',
     alter: "ALTER TABLE users ADD COLUMN job_title TEXT NOT NULL DEFAULT ''",
+  },
+  // Login interno do participante, pedido só por cliente Amazon no QR.
+  {
+    marcador: 'col_participants_employee_login',
+    tabela: 'participants',
+    coluna: 'employee_login',
+    alter: "ALTER TABLE participants ADD COLUMN employee_login TEXT NOT NULL DEFAULT ''",
   },
 ];
 
@@ -365,6 +373,7 @@ export function ensurePortalSchema(): Promise<void> {
         email TEXT NOT NULL DEFAULT '',
         phone TEXT NOT NULL DEFAULT '',
         job_title TEXT NOT NULL DEFAULT '',
+        employee_login TEXT NOT NULL DEFAULT '',
         consent INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       )`),
@@ -1271,7 +1280,7 @@ export async function getInstructorDashboardData(
       d1
         .prepare(`SELECT p.id, p.training_id, t.title AS training_title,
           t.nr AS training_nr, c.name AS client_name, p.full_name,
-          p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.created_at,
+          p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.employee_login, p.created_at,
           ${COLUNAS_PRESENCA},
           ${DIAS_PRESENTES}
           FROM participants p
@@ -1411,7 +1420,7 @@ export async function listInstructorTrainingParticipants(input: {
   const result = await getD1()
     .prepare(`SELECT p.id, p.training_id, t.title AS training_title,
       t.nr AS training_nr, c.name AS client_name, p.full_name,
-      p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.created_at,
+      p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.employee_login, p.created_at,
           ${COLUNAS_PRESENCA},
           ${DIAS_PRESENTES}
       FROM participants p
@@ -1713,7 +1722,7 @@ export async function addParticipantByInstructor(input: {
   instructorId: string;
   trainingId: string;
   userId: string;
-  participant: { fullName: string; documentId: string; rg?: string; birthDate?: string; email: string; phone: string; jobTitle: string };
+  participant: { fullName: string; documentId: string; rg?: string; birthDate?: string; email: string; phone: string; jobTitle?: string; employeeLogin?: string };
 }) {
   await ensurePortalSchema();
   const d1 = getD1();
@@ -1739,8 +1748,8 @@ export async function addParticipantByInstructor(input: {
   try {
     await d1
       .prepare(`INSERT INTO participants (
-        id, training_id, full_name, document_id, rg, birth_date, email, phone, job_title, consent
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
+        id, training_id, full_name, document_id, rg, birth_date, email, phone, job_title, employee_login, consent
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
       .bind(
         id,
         training.id,
@@ -1750,7 +1759,8 @@ export async function addParticipantByInstructor(input: {
         (input.participant.birthDate ?? '').trim(),
         normalizeEmail(input.participant.email),
         input.participant.phone.trim(),
-        input.participant.jobTitle.trim(),
+        (input.participant.jobTitle ?? '').trim(),
+        (input.participant.employeeLogin ?? '').trim(),
       )
       .run();
   } catch {
@@ -2046,7 +2056,10 @@ type DadosParticipanteGestao = {
   birthDate: string;
   email: string;
   phone: string;
-  jobTitle: string;
+  /** Saiu dos formulários em 26/09/2026: sem ele, a edição mantém o que já havia. */
+  jobTitle?: string;
+  /** Login interno, só de cliente Amazon. Sem ele, a edição mantém o atual. */
+  employeeLogin?: string;
 };
 
 function validarParticipante(dados: DadosParticipanteGestao) {
@@ -2072,10 +2085,11 @@ export async function addParticipantByAdmin(input: {
   const dados = input.participant;
   await getD1()
     .prepare(`INSERT INTO participants (
-      id, training_id, full_name, document_id, rg, birth_date, email, phone, job_title, consent
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
+      id, training_id, full_name, document_id, rg, birth_date, email, phone, job_title, employee_login, consent
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
     .bind(id, input.trainingId, dados.fullName.trim(), formatarCpf(dados.documentId), formatarRg(dados.rg, dados.documentId),
-      (dados.birthDate ?? '').trim(), normalizeEmail(dados.email ?? ''), (dados.phone ?? '').trim(), (dados.jobTitle ?? '').trim())
+      (dados.birthDate ?? '').trim(), normalizeEmail(dados.email ?? ''), (dados.phone ?? '').trim(), (dados.jobTitle ?? '').trim(),
+      (dados.employeeLogin ?? '').trim())
     .run();
   await writeAudit(input.byUserId, 'participant.added_by_company', 'participant', id, { trainingId: input.trainingId });
   return { id };
@@ -2097,11 +2111,13 @@ export async function updateParticipantByAdmin(input: {
   if (mesmoCpf && mesmoCpf.id !== atual.id) throw new Error('Já existe outro participante com este CPF nesta turma.');
   const dados = input.participant;
   await getD1()
+    // Campo que o formulário não mandou fica como estava (COALESCE com null).
     .prepare(`UPDATE participants SET full_name = ?, document_id = ?, rg = ?, birth_date = ?, email = ?,
-      phone = ?, job_title = ? WHERE id = ?`)
+      phone = ?, job_title = COALESCE(?, job_title), employee_login = COALESCE(?, employee_login) WHERE id = ?`)
     .bind(dados.fullName.trim(), formatarCpf(dados.documentId), formatarRg(dados.rg, dados.documentId),
       (dados.birthDate ?? '').trim(), normalizeEmail(dados.email ?? ''), (dados.phone ?? '').trim(),
-      (dados.jobTitle ?? '').trim(), atual.id)
+      dados.jobTitle === undefined ? null : dados.jobTitle.trim(),
+      dados.employeeLogin === undefined ? null : dados.employeeLogin.trim(), atual.id)
     .run();
   await writeAudit(input.byUserId, 'participant.updated_by_company', 'participant', atual.id, { trainingId: atual.training_id });
   return { ok: true as const };
@@ -3009,7 +3025,7 @@ export async function getCompanyDashboardData(
         .prepare(
           `SELECT p.id, p.training_id, t.title AS training_title,
            t.nr AS training_nr, c.name AS client_name, p.full_name,
-           p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.created_at,
+           p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.employee_login, p.created_at,
           ${COLUNAS_PRESENCA}
            FROM participants p
            JOIN trainings t ON t.id = p.training_id
@@ -3391,7 +3407,8 @@ export async function findTrainingByToken(token: string) {
   await ensurePortalSchema();
   return getD1()
     .prepare(
-      `SELECT t.id, t.client_id, t.instructor_id, c.name AS client_name, t.code, t.nr,
+      `SELECT t.id, t.client_id, t.instructor_id, c.name AS client_name,
+       c.legal_name AS client_legal_name, t.code, t.nr,
        t.title, t.internal_label, t.training_date, t.duration, t.location, t.instructor,
        t.status, t.participant_limit, t.qr_token, t.qr_enabled, t.created_at,
        0 AS file_count,
@@ -3512,7 +3529,9 @@ export async function registerParticipant(
     birthDate?: string;
     email: string;
     phone: string;
-    jobTitle: string;
+    /** Saiu do formulário do QR em 26/09/2026; fica para quem ainda mandar. */
+    jobTitle?: string;
+    employeeLogin?: string;
   },
 ) {
   const training = await findTrainingByToken(token);
@@ -3520,6 +3539,10 @@ export async function registerParticipant(
   // CPF e RG completos, só com números; a pontuação é colocada ao gravar.
   const problemaDocumento = problemaCpf(input.documentId) ?? problemaRg(input.rg ?? '');
   if (problemaDocumento) throw new Error(problemaDocumento);
+  const login = (input.employeeLogin ?? '').trim();
+  if (clientePedeLogin([training.client_name, training.client_legal_name]) && !login) {
+    throw new Error('Informe o seu login da Amazon.');
+  }
   const dia = await diaAbertoParaCheckin(training.id);
   if (!dia) throw new Error(SEM_DIA_ABERTO);
   // Já inscrito num dia anterior: vale como check-in, sem duplicar o cadastro.
@@ -3530,8 +3553,8 @@ export async function registerParticipant(
   const id = makeId('participant');
   await getD1()
     .prepare(`INSERT INTO participants (
-      id, training_id, full_name, document_id, rg, birth_date, email, phone, job_title, consent
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
+      id, training_id, full_name, document_id, rg, birth_date, email, phone, job_title, employee_login, consent
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`)
     .bind(
       id,
       training.id,
@@ -3541,7 +3564,8 @@ export async function registerParticipant(
       (input.birthDate ?? '').trim(),
       normalizeEmail(input.email),
       input.phone.trim(),
-      input.jobTitle.trim(),
+      (input.jobTitle ?? '').trim(),
+      login,
     )
     .run();
   return {
@@ -3650,7 +3674,7 @@ export async function getClientPortalData(
     // nascimento e contato ficam só com a equipe Space.
     d1
       .prepare(
-        `SELECT p.id, p.training_id, p.full_name, p.job_title, t.nr,
+        `SELECT p.id, p.training_id, p.full_name, p.job_title, p.employee_login, t.nr,
          ${COLUNAS_PRESENCA}
          FROM participants p
          JOIN trainings t ON t.id = p.training_id
@@ -3663,6 +3687,7 @@ export async function getClientPortalData(
         training_id: string;
         full_name: string;
         job_title: string;
+        employee_login: string;
         nr: string;
         days_present: number;
         days_total: number;
@@ -3755,6 +3780,7 @@ export async function getClientPortalData(
     trainingId: item.training_id,
     fullName: item.full_name,
     jobTitle: item.job_title,
+    employeeLogin: item.employee_login ?? '',
     daysPresent: item.days_present,
     daysTotal: item.days_total,
     certificateFileId: certificadoPorNome.get(`${item.training_id}|${nomeCertificadoAluno(item.full_name, item.nr)}`) ?? null,

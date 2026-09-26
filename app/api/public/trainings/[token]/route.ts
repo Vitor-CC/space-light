@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { checkinParticipant, findTrainingByToken, listTrainingSessions, registerParticipant } from '@/db/company-repository';
+import { clientePedeLogin } from '@/lib/login-do-participante';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -8,12 +9,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   // Data e horário de cada dia, para o formulário mostrar o dia do check-in.
   // O nome do instrutor não precisa sair numa página pública.
   const sessions = (await listTrainingSessions(training.id)).map((dia) => ({ ...dia, instructor_id: null, instructor_name: null }));
-  return NextResponse.json({ training: { ...training, sessions } });
+  // A razão social só serve para saber se o formulário pede o login da Amazon.
+  const { client_legal_name: razaoSocial, ...publico } = training;
+  const pedeLogin = clientePedeLogin([training.client_name, razaoSocial]);
+  return NextResponse.json({ training: { ...publico, sessions, pedeLogin } });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const input = await request.json() as { fullName: string; documentId: string; rg?: string; birthDate?: string; email: string; phone: string; jobTitle: string; checkinOnly?: boolean };
+  const input = await request.json() as { fullName: string; documentId: string; rg?: string; birthDate?: string; email: string; phone: string; jobTitle?: string; employeeLogin?: string; checkinOnly?: boolean };
   try {
     // Dias seguintes ao 1º: só o CPF basta para marcar a presença.
     if (input.checkinOnly) return NextResponse.json(await checkinParticipant(token, input.documentId ?? ''));

@@ -13,6 +13,7 @@ type Corpo = {
   email?: string;
   phone?: string;
   jobTitle?: string;
+  employeeLogin?: string;
 };
 
 async function exigirGestao() {
@@ -35,7 +36,9 @@ function dados(corpo: Corpo) {
     birthDate: corpo.birthDate ?? '',
     email: corpo.email ?? '',
     phone: corpo.phone ?? '',
-    jobTitle: corpo.jobTitle ?? '',
+    // Sem o campo no pedido, a edição mantém o valor atual.
+    jobTitle: corpo.jobTitle,
+    employeeLogin: corpo.employeeLogin,
   };
 }
 

@@ -62,6 +62,14 @@ export function situacaoCertificado(p: ClientParticipant, turma: ClientTraining 
   return { tom: 'sucesso', texto: 'Disponível' };
 }
 
+/**
+ * Segunda informação da pessoa nas tabelas: o login, para cliente Amazon; a
+ * função, que só existe em quem se cadastrou antes de 26/09/2026.
+ */
+export function identificacaoDaPessoa(p: Pick<ClientParticipant, 'employeeLogin' | 'jobTitle'>) {
+  return p.employeeLogin ? `Login ${p.employeeLogin}` : p.jobTitle || '—';
+}
+
 export function slug(texto: string) {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/(^-|-$)/g, '').toLowerCase() || 'arquivos';
 }

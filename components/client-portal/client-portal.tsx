@@ -4,10 +4,11 @@ import { ArrowRight, Award, CalendarDays, ChevronRight, Clock3, Download, Eye, F
 import { useMemo, useState } from 'react';
 
 import { Certificados, Documentos, Galeria, Perfil, Sino, Solicitar } from '@/components/client-portal/cliente-secoes';
-import { BotaoZip, dataCurta, diasAte, rotuloDoStatus, situacaoCertificado, slug, tomDoStatus, vencimento, type Secao } from '@/components/client-portal/cliente-util';
+import { BotaoZip, dataCurta, diasAte, identificacaoDaPessoa, rotuloDoStatus, situacaoCertificado, slug, tomDoStatus, vencimento, type Secao } from '@/components/client-portal/cliente-util';
 import { BarraProgresso, botaoClasses, campoClasses, Cartao, CartaoCabecalho, Indicador, LinhaArquivo, Meta, Pilula, tabelaClasses as tb, Tag, TopoDePagina, Vazio } from '@/components/ds/base';
 import { Abas, Aviso, PortalShell, useAviso } from '@/components/ds/interativo';
 import type { ClientPortalData, ClientTraining } from '@/lib/client-portal-data';
+import { clientePedeLogin } from '@/lib/login-do-participante';
 import { cn } from '@/lib/utils';
 
 export function ClientPortal({ data, user }: { data: ClientPortalData; user: { name: string; email: string } }) {
@@ -158,6 +159,8 @@ type AbaTurma = 'presenca' | 'fotos' | 'documentos' | 'certificados';
 function DetalheTurma({ data, turmaId, voltar }: { data: ClientPortalData; turmaId: string; voltar: () => void }) {
   const turma = data.trainings.find((t) => t.id === turmaId);
   const pessoas = useMemo(() => data.participants.filter((p) => p.trainingId === turmaId), [data.participants, turmaId]);
+  // Cliente Amazon identifica as pessoas pelo login; os demais, pela função antiga.
+  const colunaDaPessoa = clientePedeLogin([data.organization.displayName, data.organization.legalName]) ? 'Login' : 'Função';
   const fotos = data.photos.filter((f) => f.trainingId === turmaId);
   const docs = data.documents.filter((d) => d.trainingId === turmaId && !d.isCertificate);
   const [aba, setAba] = useState<AbaTurma>(turma?.status === 'Concluído' && pessoas.some((p) => p.certificateFileId) ? 'certificados' : 'presenca');
@@ -189,8 +192,8 @@ function DetalheTurma({ data, turmaId, voltar }: { data: ClientPortalData; turma
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="min-w-0">
         {aba === 'presenca' ? (pessoas.length ? <div className={tb.moldura}><div className={tb.rolagem}><table className={cn(tb.tabela, 'min-w-[560px]')}>
-          <thead className={tb.cabeca}><tr><th className={tb.th}>Participante</th><th className={tb.th}>Função</th><th className={tb.th}>Dias</th><th className={tb.th}>Status</th></tr></thead>
-          <tbody>{pessoas.map((p) => { const completo = p.daysTotal > 0 && p.daysPresent >= p.daysTotal; const tom = completo ? 'sucesso' : turma.status === 'Concluído' ? 'atencao' : 'neutro'; const texto = completo ? 'Presente' : turma.status === 'Concluído' ? 'Ausente — reagendar' : 'Em curso'; return <tr key={p.id} className={tb.linha}><td className={cn(tb.td, 'font-medium')}>{p.fullName}</td><td className={cn(tb.td, 'text-ds-texto-2')}>{p.jobTitle || '—'}</td><td className={tb.td}>{p.daysPresent}/{p.daysTotal}</td><td className={tb.td}><Tag tom={tom}>{texto}</Tag></td></tr>; })}</tbody>
+          <thead className={tb.cabeca}><tr><th className={tb.th}>Participante</th><th className={tb.th}>{colunaDaPessoa}</th><th className={tb.th}>Dias</th><th className={tb.th}>Status</th></tr></thead>
+          <tbody>{pessoas.map((p) => { const completo = p.daysTotal > 0 && p.daysPresent >= p.daysTotal; const tom = completo ? 'sucesso' : turma.status === 'Concluído' ? 'atencao' : 'neutro'; const texto = completo ? 'Presente' : turma.status === 'Concluído' ? 'Ausente — reagendar' : 'Em curso'; return <tr key={p.id} className={tb.linha}><td className={cn(tb.td, 'font-medium')}>{p.fullName}</td><td className={cn(tb.td, 'text-ds-texto-2')}>{identificacaoDaPessoa(p)}</td><td className={tb.td}>{p.daysPresent}/{p.daysTotal}</td><td className={tb.td}><Tag tom={tom}>{texto}</Tag></td></tr>; })}</tbody>
         </table></div></div> : <Vazio icone={<UsersRound />} titulo="Nenhum participante registrado" texto="A lista aparece conforme os participantes fazem o check-in pelo QR Code." />) : null}
 
         {aba === 'fotos' ? (fotos.length ? <Galeria fotos={fotos} /> : <Vazio icone={<ImageIcon />} titulo="Nenhuma foto publicada" texto="As fotos da prática aparecem aqui depois da aula." />) : null}
@@ -202,12 +205,12 @@ function DetalheTurma({ data, turmaId, voltar }: { data: ClientPortalData; turma
           <div className={tb.rolagem}><table className={cn(tb.tabela, 'min-w-[600px]')}>
             <thead className={tb.cabeca}><tr>
               <th className={cn(tb.th, 'w-12')}><input type="checkbox" aria-label="Selecionar todos" disabled={!comCertificado.length} checked={todos} onChange={() => setSelecionados(todos ? new Set() : new Set(comCertificado.map((p) => p.id)))} className="size-[18px] accent-ds-inverso" /></th>
-              <th className={tb.th}>Participante</th><th className={tb.th}>Função</th><th className={tb.th}>Status</th><th className={cn(tb.th, 'w-12')}><span className="sr-only">Baixar</span></th>
+              <th className={tb.th}>Participante</th><th className={tb.th}>{colunaDaPessoa}</th><th className={tb.th}>Status</th><th className={cn(tb.th, 'w-12')}><span className="sr-only">Baixar</span></th>
             </tr></thead>
             <tbody>{pessoas.map((p) => { const sit = situacaoCertificado(p, turma); return <tr key={p.id} className={tb.linha}>
               <td className={tb.td}><input type="checkbox" disabled={!p.certificateFileId} aria-label={`Selecionar ${p.fullName}`} checked={selecionados.has(p.id)} onChange={() => setSelecionados((atual) => { const novo = new Set(atual); if (novo.has(p.id)) novo.delete(p.id); else novo.add(p.id); return novo; })} className="size-[18px] accent-ds-inverso disabled:opacity-30" /></td>
               <td className={cn(tb.td, 'font-medium')}>{p.fullName}</td>
-              <td className={cn(tb.td, 'text-ds-texto-2')}>{p.jobTitle || '—'}</td>
+              <td className={cn(tb.td, 'text-ds-texto-2')}>{identificacaoDaPessoa(p)}</td>
               <td className={tb.td}><Tag tom={sit.tom}>{sit.texto}</Tag></td>
               <td className={tb.td}>{p.certificateFileId ? <a href={`/api/files/${p.certificateFileId}?download=1`} aria-label={`Baixar certificado de ${p.fullName}`} className="inline-flex rounded p-1 hover:bg-ds-muted"><Download className="size-[18px]" /></a> : null}</td>
             </tr>; })}</tbody>

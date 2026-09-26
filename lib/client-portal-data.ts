@@ -33,6 +33,8 @@ export type ClientParticipant = {
   trainingId: string;
   fullName: string;
   jobTitle: string;
+  /** Login interno (cliente Amazon); vazio nos demais. */
+  employeeLogin: string;
   daysPresent: number;
   daysTotal: number;
   /** PDF do certificado desta pessoa, quando já foi gerado. */
