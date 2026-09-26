@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   if (!owner) {
     return NextResponse.json({ error: 'Acesso restrito ao dono da conta.' }, { status: 403 });
   }
-  const input = (await request.json()) as { name?: string; email?: string };
+  const input = (await request.json()) as { name?: string; email?: string; jobTitle?: string };
   if (!input.name?.trim() || !input.email?.trim()) {
     return NextResponse.json({ error: 'Informe o nome e o e-mail do funcionário.' }, { status: 400 });
   }
@@ -45,6 +45,7 @@ export async function POST(request: Request) {
     const result = await createEmployeeByOwner({
       name: input.name,
       email: input.email,
+      jobTitle: input.jobTitle,
       createdByUserId: owner.id,
       ...credentials,
     });

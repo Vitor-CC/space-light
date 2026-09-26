@@ -43,9 +43,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if ('error' in context) {
     return NextResponse.json({ error: context.error }, { status: context.status });
   }
-  // O instrutor enxerga só a lista assinada que ele mesmo enviou. Documento do
-  // cliente é assunto da Space Light, não dele. 'photo' entra por causa das
-  // listas enviadas antes de a lista virar documento.
+  // O instrutor enxerga as listas assinadas e as fotos da aula da turma.
+  // Documento do cliente é assunto da Space Light, não dele.
   const files = (await listTrainingFiles(id)).filter(
     (file) => file.kind === 'attendance' || file.kind === 'photo',
   );
@@ -77,11 +76,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const form = await request.formData();
   const file = form.get('file');
-  // Esta rota existe só para a lista de presença assinada. Ela é arquivada como
-  // documento do treinamento, não na galeria de fotos: é comprovante, não
-  // registro da aula.
+  // Dois tipos de envio do instrutor: a lista de presença assinada (arquivada
+  // como documento — é comprovante, e é ela que destrava o encerramento do
+  // último dia) e as fotos da aula (vão para a galeria que o cliente vê).
+  const kind = form.get('kind') === 'photo' ? 'photo' : 'attendance';
+  const nomePadrao = kind === 'photo' ? 'foto-da-aula' : 'lista-assinada';
   if (!(file instanceof File) || file.size === 0) {
-    return NextResponse.json({ error: 'Escolha a foto da lista assinada.' }, { status: 400 });
+    return NextResponse.json({ error: kind === 'photo' ? 'Escolha a foto da aula.' : 'Escolha a foto da lista assinada.' }, { status: 400 });
   }
   if (file.size > MAX_UPLOAD_BYTES) {
     return NextResponse.json(
@@ -103,7 +104,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       clientId: context.training.client_id,
       trainingId: id,
       fileId,
-      name: file.name || 'lista-assinada',
+      name: file.name || nomePadrao,
       contentType,
       body: await file.arrayBuffer(),
     });
@@ -111,12 +112,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       fileId,
       clientId: context.training.client_id,
       trainingId: id,
-      name: file.name || 'lista-assinada',
+      name: file.name || nomePadrao,
       objectKey,
       contentType,
       size: file.size,
-      kind: 'attendance',
-      // Guarda o dia para saber a qual data a folha assinada corresponde.
+      kind,
+      // Guarda o dia para saber a qual data a folha (ou a foto) corresponde.
       sessionId: await diaEmCurso(id, context.instructorId),
       createdByUserId: context.user.id,
     });

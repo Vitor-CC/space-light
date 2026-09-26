@@ -1,14 +1,17 @@
 import { getD1 } from '@/db';
 import { formatarCpf, formatarRg, problemaCpf, problemaRg } from '@/lib/documentos';
 import { INSTRUCTOR_DOCUMENT_CATEGORIES } from '@/lib/instructor-documents';
+import { nomeCertificadoAluno, PREFIXO_CERTIFICADO_ALUNO } from '@/lib/nome-certificado';
 import { normalizarUsuario, USUARIO_REGRA, usuarioValido } from '@/lib/usuario';
 import type { DatabaseBinding, DatabaseResult } from '@/db/sqlite-adapter';
 import type {
   ClientCertificate,
   ClientDocument,
+  ClientParticipant,
   ClientPhoto,
   ClientPortalData,
   ClientTraining,
+  ClientTrainingRequest,
 } from '@/lib/client-portal-data';
 import type {
   AttendanceListData,
@@ -23,6 +26,7 @@ import type {
   CompanyInstructorDocument,
   CompanyParticipant,
   CompanyTraining,
+  CompanyTrainingRequest,
 } from '@/lib/company-types';
 import type {
   InstructorAvailability,
@@ -130,7 +134,69 @@ const COLUNAS_POR_MARCADOR = [
     coluna: 'theme',
     alter: "ALTER TABLE trainings ADD COLUMN theme TEXT NOT NULL DEFAULT ''",
   },
+  // Validade do certificado em meses (0 = não informada). Só aparece no
+  // portal — o PDF do certificado não muda — e alimenta as reciclagens.
+  {
+    marcador: 'col_trainings_validity_months',
+    tabela: 'trainings',
+    coluna: 'validity_months',
+    alter: 'ALTER TABLE trainings ADD COLUMN validity_months INTEGER NOT NULL DEFAULT 0',
+  },
+  // Cargo do funcionário da Space, mostrado no pé do menu da gestão.
+  {
+    marcador: 'col_users_job_title',
+    tabela: 'users',
+    coluna: 'job_title',
+    alter: "ALTER TABLE users ADD COLUMN job_title TEXT NOT NULL DEFAULT ''",
+  },
 ];
+
+/**
+ * Tabelas novas, pelo mesmo motivo das colunas acima: o CREATE TABLE do lote
+ * principal só roda em banco abaixo da versão corrente, e a produção já está
+ * nela. CREATE TABLE IF NOT EXISTS é idempotente, então pode rodar sempre.
+ */
+const TABELAS_POR_MARCADOR = [
+  // Pedido de nova turma feito pelo cliente no portal ("Solicitar treinamento").
+  {
+    marcador: 'tab_training_requests',
+    tabela: 'training_requests',
+    criar: `CREATE TABLE IF NOT EXISTS training_requests (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      requested_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      nr TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      participants INTEGER NOT NULL DEFAULT 0,
+      preferred_period TEXT NOT NULL DEFAULT '',
+      location TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      based_on_training_id TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+];
+
+async function tabelasPorMarcador(d1: DatabaseBinding, marcadores: Map<string, string>) {
+  for (const { marcador, tabela, criar } of TABELAS_POR_MARCADOR) {
+    if (marcadores.has(marcador)) continue;
+    try {
+      await d1.prepare(criar).run();
+    } catch { /* confere abaixo */ }
+    const existe = await d1
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .bind(tabela)
+      .first<{ name: string }>();
+    if (!existe) continue;
+    await d1
+      .prepare(`INSERT INTO schema_meta (key, value) VALUES (?, datetime('now'))
+        ON CONFLICT(key) DO NOTHING`)
+      .bind(marcador)
+      .run();
+    marcadores.set(marcador, 'ok');
+  }
+}
 
 async function colunasPorMarcador(d1: DatabaseBinding, marcadores: Map<string, string>) {
   for (const { marcador, tabela, coluna, alter } of COLUNAS_POR_MARCADOR) {
@@ -163,6 +229,7 @@ export function ensurePortalSchema(): Promise<void> {
     // Antes do atalho de versão: coluna por marcador precisa chegar também em
     // banco que já está na versão corrente, que é o caso da produção.
     await colunasPorMarcador(d1, marcadores);
+    await tabelasPorMarcador(d1, marcadores);
     // Banco já na versão corrente e com o mesmo dono configurado: nada a fazer.
     if (
       Number(marcadores.get('version') ?? 0) >= SCHEMA_VERSION &&
@@ -228,6 +295,7 @@ export function ensurePortalSchema(): Promise<void> {
         username TEXT,
         active INTEGER NOT NULL DEFAULT 1,
         must_reset INTEGER NOT NULL DEFAULT 0,
+        job_title TEXT NOT NULL DEFAULT '',
         last_login_at TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       )`),
@@ -242,6 +310,7 @@ export function ensurePortalSchema(): Promise<void> {
         training_dates TEXT NOT NULL DEFAULT '',
         internal_label TEXT NOT NULL DEFAULT '',
         theme TEXT NOT NULL DEFAULT '',
+        validity_months INTEGER NOT NULL DEFAULT 0,
         content_program TEXT NOT NULL DEFAULT '',
         duration TEXT NOT NULL,
         location TEXT NOT NULL,
@@ -663,6 +732,10 @@ const CERTIFICA_NESTA_TURMA = `p.training_id = ${TURMA_QUE_CERTIFICA}`;
 const COLUNAS_PRESENCA = `(SELECT count(*) FROM training_sessions s
     WHERE s.training_id = p.training_id AND EXISTS (${PRESENCA_DA_PESSOA_NO_DIA})) AS days_present,
   (SELECT count(*) FROM training_sessions s WHERE s.training_id = p.training_id) AS days_total`;
+
+/** Ids dos dias em que a pessoa tem presença, separados por vírgula (chamada do instrutor). */
+const DIAS_PRESENTES = `(SELECT group_concat(sa.session_id) FROM session_attendance sa
+    WHERE sa.participant_id = p.id) AS present_sessions`;
 
 export type TrainingSessionRow = {
   id: string;
@@ -1199,7 +1272,8 @@ export async function getInstructorDashboardData(
         .prepare(`SELECT p.id, p.training_id, t.title AS training_title,
           t.nr AS training_nr, c.name AS client_name, p.full_name,
           p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.created_at,
-          ${COLUNAS_PRESENCA}
+          ${COLUNAS_PRESENCA},
+          ${DIAS_PRESENTES}
           FROM participants p
           JOIN trainings t ON t.id = p.training_id
           JOIN clients c ON c.id = t.client_id
@@ -1338,7 +1412,8 @@ export async function listInstructorTrainingParticipants(input: {
     .prepare(`SELECT p.id, p.training_id, t.title AS training_title,
       t.nr AS training_nr, c.name AS client_name, p.full_name,
       p.document_id, p.rg, p.birth_date, p.email, p.phone, p.job_title, p.created_at,
-          ${COLUNAS_PRESENCA}
+          ${COLUNAS_PRESENCA},
+          ${DIAS_PRESENTES}
       FROM participants p
       JOIN trainings t ON t.id = p.training_id
       JOIN clients c ON c.id = t.client_id
@@ -1799,6 +1874,8 @@ export async function updateTrainingByAdmin(input: {
   location: string;
   contentProgram: string;
   theme?: string;
+  /** Meses de validade do certificado; ausente = não mexe. */
+  validityMonths?: number;
 }) {
   await ensurePortalSchema();
   const d1 = getD1();
@@ -1811,6 +1888,8 @@ export async function updateTrainingByAdmin(input: {
     contentProgram: (input.contentProgram ?? '').trim(),
     theme: (input.theme ?? '').trim(),
   };
+  const meses = input.validityMonths === undefined ? null : Math.trunc(Number(input.validityMonths));
+  if (meses !== null && (!Number.isFinite(meses) || meses < 0 || meses > 120)) throw new Error('Validade inválida.');
   if (!campos.clientId || !campos.nr || !campos.title || !campos.duration || !campos.location) {
     throw new Error('Preencha cliente, norma, título, carga horária e endereço.');
   }
@@ -1828,6 +1907,7 @@ export async function updateTrainingByAdmin(input: {
       .bind(campos.clientId, campos.nr, campos.title, campos.duration, campos.location, campos.contentProgram, campos.theme, input.trainingId),
     // Arquivos seguem a turma: o cliente novo passa a vê-los no portal dele.
     d1.prepare('UPDATE files SET client_id = ? WHERE training_id = ?').bind(campos.clientId, input.trainingId),
+    ...(meses === null ? [] : [d1.prepare('UPDATE trainings SET validity_months = ? WHERE id = ?').bind(meses, input.trainingId)]),
   ]);
   await writeAudit(input.byUserId, 'training.updated', 'training', input.trainingId, {
     clienteTrocado: turma.client_id !== campos.clientId,
@@ -2044,6 +2124,156 @@ export async function setAttendanceByAdmin(input: {
     presente: input.present,
   });
   return { ok: true as const };
+}
+
+/**
+ * Chamada em campo: o instrutor marca presente ou ausente no dia DELE, com o
+ * dia já iniciado. É o mesmo registro do check-in pelo QR — marcar presente
+ * aqui equivale ao aluno ter lido o QR; ausente apaga a presença do dia.
+ */
+export async function setAttendanceByInstructor(input: {
+  instructorId: string;
+  trainingId: string;
+  participantId: string;
+  present: boolean;
+  userId: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const turma = await d1
+    .prepare(`SELECT t.id FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`)
+    .bind(input.trainingId, input.instructorId)
+    .first<{ id: string }>();
+  if (!turma) throw new Error('Treinamento não encontrado para este instrutor.');
+  const dia = await diaDoInstrutor(input.trainingId, input.instructorId);
+  if (!dia) throw new Error('Nenhum dia deste treinamento está atribuído a você.');
+  if (dia.atual.status !== 'in_progress') {
+    throw new Error(dia.atual.status === 'completed' ? 'O seu dia já foi encerrado.' : 'Inicie o seu dia antes de fazer a chamada.');
+  }
+  const aluno = await d1
+    .prepare('SELECT id FROM participants WHERE id = ? AND training_id = ? LIMIT 1')
+    .bind(input.participantId, input.trainingId)
+    .first<{ id: string }>();
+  if (!aluno) throw new Error('Participante não encontrado nesta turma.');
+  if (input.present) {
+    await d1
+      .prepare('INSERT OR IGNORE INTO session_attendance (id, session_id, participant_id) VALUES (?, ?, ?)')
+      .bind(makeId('attendance'), dia.atual.id, input.participantId)
+      .run();
+  } else {
+    await d1
+      .prepare('DELETE FROM session_attendance WHERE session_id = ? AND participant_id = ?')
+      .bind(dia.atual.id, input.participantId)
+      .run();
+  }
+  await writeAudit(input.userId, 'attendance.set_by_instructor', 'participant', input.participantId, {
+    trainingId: input.trainingId,
+    dia: dia.atual.day_number,
+    presente: input.present,
+  });
+  return { ok: true as const, sessionId: dia.atual.id };
+}
+
+/** Validade do certificado da turma, em meses (0 = não informada). Só portal. */
+export async function setTrainingValidity(input: { trainingId: string; months: number; byUserId: string }) {
+  await ensurePortalSchema();
+  const meses = Math.trunc(Number(input.months));
+  if (!Number.isFinite(meses) || meses < 0 || meses > 120) throw new Error('Validade inválida.');
+  const result = await getD1()
+    .prepare('UPDATE trainings SET validity_months = ? WHERE id = ?')
+    .bind(meses, input.trainingId)
+    .run();
+  if (!result.meta?.changes) throw new Error('Treinamento não encontrado.');
+  await writeAudit(input.byUserId, 'training.validity_set', 'training', input.trainingId, { meses });
+  return { ok: true as const };
+}
+
+export const STATUS_SOLICITACAO = ['open', 'scheduled', 'declined'] as const;
+export type StatusSolicitacao = (typeof STATUS_SOLICITACAO)[number];
+
+/** Pedido de nova turma feito pela empresa no portal. */
+export async function createTrainingRequest(input: {
+  clientId: string;
+  userId: string;
+  nr: string;
+  title: string;
+  participants: number;
+  preferredPeriod: string;
+  location: string;
+  notes: string;
+  basedOnTrainingId?: string | null;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const nr = (input.nr ?? '').trim();
+  if (!nr) throw new Error('Escolha a norma do treinamento.');
+  const participantes = Math.trunc(Number(input.participants) || 0);
+  if (participantes < 0 || participantes > 9999) throw new Error('Número de participantes inválido.');
+  let base: string | null = null;
+  if (input.basedOnTrainingId) {
+    const turma = await findTrainingForClient({ clientId: input.clientId, trainingId: input.basedOnTrainingId });
+    base = turma ? input.basedOnTrainingId : null;
+  }
+  const id = makeId('request');
+  await d1
+    .prepare(`INSERT INTO training_requests (
+      id, client_id, requested_by, nr, title, participants, preferred_period,
+      location, notes, based_on_training_id, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')`)
+    .bind(
+      id,
+      input.clientId,
+      input.userId,
+      nr,
+      (input.title ?? '').trim().slice(0, 200),
+      participantes,
+      (input.preferredPeriod ?? '').trim().slice(0, 200),
+      (input.location ?? '').trim().slice(0, 300),
+      (input.notes ?? '').trim().slice(0, 2000),
+      base,
+    )
+    .run();
+  await writeAudit(input.userId, 'training_request.created', 'training_request', id, { nr, participantes });
+  return { id };
+}
+
+export async function setTrainingRequestStatus(input: { requestId: string; status: string; byUserId: string }) {
+  await ensurePortalSchema();
+  if (!STATUS_SOLICITACAO.includes(input.status as StatusSolicitacao)) throw new Error('Situação inválida.');
+  const result = await getD1()
+    .prepare('UPDATE training_requests SET status = ? WHERE id = ?')
+    .bind(input.status, input.requestId)
+    .run();
+  if (!result.meta?.changes) throw new Error('Solicitação não encontrada.');
+  await writeAudit(input.byUserId, 'training_request.status', 'training_request', input.requestId, { status: input.status });
+  return { ok: true as const };
+}
+
+/** Cargo do funcionário da Space: o dono edita o de qualquer um; cada um, o seu. */
+export async function updateEmployeeJobTitle(input: { userId: string; jobTitle: string; byUserId: string; byOwner: boolean }) {
+  await ensurePortalSchema();
+  if (!input.byOwner && input.userId !== input.byUserId) throw new Error('Só o dono altera o cargo de outra pessoa.');
+  const cargo = (input.jobTitle ?? '').trim().slice(0, 80);
+  const result = await getD1()
+    .prepare("UPDATE users SET job_title = ? WHERE id = ? AND role = 'admin'")
+    .bind(cargo, input.userId)
+    .run();
+  if (!result.meta?.changes) throw new Error('Funcionário não encontrado.');
+  await writeAudit(input.byUserId, 'employee.job_title_set', 'user', input.userId, {});
+  return { ok: true as const };
+}
+
+/** Dados do aviso ao cliente de que os certificados estão no portal. */
+export async function getCertificateNoticeInfo(trainingId: string) {
+  await ensurePortalSchema();
+  return getD1()
+    .prepare(`SELECT c.contact_email, c.contact_name, t.nr, t.title, t.code,
+      (SELECT cb.participant_count FROM certificate_batches cb
+       WHERE cb.training_id = t.id AND cb.status = 'generated'
+       ORDER BY cb.generated_at DESC LIMIT 1) AS quantity
+      FROM trainings t JOIN clients c ON c.id = t.client_id WHERE t.id = ? LIMIT 1`)
+    .bind(trainingId)
+    .first<{ contact_email: string; contact_name: string; nr: string; title: string; code: string; quantity: number | null }>();
 }
 
 export async function getAttendanceListData(input: {
@@ -2576,7 +2806,7 @@ export function isOwnerByEmailOrFlag(email: string, isOwnerFlag?: number): boole
 export async function listEmployees(): Promise<CompanyEmployee[]> {
   await ensurePortalSchema();
   const result = await getD1()
-    .prepare(`SELECT id, name, email, is_owner, active, must_reset,
+    .prepare(`SELECT id, name, email, is_owner, active, must_reset, job_title,
       last_login_at, created_at
       FROM users WHERE role = 'admin'
       ORDER BY is_owner DESC, created_at ASC`)
@@ -2590,6 +2820,7 @@ export async function createEmployeeByOwner(input: {
   passwordHash: string;
   passwordSalt: string;
   createdByUserId: string;
+  jobTitle?: string;
 }) {
   await ensurePortalSchema();
   const email = normalizeEmail(input.email);
@@ -2599,9 +2830,9 @@ export async function createEmployeeByOwner(input: {
   await getD1()
     .prepare(`INSERT INTO users (
       id, client_id, instructor_id, name, email, password_hash, password_salt,
-      role, is_owner, active, must_reset
-    ) VALUES (?, NULL, NULL, ?, ?, ?, ?, 'admin', 0, 1, 1)`)
-    .bind(id, input.name.trim(), email, input.passwordHash, input.passwordSalt)
+      role, is_owner, active, must_reset, job_title
+    ) VALUES (?, NULL, NULL, ?, ?, ?, ?, 'admin', 0, 1, 1, ?)`)
+    .bind(id, input.name.trim(), email, input.passwordHash, input.passwordSalt, (input.jobTitle ?? '').trim().slice(0, 80))
     .run();
   await writeAudit(input.createdByUserId, 'employee.created', 'user', id, { email });
   return { userId: id, email };
@@ -2677,7 +2908,7 @@ export async function getCompanyDashboardData(
 ): Promise<CompanyDashboardData> {
   await ensurePortalSchema();
   const d1 = getD1();
-  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult] =
+  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult, requestsResult, perfil] =
     await Promise.all([
       d1
         .prepare(
@@ -2714,7 +2945,9 @@ export async function getCompanyDashboardData(
            t.code, t.nr, t.title, t.internal_label, t.theme, t.training_date, t.duration, t.location, t.content_program,
            COALESCE(i.name, t.instructor) AS instructor,
            t.status, t.participant_limit, t.qr_token, t.qr_enabled,
-           t.created_at,
+           t.created_at, t.validity_months,
+           (SELECT max(cb.generated_at) FROM certificate_batches cb
+            WHERE cb.training_id = t.id AND cb.status = 'generated') AS certificate_generated_at,
            (SELECT count(*) FROM files f WHERE f.training_id = t.id) AS file_count,
            (SELECT count(*) FROM participants p WHERE p.training_id = t.id) AS participant_count
            FROM trainings t
@@ -2749,6 +2982,16 @@ export async function getCompanyDashboardData(
       sessoesPorTurma(d1),
       // Presença por dia de cada aluno: a gestão marca e desmarca na lista.
       d1.prepare('SELECT participant_id, session_id FROM session_attendance').all<{ participant_id: string; session_id: string }>(),
+      d1
+        .prepare(`SELECT r.id, r.client_id, c.name AS client_name, u.name AS requested_by_name,
+           r.nr, r.title, r.participants, r.preferred_period, r.location, r.notes,
+           r.based_on_training_id, r.status, r.created_at
+           FROM training_requests r
+           JOIN clients c ON c.id = r.client_id
+           LEFT JOIN users u ON u.id = r.requested_by
+           ORDER BY r.created_at DESC`)
+        .all<CompanyTrainingRequest>(),
+      d1.prepare('SELECT name, job_title FROM users WHERE id = ? LIMIT 1').bind(currentUser.id).first<{ name: string; job_title: string }>(),
     ]);
 
   return {
@@ -2759,9 +3002,13 @@ export async function getCompanyDashboardData(
     files: rows(filesResult),
     participants: rows(participantsResult),
     attendance: rows(presencasResult),
+    requests: rows(requestsResult),
+    mailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM),
     currentUser: {
       id: currentUser.id,
       email: currentUser.email,
+      name: perfil?.name ?? 'Equipe Space Light',
+      jobTitle: perfil?.job_title ?? '',
       isOwner: isOwnerByEmailOrFlag(currentUser.email, currentUser.is_owner),
     },
   };
@@ -3290,11 +3537,13 @@ export async function getClientPortalData(
     }>();
   if (!organization) return null;
 
-  const [trainingResult, fileResult, certificateResult] = await Promise.all([
+  const [trainingResult, fileResult, certificateResult, participantResult, requestResult] = await Promise.all([
     d1
       .prepare(
         `SELECT t.id, t.client_id, t.code, t.nr, t.title, t.internal_label, t.training_date,
-         t.training_dates, t.duration, t.location, t.instructor, t.status,
+         t.training_dates, t.duration, t.location, t.instructor, t.status, t.validity_months,
+         (SELECT max(s.session_date) FROM training_sessions s WHERE s.training_id = t.id) AS last_session,
+         (SELECT count(*) FROM training_sessions s WHERE s.training_id = t.id) AS days_total,
          (SELECT count(*) FROM participants p WHERE p.training_id = t.id) AS participant_count,
          (SELECT count(*) FROM files f WHERE f.training_id = t.id AND f.kind = 'photo') AS photo_count,
          (SELECT count(*) FROM files f WHERE f.training_id = t.id AND f.kind IN ('document', 'attendance')) AS document_count,
@@ -3317,6 +3566,9 @@ export async function getClientPortalData(
         location: string;
         instructor: string;
         status: string;
+        validity_months: number | null;
+        last_session: string | null;
+        days_total: number;
         participant_count: number;
         photo_count: number;
         document_count: number;
@@ -3356,34 +3608,80 @@ export async function getClientPortalData(
         generated_at: string;
         participant_count: number;
       }>(),
+    // Participantes da turma para a empresa: nome, função e presença. CPF, RG,
+    // nascimento e contato ficam só com a equipe Space.
+    d1
+      .prepare(
+        `SELECT p.id, p.training_id, p.full_name, p.job_title, t.nr,
+         ${COLUNAS_PRESENCA}
+         FROM participants p
+         JOIN trainings t ON t.id = p.training_id
+         WHERE t.client_id = ?
+         ORDER BY p.full_name COLLATE NOCASE ASC`,
+      )
+      .bind(clientId)
+      .all<{
+        id: string;
+        training_id: string;
+        full_name: string;
+        job_title: string;
+        nr: string;
+        days_present: number;
+        days_total: number;
+      }>(),
+    d1
+      .prepare(
+        `SELECT id, nr, title, participants, preferred_period, status, created_at
+         FROM training_requests WHERE client_id = ? ORDER BY created_at DESC`,
+      )
+      .bind(clientId)
+      .all<{
+        id: string;
+        nr: string;
+        title: string;
+        participants: number;
+        preferred_period: string;
+        status: string;
+        created_at: string;
+      }>(),
   ]);
 
-  const trainings: ClientTraining[] = rows(trainingResult).map((item) => ({
-    id: item.id,
-    clientId: item.client_id,
-    code: item.code,
-    nr: item.nr,
-    title: item.title,
-    date: item.training_date,
-    // Turma de vários dias mostra todos eles, não só o primeiro.
-    dateLabel: datasDaTurma(item).map((dia) => formatDate(dia)).join(' · '),
-    duration: item.duration,
-    location: item.location,
-    instructor: item.instructor,
-    status:
-      item.status === 'completed'
-        ? 'Concluído'
-        : item.status === 'in_progress'
-          ? 'Em andamento'
-          : 'Agendado',
-    participantCount: item.participant_count,
-    photoCount: item.photo_count,
-    documentCount: item.document_count,
-    certificateCount: item.certificate_count,
-  }));
+  const trainings: ClientTraining[] = rows(trainingResult).map((item) => {
+    const lastDate = item.last_session || datasDaTurma(item).slice(-1)[0] || item.training_date;
+    const validityMonths = Number(item.validity_months ?? 0);
+    return {
+      id: item.id,
+      clientId: item.client_id,
+      code: item.code,
+      nr: item.nr,
+      title: item.title,
+      date: item.training_date,
+      // Turma de vários dias mostra todos eles, não só o primeiro.
+      dateLabel: datasDaTurma(item).map((dia) => formatDate(dia)).join(' · '),
+      duration: item.duration,
+      location: item.location,
+      instructor: item.instructor,
+      status:
+        item.status === 'completed'
+          ? 'Concluído'
+          : item.status === 'in_progress'
+            ? 'Em andamento'
+            : 'Agendado',
+      participantCount: item.participant_count,
+      photoCount: item.photo_count,
+      documentCount: item.document_count,
+      certificateCount: item.certificate_count,
+      lastDate,
+      daysTotal: Math.max(1, item.days_total),
+      validityMonths,
+      expiresAt: item.status === 'completed' && validityMonths > 0 ? somarMeses(lastDate, validityMonths) : null,
+    };
+  });
 
-  const photos: ClientPhoto[] = rows(fileResult)
-    .filter((item) => item.kind === 'photo' && item.status === 'stored')
+  const arquivosGuardados = rows(fileResult).filter((item) => item.status === 'stored');
+
+  const photos: ClientPhoto[] = arquivosGuardados
+    .filter((item) => item.kind === 'photo')
     .map((item) => ({
       id: item.id,
       clientId,
@@ -3391,33 +3689,64 @@ export async function getClientPortalData(
       src: `/api/files/${item.id}`,
       alt: item.name,
       dateLabel: formatDate(item.created_at),
+      createdAt: item.created_at,
     }));
 
-  const documents: ClientDocument[] = rows(fileResult)
-    .filter((item) => (item.kind === 'document' || item.kind === 'attendance') && item.status === 'stored')
+  const documents: ClientDocument[] = arquivosGuardados
+    .filter((item) => item.kind === 'document' || item.kind === 'attendance')
     .map((item) => ({
       id: item.id,
       clientId,
       trainingId: item.training_id,
       title: item.name,
-      category: 'Documento do treinamento',
+      category: item.kind === 'attendance' ? 'Lista de presença assinada' : 'Documento do treinamento',
       format: fileFormat(item.content_type, item.name),
       size: formatSize(item.size),
       updatedAt: formatDate(item.created_at),
+      createdAt: item.created_at,
+      isCertificate: item.name.startsWith(PREFIXO_CERTIFICADO_ALUNO),
     }));
 
+  // O PDF de cada aluno é achado pelo nome, que é o mesmo que o gerador usa.
+  const certificadoPorNome = new Map<string, string>();
+  for (const doc of documents) {
+    if (doc.isCertificate && doc.trainingId) certificadoPorNome.set(`${doc.trainingId}|${doc.title}`, doc.id);
+  }
+  const participants: ClientParticipant[] = rows(participantResult).map((item) => ({
+    id: item.id,
+    trainingId: item.training_id,
+    fullName: item.full_name,
+    jobTitle: item.job_title,
+    daysPresent: item.days_present,
+    daysTotal: item.days_total,
+    certificateFileId: certificadoPorNome.get(`${item.training_id}|${nomeCertificadoAluno(item.full_name, item.nr)}`) ?? null,
+  }));
+
   const certificates: ClientCertificate[] = rows(certificateResult).map(
-    (item) => ({
-      id: item.id,
-      clientId,
-      trainingId: item.training_id,
-      title: `Certificados — ${item.title}`,
-      reference: `${item.nr} · Lote ${item.id.slice(-8).toUpperCase()}`,
-      issuedAt: formatDate(item.generated_at),
-      expiresAt: 'Conforme plano da empresa',
-      quantity: item.participant_count,
-    }),
+    (item) => {
+      const turma = trainings.find((t) => t.id === item.training_id);
+      return {
+        id: item.id,
+        clientId,
+        trainingId: item.training_id,
+        title: `Certificados — ${item.title}`,
+        reference: `${item.nr} · Lote ${item.id.slice(-8).toUpperCase()}`,
+        issuedAt: formatDate(item.generated_at),
+        expiresAt: turma?.expiresAt ? formatDate(turma.expiresAt) : 'Não informada',
+        quantity: item.participant_count,
+      };
+    },
   );
+
+  const requests: ClientTrainingRequest[] = rows(requestResult).map((item) => ({
+    id: item.id,
+    nr: item.nr,
+    title: item.title,
+    participants: item.participants,
+    preferredPeriod: item.preferred_period,
+    status: item.status,
+    createdAt: item.created_at,
+  }));
 
   return {
     organization: {
@@ -3435,7 +3764,18 @@ export async function getClientPortalData(
     photos,
     documents,
     certificates,
+    participants,
+    requests,
   };
+}
+
+/** YYYY-MM-DD + N meses, sem passar por fuso (31/01 + 1 mês = 28 ou 29/02). */
+function somarMeses(iso: string, meses: number) {
+  const [ano, mes, dia] = iso.split('-').map(Number);
+  const alvo = new Date(Date.UTC(ano, mes - 1 + meses, 1));
+  const ultimo = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
+  alvo.setUTCDate(Math.min(dia, ultimo));
+  return alvo.toISOString().slice(0, 10);
 }
 
 async function writeAudit(

@@ -130,7 +130,7 @@ export function readEmployees() {
   return requestJson<{ employees: CompanyEmployee[] }>('/api/company/employees', { cache: 'no-store' }).then((result) => result.employees);
 }
 
-export function createEmployee(input: { name: string; email: string }) {
+export function createEmployee(input: { name: string; email: string; jobTitle?: string }) {
   return requestJson<{ userId: string; email: string; temporaryPassword: string }>('/api/company/employees', { method: 'POST', body: JSON.stringify(input) });
 }
 
@@ -176,8 +176,22 @@ export function reviewInstructorDocument(documentId: string, status: 'approved' 
   return requestJson<{ ok: true; activated: boolean }>('/api/company/instructor-documents', { method: 'POST', body: JSON.stringify({ documentId, status }) });
 }
 
-export function generateCertificates(trainingId: string) {
-  return requestJson<{ ok: true; documents: { name: string; fileId: string }[] }>('/api/company/certificates', { method: 'POST', body: JSON.stringify({ trainingId }) });
+export type AvisoCertificado = 'enviado' | 'sem-email' | 'nao-configurado' | 'falhou' | null;
+
+export function generateCertificates(trainingId: string, opcoes: { validityMonths?: number; notifyClient?: boolean } = {}) {
+  return requestJson<{ ok: true; documents: { name: string; fileId: string }[]; aviso: AvisoCertificado }>('/api/company/certificates', { method: 'POST', body: JSON.stringify({ trainingId, ...opcoes }) });
+}
+
+export function saveTrainingValidity(trainingId: string, months: number) {
+  return requestJson<{ ok: true }>(`/api/company/trainings/${encodeURIComponent(trainingId)}/validity`, { method: 'POST', body: JSON.stringify({ months }) });
+}
+
+export function setTrainingRequestStatus(requestId: string, status: 'open' | 'scheduled' | 'declined') {
+  return requestJson<{ ok: true }>('/api/company/requests', { method: 'PATCH', body: JSON.stringify({ requestId, status }) });
+}
+
+export function saveEmployeeJobTitle(userId: string, jobTitle: string) {
+  return requestJson<{ ok: true }>(`/api/company/employees/${encodeURIComponent(userId)}/job-title`, { method: 'POST', body: JSON.stringify({ jobTitle }) });
 }
 
 export function saveClientAddress(input: { clientId: string; address: string; district: string; city: string; state: string; postalCode: string }) {

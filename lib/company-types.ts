@@ -95,6 +95,27 @@ export type CompanyTraining = {
   file_count: number;
   participant_count: number;
   sessions: TrainingSession[];
+  /** Validade do certificado em meses; 0 = não informada. Só existe no portal. */
+  validity_months?: number;
+  /** Quando o último lote de certificados foi gerado; nulo = turma sem certificado. */
+  certificate_generated_at?: string | null;
+};
+
+/** Pedido de nova turma feito pelo cliente no portal. */
+export type CompanyTrainingRequest = {
+  id: string;
+  client_id: string;
+  client_name: string;
+  requested_by_name: string | null;
+  nr: string;
+  title: string;
+  participants: number;
+  preferred_period: string;
+  location: string;
+  notes: string;
+  based_on_training_id: string | null;
+  status: string;
+  created_at: string;
 };
 
 export type CompanyFile = {
@@ -132,6 +153,8 @@ export type CompanyParticipant = {
   days_present: number;
   /** Dias da turma. Certificado só com days_present === days_total. */
   days_total: number;
+  /** Ids dos dias com presença, separados por vírgula. Vem só nos dados do instrutor. */
+  present_sessions?: string | null;
 };
 
 /** Resposta do check-in pelo QR: qual dia foi marcado e quantos o aluno já tem. */
@@ -171,6 +194,7 @@ export type CompanyEmployee = {
   is_owner: number;
   active: number;
   must_reset: number;
+  job_title: string;
   last_login_at: string | null;
   created_at: string;
 };
@@ -195,5 +219,8 @@ export type CompanyDashboardData = {
   participants: CompanyParticipant[];
   /** Um par por presença gravada (check-in do aluno ou marcação da gestão). */
   attendance: { participant_id: string; session_id: string }[];
-  currentUser: { id: string; email: string; isOwner: boolean };
+  requests: CompanyTrainingRequest[];
+  /** Há envio de e-mail configurado (RESEND_API_KEY + MAIL_FROM no servidor)? */
+  mailConfigured: boolean;
+  currentUser: { id: string; email: string; name: string; jobTitle: string; isOwner: boolean };
 };

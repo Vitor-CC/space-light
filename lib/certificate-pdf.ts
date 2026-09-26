@@ -12,6 +12,7 @@ import {
   registroValido,
   formatCertificateDates,
 } from '@/lib/certificate-config';
+import { nomeCertificadoAluno, PREFIXO_CERTIFICADO_ALUNO, semAcento } from '@/lib/nome-certificado';
 import { programForNr } from '@/lib/nr23-program';
 import { programaDoCurso } from '@/lib/nr-programs';
 import type { SecaoDePrograma } from '@/lib/nr-programs';
@@ -719,16 +720,6 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
   return pdf.save();
 }
 
-/** Tira acento e pontuação: nome de arquivo tem que sobreviver a qualquer sistema. */
-function semAcento(texto: string) {
-  return texto
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .toLowerCase();
-}
-
 /** Prefixo de cada papel. São disjuntos de propósito: a aba Certificados
  *  encontra os documentos pelo começo do nome, e "certificado-" sozinho pegaria
  *  também o da empresa. */
@@ -742,7 +733,7 @@ function cargaHoraria(data: CertificateData) {
   return valor ? `com carga horária de ${valor}, ` : '';
 }
 
-export const PREFIXO_CERTIFICADO_ALUNO = 'certificado-aluno-';
+export { PREFIXO_CERTIFICADO_ALUNO };
 export const PREFIXO_CERTIFICADO_EMPRESA = 'certificado-empresa-';
 
 export function companyCertificateFileName(data: CertificateData) {
@@ -758,5 +749,5 @@ export function certificateFileName(
   data: CertificateData,
   participante: { fullName: string },
 ) {
-  return `${PREFIXO_CERTIFICADO_ALUNO}${semAcento(participante.fullName)}-${semAcento(data.training.nr)}.pdf`;
+  return nomeCertificadoAluno(participante.fullName, data.training.nr);
 }

@@ -93,3 +93,41 @@ export async function sendPasswordResetEmail(input: {
     text,
   });
 }
+
+/** Aviso ao cliente de que os certificados de uma turma estão no portal. */
+export async function sendCertificatesAvailableEmail(input: {
+  to: string;
+  contactName: string;
+  trainingLabel: string;
+  quantity: number;
+  portalLink: string;
+}) {
+  const firstName = input.contactName.trim().split(/\s+/)[0] || '';
+  const greeting = firstName ? `Olá, ${firstName}.` : 'Olá.';
+  const quantidade = input.quantity === 1 ? '1 certificado' : `${input.quantity} certificados`;
+  const text = [
+    greeting,
+    '',
+    `Os certificados da turma ${input.trainingLabel} estão disponíveis no portal da Space Light (${quantidade}).`,
+    '',
+    `Acesse: ${input.portalLink}`,
+    '',
+    'Space Light Engenharia',
+  ].join('\n');
+  const html = `<!doctype html>
+<html lang="pt-BR"><body style="margin:0;background:#f4f3ef;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#000">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e4e2dc;border-radius:8px">
+    <tr><td style="background:#000;padding:22px 28px;border-radius:8px 8px 0 0">
+      <span style="color:#fac600;font-size:11px;font-weight:bold;letter-spacing:.14em;text-transform:uppercase">Space Light Engenharia</span>
+    </td></tr>
+    <tr><td style="padding:32px 28px">
+      <h1 style="margin:0;font-size:22px;line-height:1.3">Certificados disponíveis</h1>
+      <p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:#595959">${escapeHtml(greeting)} Os certificados da turma <strong style="color:#000">${escapeHtml(input.trainingLabel)}</strong> já estão no portal (${quantidade}).</p>
+      <p style="margin:26px 0 0">
+        <a href="${escapeHtml(input.portalLink)}" style="display:inline-block;background:#fac600;color:#000;padding:14px 24px;font-size:14px;font-weight:bold;text-decoration:none;border-radius:6px">Abrir o portal</a>
+      </p>
+    </td></tr>
+  </table>
+</body></html>`;
+  await sendEmail({ to: input.to, subject: `Certificados disponíveis · ${input.trainingLabel}`, html, text });
+}
