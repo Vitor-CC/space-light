@@ -51,7 +51,7 @@ export function situacaoDaTurma(training: CompanyTraining, hojeIso: string): { t
 // Ações de um dia e de uma turma
 // ---------------------------------------------------------------------------
 
-function DayRow({ training, session, instructors, reload, notify }: { training: CompanyTraining; session: TrainingSession; instructors: CompanyInstructor[]; reload: Reload; notify: Notify }) {
+function DayRow({ training, session, instructors, reload, notify, onEncerrar, ocupado = false }: { training: CompanyTraining; session: TrainingSession; instructors: CompanyInstructor[]; reload: Reload; notify: Notify; onEncerrar?: () => void; ocupado?: boolean }) {
   const [salvando, setSalvando] = useState(false);
   const total = training.sessions.length;
   const encerrado = session.status === 'completed';
@@ -100,6 +100,8 @@ function DayRow({ training, session, instructors, reload, notify }: { training: 
       {salvando ? <Loader2 className="size-4 animate-spin text-ds-amarelo-texto" /> : null}
       <div className="ml-auto flex items-center gap-2">
         {!encerrado && aviso ? <a href={aviso} target="_blank" rel="noreferrer" className={botaoClasses('fantasma', 'P')}><MessageCircle />Avisar</a> : null}
+        {/* Um dia só, quando o instrutor não fechou o dele. Turma de um dia fecha pelo "Encerrar turma". */}
+        {!encerrado && total > 1 && onEncerrar ? <Botao tipo="fantasma" tamanho="P" onClick={onEncerrar} disabled={salvando || ocupado}><Check />Encerrar este dia</Botao> : null}
         {total > 1 ? <BotaoIcone rotulo={`Remover o dia ${session.day_number}`} tom="perigo" className="size-9" onClick={() => void removerDia()} disabled={salvando}><X /></BotaoIcone> : null}
       </div>
     </div>
@@ -214,7 +216,8 @@ function Secao({ titulo, children, acao }: { titulo: string; children: ReactNode
 /** Ficha da turma no painel lateral: dias, dados, identificação e ações. */
 function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoExcluir }: { training: CompanyTraining; data: CompanyDashboardData; instructors: CompanyInstructor[]; reload: Reload; notify: Notify; emitir: () => void; aoExcluir: () => void }) {
   const [ocupado, setOcupado] = useState('');
-  const [confirmarSemLista, setConfirmarSemLista] = useState('');
+  // O que falta confirmar sem a lista: a turma inteira ou um dia só.
+  const [confirmarSemLista, setConfirmarSemLista] = useState<{ mensagem: string; sessionId?: string } | null>(null);
   const [identificacao, setIdentificacao] = useState(training.internal_label);
   const concluido = training.status === 'completed';
   const faltaLista = !data.files.some((file) => file.kind === 'attendance' && file.training_id === training.id);
@@ -234,13 +237,15 @@ function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoE
     });
   const cobraveisPorWhats = devedores.filter((item) => item.url);
 
-  async function encerrar(semLista: boolean) {
+  async function encerrar(semLista: boolean, sessionId?: string) {
     setOcupado('encerrando');
     try {
-      const resultado = await completeTrainingByCompany(training.id, semLista);
-      if (resultado.needsConfirmation) { setConfirmarSemLista(resultado.message || 'A foto da lista de presença assinada ainda não foi enviada.'); return; }
-      setConfirmarSemLista('');
-      notify(resultado.certificatePublished
+      const resultado = await completeTrainingByCompany(training.id, semLista, sessionId);
+      if (resultado.needsConfirmation) { setConfirmarSemLista({ mensagem: resultado.message || 'A foto da lista de presença assinada ainda não foi enviada.', sessionId }); return; }
+      setConfirmarSemLista(null);
+      const dia = sessionId ? training.sessions.find((item) => item.id === sessionId) : undefined;
+      if (dia && !resultado.turmaConcluida) notify(`Dia ${dia.day_number} encerrado.`);
+      else notify(resultado.certificatePublished
         ? `Turma encerrada. ${resultado.certificates} certificado(s) emitidos e arquivados nos documentos.`
         : `Turma encerrada, mas os documentos não foram gerados: ${resultado.certificateProblem ?? 'motivo desconhecido'}.`);
       await reload();
@@ -281,7 +286,7 @@ function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoE
   }
 
   return <div className="flex flex-col gap-5">
-    {confirmarSemLista ? <Faixa tom="perigo" titulo="Encerrar sem a lista assinada?" acao={<div className="flex gap-2"><Botao tipo="fantasma" tamanho="P" onClick={() => setConfirmarSemLista('')}>Cancelar</Botao><Botao tipo="perigo" tamanho="P" onClick={() => void encerrar(true)} disabled={ocupado === 'encerrando'}>{ocupado === 'encerrando' ? <Loader2 className="animate-spin" /> : <Check />}Encerrar assim mesmo</Botao></div>}>{confirmarSemLista} Os certificados saem mesmo assim e a ressalva fica registrada na Atividade com o seu nome.</Faixa> : null}
+    {confirmarSemLista ? <Faixa tom="perigo" titulo="Encerrar sem a lista assinada?" acao={<div className="flex gap-2"><Botao tipo="fantasma" tamanho="P" onClick={() => setConfirmarSemLista(null)}>Cancelar</Botao><Botao tipo="perigo" tamanho="P" onClick={() => void encerrar(true, confirmarSemLista.sessionId)} disabled={ocupado === 'encerrando'}>{ocupado === 'encerrando' ? <Loader2 className="animate-spin" /> : <Check />}Encerrar assim mesmo</Botao></div>}>{confirmarSemLista.mensagem} Os certificados saem mesmo assim e a ressalva fica registrada na Atividade com o seu nome.</Faixa> : null}
 
     <Secao titulo="Ações">
       <div className="flex flex-wrap gap-2">
@@ -300,7 +305,7 @@ function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoE
     </Secao>
 
     <Secao titulo={`Dias · ${training.sessions.length}`}>
-      <div>{training.sessions.map((dia) => <DayRow key={dia.id} training={training} session={dia} instructors={instructors} reload={reload} notify={notify} />)}</div>
+      <div>{training.sessions.map((dia) => <DayRow key={dia.id} training={training} session={dia} instructors={instructors} reload={reload} notify={notify} onEncerrar={() => void encerrar(false, dia.id)} ocupado={Boolean(ocupado)} />)}</div>
       <AddDay training={training} instructors={instructors} reload={reload} notify={notify} />
     </Secao>
 

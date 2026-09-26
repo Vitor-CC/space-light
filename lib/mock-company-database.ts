@@ -61,14 +61,15 @@ export function updateTrainingDay(trainingId: string, input: { sessionId: string
 }
 
 /**
- * Encerra a turma pela Space. Sem a foto da lista, a primeira tentativa volta
- * com 409 e `needsConfirmation` — quem insiste manda `semLista`.
+ * Encerra a turma pela Space, inteira ou só um dia (`sessionId`). Sem a foto
+ * da lista, fechar o último dia volta com 409 e `needsConfirmation` — quem
+ * insiste manda `semLista`.
  */
-export async function completeTrainingByCompany(trainingId: string, semLista = false) {
+export async function completeTrainingByCompany(trainingId: string, semLista = false, sessionId?: string) {
   const response = await fetch(`/api/company/trainings/${encodeURIComponent(trainingId)}/complete`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ semLista }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ semLista, sessionId }),
   });
-  const payload = (await response.json().catch(() => ({}))) as { error?: string; needsConfirmation?: boolean; certificates?: number; certificatePublished?: boolean; certificateProblem?: string | null };
+  const payload = (await response.json().catch(() => ({}))) as { error?: string; needsConfirmation?: boolean; turmaConcluida?: boolean; certificates?: number; certificatePublished?: boolean; certificateProblem?: string | null };
   if (response.status === 409 && payload.needsConfirmation) return { needsConfirmation: true as const, message: payload.error ?? '' };
   if (!response.ok) throw new Error(payload.error || 'Não foi possível encerrar o treinamento.');
   return { needsConfirmation: false as const, ...payload };

@@ -1515,6 +1515,44 @@ export async function completeTrainingByAdmin(input: {
 }
 
 /**
+ * A Space encerra um dia só, quando o instrutor não fechou o dele. Se for o
+ * último dia aberto, vale a mesma regra de `completeTrainingByAdmin`: sem a
+ * lista assinada, só com confirmação.
+ */
+export async function completeSessionByAdmin(input: {
+  trainingId: string;
+  sessionId: string;
+  byUserId: string;
+  semLista?: boolean;
+}) {
+  await ensurePortalSchema();
+  const sessoes = await listTrainingSessions(input.trainingId);
+  const dia = sessoes.find((sessao) => sessao.id === input.sessionId);
+  if (!dia) throw new Error('Dia não encontrado nesta turma.');
+  if (dia.status === 'completed') throw new Error('Este dia já foi encerrado.');
+  const ultimoAberto = sessoes.every((outro) => outro.id === dia.id || outro.status === 'completed');
+  const listaEnviada = await temListaAssinada(input.trainingId);
+  if (ultimoAberto && !listaEnviada && !input.semLista) throw new Error('SEM_LISTA');
+
+  await getD1()
+    .prepare("UPDATE training_sessions SET status = 'completed' WHERE id = ?")
+    .bind(dia.id)
+    .run();
+  const { concluiuAgora } = await sincronizarTurma(input.trainingId);
+  await writeAudit(input.byUserId, 'training.day_completed_by_company', 'training', input.trainingId, {
+    dia: dia.day_number,
+    turmaConcluida: concluiuAgora,
+    semListaAssinada: ultimoAberto && !listaEnviada,
+  });
+  if (!concluiuAgora) return { concluiuAgora: false, certificates: 0, listaEnviada };
+  const certificates = await issueCertificateBatch({
+    trainingId: input.trainingId,
+    byUserId: input.byUserId,
+  });
+  return { concluiuAgora: true, certificates, listaEnviada };
+}
+
+/**
  * Renomeia a identificação da turma. É só o nome interno: o título impresso no
  * certificado continua sendo `title` e não muda por aqui.
  */
