@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 export type Aba<T extends string> = { id: T; rotulo: string; contador?: ReactNode };
 
 export function Abas<T extends string>({ abas, ativa, onChange, rotulo, className }: { abas: Aba<T>[]; ativa: T; onChange: (id: T) => void; rotulo: string; className?: string }) {
-  return <div role="tablist" aria-label={rotulo} className={cn('flex gap-7 overflow-x-auto border-b border-ds-borda', className)}>
+  return <div role="tablist" aria-label={rotulo} className={cn('flex gap-7 overflow-x-auto overflow-y-hidden border-b border-ds-borda', className)}>
     {abas.map((aba) => {
       const sel = aba.id === ativa;
       return <button key={aba.id} type="button" role="tab" aria-selected={sel} onClick={() => onChange(aba.id)} className={cn('-mb-px inline-flex shrink-0 items-center gap-2 border-b-[3px] pb-3 font-ds-sans text-base leading-6 font-semibold transition-colors ds-foco', sel ? 'border-ds-amarelo text-ds-texto' : 'border-transparent text-ds-texto-2 hover:text-ds-texto')}>
