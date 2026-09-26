@@ -4,6 +4,8 @@ import { getAuthEnvironment } from '@/db';
 
 export const SESSION_COOKIE = 'space_light_session';
 const SESSION_DURATION_SECONDS = 60 * 60 * 12;
+/** "Manter conectado" no login: a sessão vale 30 dias em vez de 12 horas. */
+export const LONG_SESSION_DURATION_SECONDS = 60 * 60 * 24 * 30;
 const PASSWORD_ITERATIONS = 210_000;
 
 function bytesToBase64Url(bytes: Uint8Array) {
@@ -91,12 +93,12 @@ export function generateTemporaryPassword() {
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
 }
 
-export async function createSessionToken(userId: string) {
+export async function createSessionToken(userId: string, durationSeconds = SESSION_DURATION_SECONDS) {
   const payload = bytesToBase64Url(
     new TextEncoder().encode(
       JSON.stringify({
         userId,
-        exp: Math.floor(Date.now() / 1000) + SESSION_DURATION_SECONDS,
+        exp: Math.floor(Date.now() / 1000) + durationSeconds,
       }),
     ),
   );

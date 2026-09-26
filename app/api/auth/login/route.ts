@@ -9,6 +9,7 @@ import {
 } from '@/db/company-repository';
 import {
   createSessionToken,
+  LONG_SESSION_DURATION_SECONDS,
   SESSION_COOKIE,
   sessionCookieOptions,
   verifyPassword,
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
   // "login" é o nome de usuário na porta da empresa e o e-mail nas outras duas.
   const email = String(form.get('login') ?? form.get('email') ?? '').trim().toLowerCase();
   const password = String(form.get('password') ?? '');
+  const manterConectado = form.get('manter') === '1';
   const requestedPath = String(form.get('loginPath') ?? '');
   const loginPath = requestedPath === '/instrutor/login' || requestedPath === '/empresa/login'
     ? requestedPath
@@ -71,8 +73,12 @@ export async function POST(request: Request) {
   const response = destination(request, path);
   response.cookies.set(
     SESSION_COOKIE,
-    await createSessionToken(user.id),
-    sessionCookieOptions,
+    manterConectado
+      ? await createSessionToken(user.id, LONG_SESSION_DURATION_SECONDS)
+      : await createSessionToken(user.id),
+    manterConectado
+      ? { ...sessionCookieOptions, maxAge: LONG_SESSION_DURATION_SECONDS }
+      : sessionCookieOptions,
   );
   return response;
 }

@@ -29,13 +29,13 @@ export function Abas<T extends string>({ abas, ativa, onChange, rotulo, classNam
 
 /* ─── Controle segmentado (login, abas do instrutor) ────────────────────── */
 
-export function Segmentado<T extends string>({ opcoes, ativa, onChange, rotulo, tom = 'claro', className }: { opcoes: Array<{ id: T; rotulo: ReactNode; icone?: ReactNode }>; ativa: T; onChange: (id: T) => void; rotulo: string; tom?: 'claro' | 'escuro'; className?: string }) {
+export function Segmentado<T extends string>({ opcoes, ativa, onChange, rotulo, tom = 'claro', className }: { opcoes: Array<{ id: T; rotulo: ReactNode; curto?: ReactNode; icone?: ReactNode }>; ativa: T; onChange: (id: T) => void; rotulo: string; tom?: 'claro' | 'escuro'; className?: string }) {
   return <div role="tablist" aria-label={rotulo} className={cn('flex gap-1 rounded-lg p-1', tom === 'claro' ? 'bg-ds-muted' : 'bg-ds-superficie', className)}>
     {opcoes.map((op) => {
       const sel = op.id === ativa;
       const ativo = tom === 'claro' ? 'bg-ds-superficie text-ds-texto shadow-[0_1px_3px_rgba(0,0,0,0.08)]' : 'bg-ds-inverso text-ds-texto-inv';
       return <button key={op.id} type="button" role="tab" aria-selected={sel} onClick={() => onChange(op.id)} className={cn('flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md px-2 py-2.5 font-ds-sans text-sm leading-5 font-medium transition-colors ds-foco [&_svg]:size-4 [&_svg]:shrink-0', sel ? ativo : 'text-ds-texto-2 hover:text-ds-texto')}>
-        {op.icone}<span className="truncate">{op.rotulo}</span>
+        {op.icone}{op.curto ? <><span className="truncate sm:hidden">{op.curto}</span><span className="hidden truncate sm:inline">{op.rotulo}</span></> : <span className="truncate">{op.rotulo}</span>}
       </button>;
     })}
   </div>;
