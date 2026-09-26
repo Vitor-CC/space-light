@@ -75,8 +75,10 @@ export async function completeTrainingByCompany(trainingId: string, semLista = f
 }
 
 /**
- * Envia um arquivo por requisição de propósito: uma função da Vercel aceita
- * no máximo 4,5 MB por requisição, então um lote inteiro de uma vez estouraria.
+ * Envia um arquivo por requisição de propósito. Começou por causa do limite de
+ * 4,5 MB da Vercel, que não existe mais, e ficou por dois motivos melhores: dá
+ * para mostrar o progresso com nome de arquivo, e uma falha no meio derruba só
+ * aquele envio em vez do lote inteiro.
  */
 export async function uploadCompanyFiles(input: {
   clientId: string;

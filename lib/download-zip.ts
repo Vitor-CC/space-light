@@ -23,8 +23,10 @@ function uniqueName(name: string, used: Set<string>) {
 
 /**
  * Baixa os arquivos um a um pelo próprio site (que checa permissão) e monta o
- * .zip no navegador. Fazer isso no servidor esbarraria no limite de 4,5 MB de
- * resposta de uma função da Vercel.
+ * .zip no navegador. Nasceu assim por causa do limite de resposta da Vercel,
+ * que não existe mais, mas continua sendo o lugar certo: compactar no servidor
+ * significaria carregar a turma inteira na memória dele para cada pessoa que
+ * clicasse, e aqui o custo fica na máquina de quem pediu.
  */
 export async function downloadFilesAsZip(input: {
   entries: ZipEntry[];

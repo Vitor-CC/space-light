@@ -12,6 +12,7 @@ import { Segmentado } from '@/components/ds/interativo';
 import type { CompanyParticipant } from '@/lib/company-types';
 import { limparDigitacaoCpf, limparDigitacaoRg, problemaCpf, problemaRg } from '@/lib/documentos';
 import type { InstructorDashboardData } from '@/lib/instructor-types';
+import { LIMITE_UPLOAD_LABEL } from '@/lib/upload-limites';
 import { cn } from '@/lib/utils';
 
 type TrainingFile = { id: string; name: string; kind: string; size: number; contentType: string; createdAt: string; stored: boolean };
@@ -306,7 +307,7 @@ export function Sala({ data, selectedId, selectTraining, reload, notify }: { dat
           <div className="min-w-0 flex-1"><h3 className="ds-h4">Fotos da aula</h3><p className="ds-caption text-ds-texto-2">Registros da prática. Vão para a galeria da turma, que o cliente vê.</p></div>
           <label className={botaoClasses('primario', 'M', cn('cursor-pointer', enviando && 'pointer-events-none opacity-60'))}>{enviando === 'photo' ? <Loader2 className="animate-spin" /> : <Camera />}{enviando === 'photo' ? 'Enviando…' : 'Enviar fotos'}<input ref={entradaFotos} type="file" multiple accept={ACEITA_IMAGEM} onChange={(e) => void enviarArquivos('photo', e.currentTarget)} className="hidden" /></label>
         </div>
-        <ListaDeArquivos arquivos={files === null ? null : fotosDaAula} vazio="Nenhuma foto da aula ainda. JPG, PNG, WEBP ou HEIC, até 4 MB cada." />
+        <ListaDeArquivos arquivos={files === null ? null : fotosDaAula} vazio={`Nenhuma foto da aula ainda. JPG, PNG, WEBP ou HEIC, até ${LIMITE_UPLOAD_LABEL} cada.`} />
       </Cartao>
       <Cartao className="flex flex-col gap-3 p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start">

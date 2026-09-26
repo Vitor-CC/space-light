@@ -10,6 +10,7 @@ import type { CompanyDashboardData, CompanyFile } from '@/lib/company-types';
 import { dataDoDia, rotuloDiaDaTurma } from '@/lib/dias-da-turma';
 import { downloadFilesAsZip } from '@/lib/download-zip';
 import { deleteCompanyFile, generateCertificates, uploadCompanyFiles } from '@/lib/mock-company-database';
+import { LIMITE_UPLOAD_LABEL } from '@/lib/upload-limites';
 
 type Aba = 'photo' | 'document' | 'upload';
 type Kind = 'photo' | 'document';
@@ -19,13 +20,13 @@ const kindCopy: Record<Kind, { label: string; plural: string; accept: string; hi
     label: 'Foto',
     plural: 'Fotos',
     accept: 'image/jpeg,image/png,image/webp,image/heic,image/heif',
-    hint: 'JPG, PNG, WEBP ou HEIC — até 4 MB cada.',
+    hint: `JPG, PNG, WEBP ou HEIC — até ${LIMITE_UPLOAD_LABEL} cada.`,
   },
   document: {
     label: 'Documento',
     plural: 'Documentos',
     accept: '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt',
-    hint: 'PDF, Word, Excel, CSV ou TXT — até 4 MB cada.',
+    hint: `PDF, Word, Excel, CSV ou TXT — até ${LIMITE_UPLOAD_LABEL} cada.`,
   },
 };
 
@@ -138,7 +139,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
       });
       setQueue([]);
       notify(result.rejected.length
-        ? `${result.saved} enviado(s). Recusado(s): ${result.rejected.join(', ')} — tipo não aceito ou acima de 4 MB.`
+        ? `${result.saved} enviado(s). Recusado(s): ${result.rejected.join(', ')} — tipo não aceito ou acima de ${LIMITE_UPLOAD_LABEL}.`
         : `${result.saved} arquivo(s) enviado(s).`);
       await reload();
       setAba(uploadKind);
@@ -222,7 +223,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
     {aba === 'upload' ? <section className="rounded-lg max-w-2xl border border-ds-borda bg-ds-superficie p-6 md:p-8">
       <span className="eyebrow text-ds-amarelo-texto">Envio em lote</span>
       <h2 className="mt-2 ds-h4">Enviar arquivos</h2>
-      <p className="mt-3 text-xs leading-relaxed text-ds-texto-2">Pode escolher vários de uma vez: eles são enviados um a um, porque cada requisição da Vercel aceita no máximo 4,5 MB. Turma encerrada também recebe arquivo novo, e gerar os documentos de novo não apaga o que foi enviado aqui.</p>
+      <p className="mt-3 text-xs leading-relaxed text-ds-texto-2">Pode escolher vários de uma vez: eles são enviados um a um, para você acompanhar o progresso e uma falha não derrubar o lote. Turma encerrada também recebe arquivo novo, e gerar os documentos de novo não apaga o que foi enviado aqui.</p>
 
       <div className="mt-6 flex gap-px bg-ds-borda">
         {(['photo', 'document'] as Kind[]).map((option) => <button key={option} type="button" onClick={() => { setUploadKind(option); setQueue([]); }} className={`flex-1 px-4 py-3 ds-caps transition ${uploadKind === option ? 'bg-black text-ds-amarelo' : 'bg-ds-superficie text-ds-texto-2 hover:bg-ds-amarelo-suave'}`}>

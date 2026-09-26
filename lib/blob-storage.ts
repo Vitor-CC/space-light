@@ -24,31 +24,15 @@ function raiz() {
   return path.resolve(configurada || path.join(process.cwd(), 'data', 'arquivos'));
 }
 
-/**
- * Antes era 4 MB porque uma função da Vercel aceitava no máximo 4,5 MB por
- * requisição. Esse teto não existe mais em servidor próprio; segue assim só
- * para a migração não mudar comportamento de uma vez. Dá para subir quando
- * quisermos — é trocar este número.
- */
-export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
-
-export const ACCEPTED_PHOTO_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/heic',
-  'image/heif',
-];
-
-export const ACCEPTED_DOCUMENT_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/csv',
-  'text/plain',
-];
+// Limite e tipos aceitos moram em `upload-limites.ts`, que a tela também
+// importa — este arquivo usa `node:fs` e não pode ir para o navegador.
+// Reexportados aqui para quem já importava daqui não ter de mudar.
+export {
+  ACCEPTED_DOCUMENT_TYPES,
+  ACCEPTED_PHOTO_TYPES,
+  LIMITE_UPLOAD_LABEL,
+  MAX_UPLOAD_BYTES,
+} from '@/lib/upload-limites';
 
 /** Disco sempre existe; a pasta é criada na primeira gravação. */
 export function isStorageConfigured() {
