@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const clientId = String(form.get('clientId') ?? '');
   const trainingId = String(form.get('trainingId') ?? '');
-  const pedido = String(form.get('kind') ?? '');
+  const pedido = form.get('kind');
   // A lista assinada também pode vir da equipe, no lugar do instrutor: é ela
   // que destrava o encerramento do último dia.
   const kind = pedido === 'photo' ? 'photo' : pedido === 'attendance' ? 'attendance' : 'document';
@@ -63,8 +63,8 @@ export async function POST(request: Request) {
   let sessionId: string | null = null;
   if (kind === 'attendance') {
     const dias = await listTrainingSessions(trainingId);
-    const pedidoDia = String(form.get('sessionId') ?? '');
-    const dia = pedidoDia ? dias.find((item) => item.id === pedidoDia) : dias[dias.length - 1];
+    const pedidoDia = form.get('sessionId');
+    const dia = typeof pedidoDia === 'string' && pedidoDia ? dias.find((item) => item.id === pedidoDia) : dias[dias.length - 1];
     if (!dia) {
       return NextResponse.json({ error: 'Dia não encontrado nesta turma.' }, { status: 400 });
     }
