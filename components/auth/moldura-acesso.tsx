@@ -18,7 +18,7 @@ export function MolduraAcesso({ children, largura = 420, sobretitulo = 'Portais 
         <p className="ds-h2 text-ds-texto-inv">{titulo}</p>
         <p className="ds-body-m text-ds-texto-inv-2">{texto}</p>
       </div>
-      <Image src="/images/branding/portal-onda.svg" alt="" width={620} height={200} unoptimized className="absolute bottom-0 left-0 h-[200px] w-full" />
+      <Image src="/images/branding/portal-onda.svg" alt="" width={620} height={200} unoptimized className="absolute bottom-0 left-0 w-full" style={{ height: 200 }} />
     </section>
     <section className="flex min-w-0 flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-ds-borda px-5 py-4 lg:hidden">

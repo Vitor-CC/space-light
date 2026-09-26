@@ -210,7 +210,7 @@ export function updateInstructor(instructorId: string, input: { name: string; do
   return requestJson<{ ok: true }>(`/api/company/instructors/${encodeURIComponent(instructorId)}`, { method: 'PATCH', body: JSON.stringify(input) });
 }
 
-export function updateTrainingDetails(trainingId: string, details: { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string }) {
+export function updateTrainingDetails(trainingId: string, details: { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string; validityMonths?: number }) {
   return requestJson<{ ok: true }>(`/api/company/trainings/${encodeURIComponent(trainingId)}`, { method: 'PATCH', body: JSON.stringify({ details }) });
 }
 

@@ -40,29 +40,29 @@ function pertence(file: CompanyFile, aba: Kind) {
 function FileActions({ file, onDelete }: { file: CompanyFile; onDelete: (file: CompanyFile) => void }) {
   if (file.status !== 'stored') {
     return <div className="flex items-center gap-2">
-      <span className="inline-flex h-10 items-center gap-2 border border-[#e0c48a] bg-[#fff8e8] px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#8a6107]" title="Só a ficha deste arquivo existe: o conteúdo não está no armazenamento."><TriangleAlert className="size-3.5" />Arquivo não salvo</span>
-      <button type="button" onClick={() => onDelete(file)} aria-label={`Excluir ${file.name}`} className="inline-flex size-10 items-center justify-center border border-black/10 text-[#999] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-3.5" /></button>
+      <span className="rounded-md inline-flex h-10 items-center gap-2 border border-ds-amarelo bg-ds-amarelo-suave px-3 ds-botao text-ds-amarelo-texto" title="Só a ficha deste arquivo existe: o conteúdo não está no armazenamento."><TriangleAlert className="size-3.5" />Arquivo não salvo</span>
+      <button type="button" onClick={() => onDelete(file)} aria-label={`Excluir ${file.name}`} className="rounded-md inline-flex size-10 items-center justify-center border border-ds-borda text-ds-texto-2 hover:border-ds-perigo hover:text-ds-perigo"><Trash2 className="size-3.5" /></button>
     </div>;
   }
   return <div className="flex items-center gap-2">
-    <a href={`/api/files/${file.id}`} target="_blank" rel="noopener" className="inline-flex h-10 items-center gap-2 border border-black/15 px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] hover:bg-black hover:text-white"><ExternalLink className="size-3.5" />Abrir</a>
-    <a href={`/api/files/${file.id}?download=1`} className="inline-flex h-10 items-center gap-2 border border-black/15 px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] hover:bg-black hover:text-white"><Download className="size-3.5" />Baixar</a>
-    <button type="button" onClick={() => onDelete(file)} aria-label={`Excluir ${file.name}`} className="inline-flex size-10 items-center justify-center border border-black/10 text-[#999] hover:border-[#b62525] hover:text-[#b62525]"><Trash2 className="size-3.5" /></button>
+    <a href={`/api/files/${file.id}`} target="_blank" rel="noopener" className="rounded-md inline-flex h-10 items-center gap-2 border border-ds-borda px-3 ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv"><ExternalLink className="size-3.5" />Abrir</a>
+    <a href={`/api/files/${file.id}?download=1`} className="rounded-md inline-flex h-10 items-center gap-2 border border-ds-borda px-3 ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv"><Download className="size-3.5" />Baixar</a>
+    <button type="button" onClick={() => onDelete(file)} aria-label={`Excluir ${file.name}`} className="rounded-md inline-flex size-10 items-center justify-center border border-ds-borda text-ds-texto-2 hover:border-ds-perigo hover:text-ds-perigo"><Trash2 className="size-3.5" /></button>
   </div>;
 }
 
 function PhotoCard({ file, onDelete }: { file: CompanyFile; onDelete: (file: CompanyFile) => void }) {
-  return <article className="border border-black/10 bg-white">
-    <div className="relative aspect-[4/3] bg-[#f7f7f4]">
+  return <article className="border border-ds-borda bg-ds-superficie">
+    <div className="relative aspect-[4/3] bg-ds-muted">
       {file.status === 'stored'
         ? <Image src={`/api/files/${file.id}`} alt={file.name} fill unoptimized sizes="(min-width:1280px) 25vw, (min-width:640px) 50vw, 100vw" className="object-cover" />
-        : <span className="flex h-full items-center justify-center text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#999]">Sem conteúdo</span>}
+        : <span className="flex h-full items-center justify-center ds-caps text-ds-texto-2">Sem conteúdo</span>}
     </div>
     <div className="p-4">
-      <span className="block text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">{file.client_name} · {file.training_nr}</span>
+      <span className="block ds-caps text-ds-amarelo-texto">{file.client_name} · {file.training_nr}</span>
       <strong className="mt-1 block truncate text-sm" title={file.name}>{file.name}</strong>
-      <p className="mt-1 text-[11px] text-[#888]">{formatFileSize(file.size)} · {formatDate(file.created_at)}</p>
-      {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[11px] leading-relaxed text-[#8a6107]">Só a ficha ficou: o conteúdo não está no armazenamento. Exclua e envie de novo.</p> : null}
+      <p className="mt-1 text-[11px] text-ds-texto-2">{formatFileSize(file.size)} · {formatDate(file.created_at)}</p>
+      {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-ds-amarelo bg-ds-amarelo-suave px-3 py-2 text-[11px] leading-relaxed text-ds-amarelo-texto">Só a ficha ficou: o conteúdo não está no armazenamento. Exclua e envie de novo.</p> : null}
       <div className="mt-3"><FileActions file={file} onDelete={onDelete} /></div>
     </div>
   </article>;
@@ -70,13 +70,13 @@ function PhotoCard({ file, onDelete }: { file: CompanyFile; onDelete: (file: Com
 
 function DocumentRow({ file, onDelete }: { file: CompanyFile; onDelete: (file: CompanyFile) => void }) {
   const ehLista = file.kind === 'attendance';
-  return <article className="grid gap-4 border border-black/10 bg-white p-5 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-    <span className={`flex size-11 items-center justify-center ${ehLista ? 'bg-[#f2ad19] text-black' : 'bg-black text-[#f2ad19]'}`}>{ehLista ? <Images className="size-5" /> : <FileText className="size-5" />}</span>
+  return <article className="rounded-lg grid gap-4 border border-ds-borda bg-ds-superficie p-5 sm:grid-cols-[auto_1fr_auto] sm:items-center">
+    <span className={`rounded-md flex size-11 items-center justify-center ${ehLista ? 'bg-ds-amarelo text-black' : 'bg-black text-ds-amarelo'}`}>{ehLista ? <Images className="size-5" /> : <FileText className="size-5" />}</span>
     <div className="min-w-0">
-      <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">{file.client_name} · {file.training_nr}{ehLista ? ' · Lista assinada' : ''}</span>
+      <span className="ds-caps text-ds-amarelo-texto">{file.client_name} · {file.training_nr}{ehLista ? ' · Lista assinada' : ''}</span>
       <h3 className="mt-1 truncate text-sm font-bold" title={file.name}>{file.name}</h3>
-      <p className="mt-1 text-[11px] text-[#888]">{file.training_title} · {formatFileSize(file.size)} · {formatDate(file.created_at)}</p>
-      {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[11px] leading-relaxed text-[#8a6107]">Só a ficha ficou: o conteúdo não está no armazenamento. Exclua este registro e envie o arquivo de novo.</p> : null}
+      <p className="mt-1 text-[11px] text-ds-texto-2">{file.training_title} · {formatFileSize(file.size)} · {formatDate(file.created_at)}</p>
+      {file.status !== 'stored' ? <p className="mt-2 border-l-2 border-ds-amarelo bg-ds-amarelo-suave px-3 py-2 text-[11px] leading-relaxed text-ds-amarelo-texto">Só a ficha ficou: o conteúdo não está no armazenamento. Exclua este registro e envie o arquivo de novo.</p> : null}
     </div>
     <FileActions file={file} onDelete={onDelete} />
   </article>;
@@ -207,7 +207,7 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
     ]} />
 
     {/* Cliente e turma valem para as três sub-abas: escolher uma vez basta. */}
-    <div className="grid gap-4 border border-black/10 bg-white p-5 sm:grid-cols-2">
+    <div className="rounded-lg grid gap-4 border border-ds-borda bg-ds-superficie p-5 sm:grid-cols-2">
       <label htmlFor="arquivos-cliente"><span className={labelClass}>Cliente</span>
         <select id="arquivos-cliente" value={clientId} onChange={(event) => changeClient(event.target.value)} className={selectClass}>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>
       </label>
@@ -219,49 +219,49 @@ export function CompanyFiles({ data, reload, notify }: { data: CompanyDashboardD
       </label>
     </div>
 
-    {aba === 'upload' ? <section className="max-w-2xl border border-black/10 bg-white p-6 md:p-8">
-      <span className="eyebrow text-[#8a6107]">Envio em lote</span>
-      <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Enviar arquivos</h2>
-      <p className="mt-3 text-xs leading-relaxed text-[#777]">Pode escolher vários de uma vez: eles são enviados um a um, porque cada requisição da Vercel aceita no máximo 4,5 MB. Turma encerrada também recebe arquivo novo, e gerar os documentos de novo não apaga o que foi enviado aqui.</p>
+    {aba === 'upload' ? <section className="rounded-lg max-w-2xl border border-ds-borda bg-ds-superficie p-6 md:p-8">
+      <span className="eyebrow text-ds-amarelo-texto">Envio em lote</span>
+      <h2 className="mt-2 ds-h4">Enviar arquivos</h2>
+      <p className="mt-3 text-xs leading-relaxed text-ds-texto-2">Pode escolher vários de uma vez: eles são enviados um a um, porque cada requisição da Vercel aceita no máximo 4,5 MB. Turma encerrada também recebe arquivo novo, e gerar os documentos de novo não apaga o que foi enviado aqui.</p>
 
-      <div className="mt-6 flex gap-px bg-black/10">
-        {(['photo', 'document'] as Kind[]).map((option) => <button key={option} type="button" onClick={() => { setUploadKind(option); setQueue([]); }} className={`flex-1 px-4 py-3 text-[11px] font-extrabold uppercase tracking-[0.1em] transition ${uploadKind === option ? 'bg-black text-[#f2ad19]' : 'bg-white text-[#666] hover:bg-[#fff8e8]'}`}>
+      <div className="mt-6 flex gap-px bg-ds-borda">
+        {(['photo', 'document'] as Kind[]).map((option) => <button key={option} type="button" onClick={() => { setUploadKind(option); setQueue([]); }} className={`flex-1 px-4 py-3 ds-caps transition ${uploadKind === option ? 'bg-black text-ds-amarelo' : 'bg-ds-superficie text-ds-texto-2 hover:bg-ds-amarelo-suave'}`}>
           <span className="inline-flex items-center gap-2">{option === 'photo' ? <Images className="size-4" /> : <FileText className="size-4" />}{kindCopy[option].plural}</span>
         </button>)}
       </div>
 
       <input ref={inputRef} type="file" multiple accept={copy.accept} className="sr-only" onChange={(event) => addFiles(event.target.files)} />
-      <button type="button" onClick={() => inputRef.current?.click()} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(event.dataTransfer.files); }} className={`mt-4 flex min-h-48 w-full flex-col items-center justify-center border-2 border-dashed p-6 text-center transition ${dragging ? 'border-[#f2ad19] bg-[#fff8e8]' : 'border-black/18 bg-[#f7f7f4] hover:border-[#f2ad19]'}`}>
-        <span className="flex size-12 items-center justify-center bg-black text-[#f2ad19]"><UploadCloud className="size-5" /></span>
-        <strong className="mt-4 text-sm uppercase tracking-[0.08em]">Arraste {copy.plural.toLowerCase()} aqui</strong>
-        <span className="mt-2 text-xs leading-relaxed text-[#777]">{copy.hint}</span>
+      <button type="button" onClick={() => inputRef.current?.click()} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); addFiles(event.dataTransfer.files); }} className={`rounded-lg mt-4 flex min-h-48 w-full flex-col items-center justify-center border-2 border-dashed p-6 text-center transition ${dragging ? 'border-ds-amarelo bg-ds-amarelo-suave' : 'border-ds-borda bg-ds-muted hover:border-ds-amarelo'}`}>
+        <span className="rounded-md flex size-12 items-center justify-center bg-black text-ds-amarelo"><UploadCloud className="size-5" /></span>
+        <strong className="mt-4 ds-body-s font-semibold">Arraste {copy.plural.toLowerCase()} aqui</strong>
+        <span className="mt-2 text-xs leading-relaxed text-ds-texto-2">{copy.hint}</span>
       </button>
 
-      {queue.length > 0 ? <div className="mt-4 border border-black/10">
-        <div className="flex items-center justify-between bg-[#f7f7f4] px-4 py-3"><strong className="text-xs">{queue.length} na fila</strong><button type="button" onClick={() => setQueue([])} className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8f1717]">Limpar</button></div>
-        <div className="max-h-44 divide-y divide-black/8 overflow-y-auto">{queue.slice(0, 40).map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs"><span className="min-w-0 truncate">{file.name}</span><span className="shrink-0 text-[#888]">{formatFileSize(file.size)}</span></div>)}{queue.length > 40 ? <p className="px-4 py-2.5 text-xs text-[#777]">+ {queue.length - 40} arquivos</p> : null}</div>
+      {queue.length > 0 ? <div className="mt-4 border border-ds-borda">
+        <div className="flex items-center justify-between bg-ds-muted px-4 py-3"><strong className="text-xs">{queue.length} na fila</strong><button type="button" onClick={() => setQueue([])} className="ds-caps text-ds-perigo">Limpar</button></div>
+        <div className="max-h-44 divide-y divide-ds-borda overflow-y-auto">{queue.slice(0, 40).map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs"><span className="min-w-0 truncate">{file.name}</span><span className="shrink-0 text-ds-texto-2">{formatFileSize(file.size)}</span></div>)}{queue.length > 40 ? <p className="px-4 py-2.5 text-xs text-ds-texto-2">+ {queue.length - 40} arquivos</p> : null}</div>
       </div> : null}
 
-      <Button type="button" disabled={!trainingId || queue.length === 0 || Boolean(busy)} onClick={() => void send()} className="mt-5 h-13 w-full rounded-none bg-[#f2ad19] text-[11px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900] disabled:opacity-50">{busy ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}{busy || `Enviar ${copy.plural.toLowerCase()}`}</Button>
-      {!trainingId ? <p className="mt-3 border-l-2 border-[#e0c48a] bg-[#fff8e8] px-3 py-2 text-[11px] leading-relaxed text-[#8a6107]">Escolha o treinamento acima: o arquivo é guardado dentro dele e é assim que o cliente enxerga.</p> : null}
+      <Button type="button" disabled={!trainingId || queue.length === 0 || Boolean(busy)} onClick={() => void send()} className="mt-5 h-13 w-full bg-ds-amarelo ds-caps text-black hover:bg-[#eab900] disabled:opacity-50">{busy ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}{busy || `Enviar ${copy.plural.toLowerCase()}`}</Button>
+      {!trainingId ? <p className="mt-3 border-l-2 border-ds-amarelo bg-ds-amarelo-suave px-3 py-2 text-[11px] leading-relaxed text-ds-amarelo-texto">Escolha o treinamento acima: o arquivo é guardado dentro dele e é assim que o cliente enxerga.</p> : null}
     </section> : <section>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <span className="eyebrow text-[#8a6107]">{selectedTraining ? `${selectedTraining.nr} · ${selectedTraining.internal_label || selectedTraining.title}` : clientName || 'Histórico'}</span>
-          <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">{copy.plural} {selectedTraining ? 'desta turma' : 'do cliente'}</h2>
+          <span className="eyebrow text-ds-amarelo-texto">{selectedTraining ? `${selectedTraining.nr} · ${selectedTraining.internal_label || selectedTraining.title}` : clientName || 'Histórico'}</span>
+          <h2 className="mt-2 ds-h4">{copy.plural} {selectedTraining ? 'desta turma' : 'do cliente'}</h2>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => void downloadAll()} disabled={downloadable.length === 0 || Boolean(zipping)} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 border border-black/16 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] transition hover:border-black hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
+          <button type="button" onClick={() => void downloadAll()} disabled={downloadable.length === 0 || Boolean(zipping)} className="rounded-md inline-flex h-11 shrink-0 items-center justify-center gap-2 border border-ds-borda bg-ds-superficie px-4 ds-botao transition hover:border-black hover:bg-ds-inverso hover:text-ds-texto-inv disabled:cursor-not-allowed disabled:opacity-40">
             {zipping ? <Loader2 className="size-4 animate-spin" /> : <FileArchive className="size-4" />}
             {zipping || (downloadable.length === 1 ? 'Baixar 1 em zip' : downloadable.length > 1 ? `Baixar os ${downloadable.length} em zip` : 'Baixar em zip')}
           </button>
-          {aba === 'document' && selectedTraining ? <button type="button" onClick={() => void gerarDocumentos()} disabled={gerando} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 bg-[#f2ad19] px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-black transition hover:bg-[#ff9900] disabled:opacity-50">
+          {aba === 'document' && selectedTraining ? <button type="button" onClick={() => void gerarDocumentos()} disabled={gerando} className="rounded-md inline-flex h-11 shrink-0 items-center justify-center gap-2 bg-ds-amarelo px-4 ds-botao text-ds-texto transition hover:bg-[#eab900] disabled:opacity-50">
             {gerando ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}{gerando ? 'Gerando…' : emitidos === 0 ? 'Gerar documentos' : 'Gerar de novo'}
           </button> : null}
         </div>
       </div>
 
-      {aba === 'document' && selectedTraining ? <p className="mb-4 border-l-4 border-[#f2ad19] bg-[#fff8e8] p-4 text-xs leading-relaxed text-[#6b4d06]">
+      {aba === 'document' && selectedTraining ? <p className="mb-4 border-l-4 border-ds-amarelo bg-ds-amarelo-suave p-4 text-xs leading-relaxed text-ds-amarelo-texto">
         Um certificado por aluno, mais o certificado da empresa e o atestado. Se alguém entrou ou saiu da lista de presença depois da emissão, use <strong>Gerar de novo</strong>: os certificados de quem saiu são recolhidos e os que ficaram são regravados.
       </p> : null}
 

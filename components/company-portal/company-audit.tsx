@@ -75,7 +75,7 @@ export function CompanyAudit({ notify }: { notify: (message: string) => void }) 
   useEffect(() => { void load(); }, [load]);
 
   if (entries === null) {
-    return <div className="flex min-h-56 items-center justify-center border border-dashed border-black/20 bg-white"><Loader2 className="size-6 animate-spin text-[#8a6107]" /></div>;
+    return <div className="rounded-lg flex min-h-56 items-center justify-center border border-dashed border-ds-borda bg-ds-superficie"><Loader2 className="size-6 animate-spin text-ds-amarelo-texto" /></div>;
   }
 
   if (entries.length === 0) {
@@ -83,11 +83,11 @@ export function CompanyAudit({ notify }: { notify: (message: string) => void }) 
   }
 
   return <ol className="space-y-3">{entries.map((entry) => (
-    <li key={entry.id} className="flex gap-4 border border-black/10 bg-white p-4">
-      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center bg-black text-[#f2ad19]"><Activity className="size-4" /></span>
+    <li key={entry.id} className="rounded-lg flex gap-4 border border-ds-borda bg-ds-superficie p-4">
+      <span className="rounded-md mt-0.5 flex size-9 shrink-0 items-center justify-center bg-black text-ds-amarelo"><Activity className="size-4" /></span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm leading-relaxed"><strong className="font-extrabold">{entry.actor_name ?? 'Sistema'}</strong> <span className="text-[#555]">{describe(entry.action)}</span></p>
-        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#999]">{formatDateTime(entry.created_at)}{entry.actor_email ? ` · ${entry.actor_email}` : ''}</p>
+        <p className="text-sm leading-relaxed"><strong className="font-extrabold">{entry.actor_name ?? 'Sistema'}</strong> <span className="text-ds-texto-2">{describe(entry.action)}</span></p>
+        <p className="mt-1 ds-caps text-ds-texto-2">{formatDateTime(entry.created_at)}{entry.actor_email ? ` · ${entry.actor_email}` : ''}</p>
       </div>
     </li>
   ))}</ol>;

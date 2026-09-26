@@ -61,22 +61,22 @@ function ClientAddress({ client, notify, reload }: { client: CompanyClient; noti
   return <div>
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div className="min-w-0">
-        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">Endereço da edificação</span>
-        <p className={`mt-1 text-xs ${completo ? 'text-[#555]' : 'font-bold text-[#b62525]'}`}>{resumo}</p>
-        {!completo ? <p className="mt-1 text-[11px] leading-relaxed text-[#888]">Necessário para emitir o atestado de treinamento.</p> : null}
+        <span className="ds-caps text-ds-amarelo-texto">Endereço da edificação</span>
+        <p className={`mt-1 text-xs ${completo ? 'text-ds-texto-2' : 'font-bold text-ds-perigo'}`}>{resumo}</p>
+        {!completo ? <p className="mt-1 text-[11px] leading-relaxed text-ds-texto-2">Necessário para emitir o atestado de treinamento.</p> : null}
       </div>
-      <button type="button" onClick={() => setAberto((v) => !v)} className="inline-flex h-10 shrink-0 items-center gap-2 border border-black/15 bg-white px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">
+      <button type="button" onClick={() => setAberto((v) => !v)} className="rounded-md inline-flex h-10 shrink-0 items-center gap-2 border border-ds-borda bg-ds-superficie px-3 ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv">
         <MapPin className="size-3.5" />{aberto ? 'Fechar' : completo ? 'Editar' : 'Preencher'}
       </button>
     </div>
 
-    {aberto ? <form onSubmit={salvar} className="mt-4 grid gap-3 border border-black/10 bg-white p-4 sm:grid-cols-2">
-      <label className="sm:col-span-2" htmlFor={`endereco-${client.id}-logradouro`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">Logradouro e número</span><Input id={`endereco-${client.id}-logradouro`} value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} placeholder="Ex.: Rua das Palmeiras, 120" className={fieldClass} /></label>
-      <label htmlFor={`endereco-${client.id}-bairro`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">Bairro</span><Input id={`endereco-${client.id}-bairro`} value={draft.district} onChange={(e) => setDraft({ ...draft, district: e.target.value })} placeholder="Ex.: Centro" className={fieldClass} /></label>
-      <label htmlFor={`endereco-${client.id}-cep`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">CEP</span><Input id={`endereco-${client.id}-cep`} value={draft.postalCode} onChange={(e) => setDraft({ ...draft, postalCode: e.target.value })} placeholder="Ex.: 01000-000" className={fieldClass} /></label>
-      <label htmlFor={`endereco-${client.id}-municipio`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">Município</span><Input id={`endereco-${client.id}-municipio`} value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="Ex.: São Paulo" className={fieldClass} /></label>
-      <label htmlFor={`endereco-${client.id}-uf`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">UF</span><Input id={`endereco-${client.id}-uf`} value={draft.state} onChange={(e) => setDraft({ ...draft, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="Ex.: SP" maxLength={2} className={fieldClass} /></label>
-      <Button type="submit" disabled={salvando} className="mt-1 h-11 rounded-none bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900] sm:col-span-2">
+    {aberto ? <form onSubmit={salvar} className="rounded-lg mt-4 grid gap-3 border border-ds-borda bg-ds-superficie p-4 sm:grid-cols-2">
+      <label className="sm:col-span-2" htmlFor={`endereco-${client.id}-logradouro`}><span className="mb-1.5 block ds-caps">Logradouro e número</span><Input id={`endereco-${client.id}-logradouro`} value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} placeholder="Ex.: Rua das Palmeiras, 120" className={fieldClass} /></label>
+      <label htmlFor={`endereco-${client.id}-bairro`}><span className="mb-1.5 block ds-caps">Bairro</span><Input id={`endereco-${client.id}-bairro`} value={draft.district} onChange={(e) => setDraft({ ...draft, district: e.target.value })} placeholder="Ex.: Centro" className={fieldClass} /></label>
+      <label htmlFor={`endereco-${client.id}-cep`}><span className="mb-1.5 block ds-caps">CEP</span><Input id={`endereco-${client.id}-cep`} value={draft.postalCode} onChange={(e) => setDraft({ ...draft, postalCode: e.target.value })} placeholder="Ex.: 01000-000" className={fieldClass} /></label>
+      <label htmlFor={`endereco-${client.id}-municipio`}><span className="mb-1.5 block ds-caps">Município</span><Input id={`endereco-${client.id}-municipio`} value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="Ex.: São Paulo" className={fieldClass} /></label>
+      <label htmlFor={`endereco-${client.id}-uf`}><span className="mb-1.5 block ds-caps">UF</span><Input id={`endereco-${client.id}-uf`} value={draft.state} onChange={(e) => setDraft({ ...draft, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="Ex.: SP" maxLength={2} className={fieldClass} /></label>
+      <Button type="submit" disabled={salvando} className="mt-1 h-11 bg-ds-amarelo ds-botao text-ds-texto hover:bg-[#eab900] sm:col-span-2">
         {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar endereço
       </Button>
     </form> : null}
@@ -107,20 +107,20 @@ function ClientEdit({ client, notify, reload }: { client: CompanyClient; notify:
     }
   }
 
-  const campo = (chave: keyof DadosCliente, rotulo: string, extra: { type?: string; required?: boolean } = {}) => <label key={chave} htmlFor={`cliente-${client.id}-${chave}`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">{rotulo}</span><Input id={`cliente-${client.id}-${chave}`} type={extra.type ?? 'text'} required={extra.required ?? true} value={draft[chave]} onChange={(e) => setDraft({ ...draft, [chave]: e.target.value })} className={fieldClass} /></label>;
+  const campo = (chave: keyof DadosCliente, rotulo: string, extra: { type?: string; required?: boolean } = {}) => <label key={chave} htmlFor={`cliente-${client.id}-${chave}`}><span className="mb-1.5 block ds-caps">{rotulo}</span><Input id={`cliente-${client.id}-${chave}`} type={extra.type ?? 'text'} required={extra.required ?? true} value={draft[chave]} onChange={(e) => setDraft({ ...draft, [chave]: e.target.value })} className={fieldClass} /></label>;
 
   return <div>
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div className="min-w-0">
-        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">Dados cadastrais</span>
-        <p className="mt-1 text-[11px] leading-relaxed text-[#888]">Razão social e CNPJ saem impressos nos documentos.</p>
+        <span className="ds-caps text-ds-amarelo-texto">Dados cadastrais</span>
+        <p className="mt-1 text-[11px] leading-relaxed text-ds-texto-2">Razão social e CNPJ saem impressos nos documentos.</p>
       </div>
-      <button type="button" onClick={() => { setDraft(inicial()); setAberto((v) => !v); }} className="inline-flex h-10 shrink-0 items-center gap-2 border border-black/15 bg-white px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">
+      <button type="button" onClick={() => { setDraft(inicial()); setAberto((v) => !v); }} className="rounded-md inline-flex h-10 shrink-0 items-center gap-2 border border-ds-borda bg-ds-superficie px-3 ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv">
         <Pencil className="size-3.5" />{aberto ? 'Fechar' : 'Editar dados'}
       </button>
     </div>
 
-    {aberto ? <form onSubmit={salvar} className="mt-4 grid gap-3 border border-black/10 bg-white p-4 sm:grid-cols-2">
+    {aberto ? <form onSubmit={salvar} className="rounded-lg mt-4 grid gap-3 border border-ds-borda bg-ds-superficie p-4 sm:grid-cols-2">
       {campo('name', 'Nome de exibição')}
       {campo('legalName', 'Razão social')}
       {campo('document', 'CNPJ')}
@@ -128,7 +128,7 @@ function ClientEdit({ client, notify, reload }: { client: CompanyClient; notify:
       {campo('contactName', 'Responsável na empresa')}
       {campo('contactEmail', 'E-mail do responsável (contato)', { type: 'email' })}
       {campo('contactPhone', 'Telefone', { required: false })}
-      <Button type="submit" disabled={salvando} className="mt-1 h-11 rounded-none bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900] sm:col-span-2">
+      <Button type="submit" disabled={salvando} className="mt-1 h-11 bg-ds-amarelo ds-botao text-ds-texto hover:bg-[#eab900] sm:col-span-2">
         {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar dados
       </Button>
     </form> : null}
@@ -159,18 +159,18 @@ function ClientUsername({ client, notify, reload }: { client: CompanyClient; not
   return <div>
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div className="min-w-0">
-        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">Nome de usuário (login)</span>
-        <p className={`mt-1 text-xs ${client.username ? 'font-mono font-bold text-[#0b0b0b]' : 'font-bold text-[#b62525]'}`}>{client.username ?? 'Não definido'}</p>
-        {!client.username ? <p className="mt-1 text-[11px] leading-relaxed text-[#888]">Sem ele, a empresa não consegue entrar no portal.</p> : null}
+        <span className="ds-caps text-ds-amarelo-texto">Nome de usuário (login)</span>
+        <p className={`mt-1 text-xs ${client.username ? 'font-mono font-bold text-ds-texto' : 'font-bold text-ds-perigo'}`}>{client.username ?? 'Não definido'}</p>
+        {!client.username ? <p className="mt-1 text-[11px] leading-relaxed text-ds-texto-2">Sem ele, a empresa não consegue entrar no portal.</p> : null}
       </div>
-      <button type="button" onClick={() => setAberto((v) => !v)} className="inline-flex h-10 shrink-0 items-center gap-2 border border-black/15 bg-white px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">
+      <button type="button" onClick={() => setAberto((v) => !v)} className="rounded-md inline-flex h-10 shrink-0 items-center gap-2 border border-ds-borda bg-ds-superficie px-3 ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv">
         <UserRound className="size-3.5" />{aberto ? 'Fechar' : client.username ? 'Alterar' : 'Definir'}
       </button>
     </div>
 
-    {aberto ? <form onSubmit={salvar} className="mt-4 flex flex-col gap-3 border border-black/10 bg-white p-4 sm:flex-row sm:items-start">
-      <label className="flex-1" htmlFor={`usuario-${client.id}`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">Nome de usuário</span><Input id={`usuario-${client.id}`} required minLength={3} maxLength={40} value={valor} onChange={(e) => setValor(limparDigitacaoUsuario(e.target.value))} placeholder="ex.: empresaexemplo1" autoCapitalize="none" spellCheck={false} className={`${fieldClass} font-mono`} /><span className="mt-1.5 block text-[11px] leading-relaxed text-[#888]">{USUARIO_REGRA}</span></label>
-      <Button type="submit" disabled={salvando} className="h-11 rounded-none bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900] sm:mt-[22px]">
+    {aberto ? <form onSubmit={salvar} className="rounded-lg mt-4 flex flex-col gap-3 border border-ds-borda bg-ds-superficie p-4 sm:flex-row sm:items-start">
+      <label className="flex-1" htmlFor={`usuario-${client.id}`}><span className="mb-1.5 block ds-caps">Nome de usuário</span><Input id={`usuario-${client.id}`} required minLength={3} maxLength={40} value={valor} onChange={(e) => setValor(limparDigitacaoUsuario(e.target.value))} placeholder="ex.: empresaexemplo1" autoCapitalize="none" spellCheck={false} className={`${fieldClass} font-mono`} /><span className="mt-1.5 block text-[11px] leading-relaxed text-ds-texto-2">{USUARIO_REGRA}</span></label>
+      <Button type="submit" disabled={salvando} className="h-11 bg-ds-amarelo px-5 ds-botao text-ds-texto hover:bg-[#eab900] sm:mt-[22px]">
         {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar
       </Button>
     </form> : null}
@@ -189,44 +189,44 @@ function ClientRow({ client, turmas, arquivos, inscritos, aberta, alternar, acoe
   reload: () => Promise<void>;
 }) {
   const pendente = client.status === 'pending';
-  const tom = pendente ? 'bg-[#fff0d2] text-[#8a6107]' : client.status === 'invited' ? 'bg-[#e7eef9] text-[#31598e]' : 'bg-[#daf2df] text-[#17642d]';
+  const tom = pendente ? 'bg-ds-amarelo-suave text-ds-amarelo-texto' : client.status === 'invited' ? 'bg-ds-info-suave text-ds-info' : 'bg-ds-sucesso-suave text-ds-sucesso';
   const rotulo = pendente ? 'Aguardando' : client.status === 'invited' ? 'Convidado' : 'Ativo';
   const semEndereco = !enderecoCompleto(client);
 
-  return <article className="border border-black/10 bg-white">
-    <button type="button" onClick={alternar} aria-expanded={aberta} className="flex w-full items-center gap-4 p-4 text-left hover:bg-[#fff8e8]">
-      <span className="flex size-11 shrink-0 items-center justify-center bg-black text-[#f2ad19]"><Building2 className="size-5" /></span>
+  return <article className="border border-ds-borda bg-ds-superficie">
+    <button type="button" onClick={alternar} aria-expanded={aberta} className="flex w-full items-center gap-4 p-4 text-left hover:bg-ds-amarelo-suave">
+      <span className="rounded-md flex size-11 shrink-0 items-center justify-center bg-black text-ds-amarelo"><Building2 className="size-5" /></span>
       <span className="min-w-0 flex-1">
-        <strong className="block truncate text-sm font-extrabold uppercase tracking-[0.04em]">{client.name}</strong>
-        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#777]">
+        <strong className="block truncate ds-body-s font-semibold">{client.name}</strong>
+        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ds-texto-2">
           <span className="truncate">{client.document}</span>
           <span className="truncate">{client.unit}</span>
           <span>{turmas === 1 ? '1 turma' : `${turmas} turmas`}</span>
           <span>{inscritos} inscrito(s)</span>
         </span>
       </span>
-      {semEndereco ? <span className="hidden shrink-0 items-center gap-1.5 bg-[#fff5f5] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] md:inline-flex"><TriangleAlert className="size-3.5" />Sem endereço</span> : null}
-      {!client.username ? <span className="hidden shrink-0 items-center gap-1.5 bg-[#fff5f5] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] md:inline-flex"><TriangleAlert className="size-3.5" />Sem usuário</span> : null}
-      <span className={`shrink-0 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] ${tom}`}>{rotulo}</span>
-      <ChevronDown className={`size-4 shrink-0 text-black/35 transition ${aberta ? 'rotate-180' : ''}`} />
+      {semEndereco ? <span className="hidden shrink-0 items-center gap-1.5 bg-ds-perigo-suave px-2.5 py-1 ds-caps text-ds-perigo md:inline-flex"><TriangleAlert className="size-3.5" />Sem endereço</span> : null}
+      {!client.username ? <span className="hidden shrink-0 items-center gap-1.5 bg-ds-perigo-suave px-2.5 py-1 ds-caps text-ds-perigo md:inline-flex"><TriangleAlert className="size-3.5" />Sem usuário</span> : null}
+      <span className={`shrink-0 px-2.5 py-1 ds-caps ${tom}`}>{rotulo}</span>
+      <ChevronDown className={`size-4 shrink-0 text-ds-texto-2 transition ${aberta ? 'rotate-180' : ''}`} />
     </button>
 
-    {aberta ? <div className="space-y-5 border-t border-black/8 bg-[#f7f7f4] p-5">
+    {aberta ? <div className="space-y-5 border-t border-ds-borda bg-ds-muted p-5">
       <dl className="grid gap-2 text-xs sm:grid-cols-2">
-        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Razão social</dt><dd className="text-right font-bold">{client.legal_name}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Responsável</dt><dd className="text-right font-bold">{client.contact_name}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">E-mail de contato</dt><dd className="break-all text-right font-bold">{client.contact_email}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Telefone</dt><dd className="text-right font-bold">{client.contact_phone || '—'}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Arquivos</dt><dd className="text-right font-bold">{arquivos}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Treinamentos</dt><dd className="text-right font-bold">{turmas}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Razão social</dt><dd className="text-right font-bold">{client.legal_name}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Responsável</dt><dd className="text-right font-bold">{client.contact_name}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">E-mail de contato</dt><dd className="break-all text-right font-bold">{client.contact_email}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Telefone</dt><dd className="text-right font-bold">{client.contact_phone || '—'}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Arquivos</dt><dd className="text-right font-bold">{arquivos}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Treinamentos</dt><dd className="text-right font-bold">{turmas}</dd></div>
       </dl>
       <ClientEdit client={client} notify={notify} reload={reload} />
       <ClientUsername client={client} notify={notify} reload={reload} />
       <ClientAddress client={client} notify={notify} reload={reload} />
       <div className="flex flex-wrap gap-2">
-        {pendente ? <Button type="button" onClick={acoes.approve} className="h-11 rounded-none bg-[#f2ad19] px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#ff9900]"><Check className="size-4" />Aprovar acesso</Button> : null}
-        <button type="button" onClick={acoes.reset} className="inline-flex h-11 items-center gap-2 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#555] hover:border-black hover:bg-black hover:text-white"><KeyRound className="size-3.5" />Redefinir senha</button>
-        <button type="button" onClick={acoes.remove} className="ml-auto inline-flex h-11 items-center gap-2 border border-[#b62525]/40 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] hover:bg-[#b62525] hover:text-white"><Trash2 className="size-3.5" />Excluir</button>
+        {pendente ? <Button type="button" onClick={acoes.approve} className="h-11 bg-ds-amarelo px-4 ds-botao text-ds-texto hover:bg-[#eab900]"><Check className="size-4" />Aprovar acesso</Button> : null}
+        <button type="button" onClick={acoes.reset} className="rounded-md inline-flex h-11 items-center gap-2 border border-ds-borda bg-ds-superficie px-4 ds-botao text-ds-texto-2 hover:border-black hover:bg-ds-inverso hover:text-ds-texto-inv"><KeyRound className="size-3.5" />Redefinir senha</button>
+        <button type="button" onClick={acoes.remove} className="rounded-md ml-auto inline-flex h-11 items-center gap-2 border border-ds-perigo bg-ds-superficie px-4 ds-botao text-ds-perigo hover:bg-ds-perigo hover:text-ds-texto-inv"><Trash2 className="size-3.5" />Excluir</button>
       </div>
     </div> : null}
   </article>;
@@ -296,18 +296,18 @@ export function CompanyClients({ data, reload, notify }: { data: CompanyDashboar
     {resetAccess ? <AccessCredentials eyebrow={`Nova senha de ${resetAccess.name}`} note={resetAccess.active ? 'Anote agora: a senha aparece somente desta vez. A senha antiga já não funciona e, no próximo acesso, o cliente terá de criar uma nova.' : 'Anote agora: a senha aparece somente desta vez. Atenção: este acesso ainda está inativo — aprove o cliente para ele conseguir entrar.'} loginLabel="Nome de usuário" email={resetAccess.username ?? 'Não definido — defina antes de enviar'} password={resetAccess.temporaryPassword} onDismiss={() => setResetAccess(null)} /> : null}
 
     {aba === 'lista' ? <>
-      {semUsuario > 0 ? <button type="button" onClick={() => setFiltro('sem_usuario')} className="flex w-full items-center gap-3 border-l-4 border-[#b62525] bg-[#fff5f5] p-4 text-left hover:bg-[#ffecec]">
-        <TriangleAlert className="size-5 shrink-0 text-[#b62525]" />
-        <span className="text-xs font-bold text-[#b62525]">{semUsuario === 1 ? '1 cliente está sem nome de usuário' : `${semUsuario} clientes estão sem nome de usuário`} — sem ele a empresa não consegue entrar no portal. Ver quais →</span>
+      {semUsuario > 0 ? <button type="button" onClick={() => setFiltro('sem_usuario')} className="flex w-full items-center gap-3 border-l-4 border-ds-perigo bg-ds-perigo-suave p-4 text-left hover:bg-ds-perigo-suave">
+        <TriangleAlert className="size-5 shrink-0 text-ds-perigo" />
+        <span className="text-xs font-bold text-ds-perigo">{semUsuario === 1 ? '1 cliente está sem nome de usuário' : `${semUsuario} clientes estão sem nome de usuário`} — sem ele a empresa não consegue entrar no portal. Ver quais →</span>
       </button> : null}
 
-      {semEndereco > 0 ? <button type="button" onClick={() => setFiltro('sem_endereco')} className="flex w-full items-center gap-3 border-l-4 border-[#b62525] bg-[#fff5f5] p-4 text-left hover:bg-[#ffecec]">
-        <TriangleAlert className="size-5 shrink-0 text-[#b62525]" />
-        <span className="text-xs font-bold text-[#b62525]">{semEndereco === 1 ? '1 cliente está sem endereço da edificação' : `${semEndereco} clientes estão sem endereço da edificação`} — sem ele o atestado sai incompleto. Ver quais →</span>
+      {semEndereco > 0 ? <button type="button" onClick={() => setFiltro('sem_endereco')} className="flex w-full items-center gap-3 border-l-4 border-ds-perigo bg-ds-perigo-suave p-4 text-left hover:bg-ds-perigo-suave">
+        <TriangleAlert className="size-5 shrink-0 text-ds-perigo" />
+        <span className="text-xs font-bold text-ds-perigo">{semEndereco === 1 ? '1 cliente está sem endereço da edificação' : `${semEndereco} clientes estão sem endereço da edificação`} — sem ele o atestado sai incompleto. Ver quais →</span>
       </button> : null}
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-black/35" /><Input aria-label="Buscar cliente ou CNPJ" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nome, usuário, CNPJ ou e-mail" className={`${fieldClass} pl-11`} /></div>
+        <div className="relative flex-1"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ds-texto-2" /><Input aria-label="Buscar cliente ou CNPJ" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nome, usuário, CNPJ ou e-mail" className={`${fieldClass} pl-11`} /></div>
         <label className="sm:w-60" htmlFor="clientes-filtro"><span className="sr-only">Filtrar clientes</span>
           <select id="clientes-filtro" value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)} className={selectClass}>
             <option value="todos">Todos</option>
@@ -335,10 +335,10 @@ export function CompanyClients({ data, reload, notify }: { data: CompanyDashboar
       {filtered.length === 0 ? <EmptyState icon={Building2} title="Nenhum cliente encontrado" text="Ajuste a busca ou cadastre uma nova empresa na aba Cadastrar." /> : null}
     </> : null}
 
-    {aba === 'criar' ? <form onSubmit={save} className="max-w-3xl border border-black/10 bg-white p-6 md:p-8">
-      <span className="eyebrow text-[#8a6107]">Cadastro corporativo</span>
-      <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Novo cliente</h2>
-      <p className="mt-3 max-w-xl text-xs leading-relaxed text-[#777]">O endereço da edificação é preenchido depois, na própria lista — é ele que sai impresso no atestado de treinamento.</p>
+    {aba === 'criar' ? <form onSubmit={save} className="rounded-lg max-w-3xl border border-ds-borda bg-ds-superficie p-6 md:p-8">
+      <span className="eyebrow text-ds-amarelo-texto">Cadastro corporativo</span>
+      <h2 className="mt-2 ds-h4">Novo cliente</h2>
+      <p className="mt-3 max-w-xl text-xs leading-relaxed text-ds-texto-2">O endereço da edificação é preenchido depois, na própria lista — é ele que sai impresso no atestado de treinamento.</p>
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <label htmlFor="cliente-nome"><span className={labelClass}>Nome de exibição</span><Input id="cliente-nome" required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className={fieldClass} /></label>
         <label htmlFor="cliente-razao"><span className={labelClass}>Razão social</span><Input id="cliente-razao" required value={draft.legalName} onChange={(e) => setDraft({ ...draft, legalName: e.target.value })} className={fieldClass} /></label>
@@ -346,10 +346,10 @@ export function CompanyClients({ data, reload, notify }: { data: CompanyDashboar
         <label htmlFor="cliente-unidade"><span className={labelClass}>Unidade / cidade</span><Input id="cliente-unidade" required value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} className={fieldClass} /></label>
         <label htmlFor="cliente-responsavel"><span className={labelClass}>Responsável na empresa</span><Input id="cliente-responsavel" required value={draft.contactName} onChange={(e) => setDraft({ ...draft, contactName: e.target.value })} className={fieldClass} /></label>
         <label htmlFor="cliente-email"><span className={labelClass}>E-mail do responsável (contato)</span><Input id="cliente-email" required type="email" value={draft.contactEmail} onChange={(e) => setDraft({ ...draft, contactEmail: e.target.value })} className={fieldClass} /></label>
-        <label htmlFor="cliente-usuario"><span className={labelClass}>Nome de usuário (login)</span><Input id="cliente-usuario" required minLength={3} maxLength={40} value={draft.username} onChange={(e) => setDraft({ ...draft, username: limparDigitacaoUsuario(e.target.value) })} placeholder="ex.: empresaexemplo1" autoCapitalize="none" spellCheck={false} className={`${fieldClass} font-mono`} /><span className="mt-1.5 block text-[11px] leading-relaxed text-[#888]">{USUARIO_REGRA}</span></label>
+        <label htmlFor="cliente-usuario"><span className={labelClass}>Nome de usuário (login)</span><Input id="cliente-usuario" required minLength={3} maxLength={40} value={draft.username} onChange={(e) => setDraft({ ...draft, username: limparDigitacaoUsuario(e.target.value) })} placeholder="ex.: empresaexemplo1" autoCapitalize="none" spellCheck={false} className={`${fieldClass} font-mono`} /><span className="mt-1.5 block text-[11px] leading-relaxed text-ds-texto-2">{USUARIO_REGRA}</span></label>
         <label htmlFor="cliente-telefone"><span className={labelClass}>Telefone</span><Input id="cliente-telefone" value={draft.contactPhone} onChange={(e) => setDraft({ ...draft, contactPhone: e.target.value })} className={fieldClass} /></label>
       </div>
-      <Button type="submit" className="mt-6 h-13 rounded-none bg-[#f2ad19] px-8 text-[11px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900]"><Plus className="size-4" />Salvar e gerar acesso</Button>
+      <Button type="submit" className="mt-6 h-12 bg-ds-amarelo px-8 ds-botao text-ds-texto hover:bg-[#eab900]"><Plus className="size-4" />Salvar e gerar acesso</Button>
     </form> : null}
   </div>;
 }

@@ -92,7 +92,7 @@ export function Pilula({ ativa, className, type = 'button', ...props }: Componen
 
 /** Caixa do campo (input, select, textarea): borda #e4e2dc, raio 6, 14×12. */
 export const campoClasses = 'w-full min-h-12 rounded-md border border-ds-borda bg-ds-superficie px-3.5 py-3 ds-body-m text-ds-texto placeholder:text-ds-texto-2 outline-none transition-colors focus:border-ds-borda-forte focus-visible:ring-2 focus-visible:ring-ds-amarelo/40 disabled:bg-ds-muted disabled:text-ds-texto-2 aria-[invalid=true]:border-ds-perigo';
-export const selectClasses = cn(campoClasses, 'appearance-none bg-[url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2718%27 height=%2718%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27black%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27><path d=%27m6 9 6 6 6-6%27/></svg>")] bg-[length:18px] bg-[right_14px_center] bg-no-repeat pr-11');
+export const selectClasses = cn(campoClasses, 'ds-select appearance-none pr-11');
 export const areaClasses = cn(campoClasses, 'min-h-28 resize-y');
 export const rotuloClasses = 'block font-ds-sans text-sm leading-5 font-medium text-ds-texto';
 

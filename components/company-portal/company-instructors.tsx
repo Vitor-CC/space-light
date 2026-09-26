@@ -40,25 +40,25 @@ function InstructorDocumentsReview({ instructorId, documents, onDecide }: {
 
   return <div>
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">Documentos obrigatórios</span>
-      <span className={`px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] ${aprovados === REQUIRED_INSTRUCTOR_DOCUMENTS.length ? 'bg-[#daf2df] text-[#17642d]' : 'bg-[#fff0d2] text-[#8a6107]'}`}>{aprovados} de {REQUIRED_INSTRUCTOR_DOCUMENTS.length} aprovados</span>
+      <span className="ds-caps text-ds-amarelo-texto">Documentos obrigatórios</span>
+      <span className={`px-2 py-1 ds-caps ${aprovados === REQUIRED_INSTRUCTOR_DOCUMENTS.length ? 'bg-ds-sucesso-suave text-ds-sucesso' : 'bg-ds-amarelo-suave text-ds-amarelo-texto'}`}>{aprovados} de {REQUIRED_INSTRUCTOR_DOCUMENTS.length} aprovados</span>
     </div>
     <ul className="mt-3 space-y-2">{REQUIRED_INSTRUCTOR_DOCUMENTS.map((required) => {
       const enviado = porCategoria.get(required.category);
       const situacao = enviado ? INSTRUCTOR_DOCUMENT_STATUS[enviado.status] : null;
-      const cor = !situacao ? 'bg-[#f3f3f0] text-[#777]'
-        : situacao.tone === 'ok' ? 'bg-[#daf2df] text-[#17642d]'
-        : situacao.tone === 'bad' ? 'bg-[#f3d4d4] text-[#8f1717]'
-        : 'bg-[#fff0d2] text-[#8a6107]';
-      return <li key={required.category} className="flex flex-wrap items-center gap-2 border border-black/10 bg-white p-3">
-        <strong className="text-[11px] font-extrabold uppercase tracking-[0.1em]">{required.label}</strong>
-        <span className={`px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.1em] ${cor}`}>{situacao?.label ?? 'Não enviado'}</span>
+      const cor = !situacao ? 'bg-ds-muted text-ds-texto-2'
+        : situacao.tone === 'ok' ? 'bg-ds-sucesso-suave text-ds-sucesso'
+        : situacao.tone === 'bad' ? 'bg-ds-perigo-suave text-ds-perigo'
+        : 'bg-ds-amarelo-suave text-ds-amarelo-texto';
+      return <li key={required.category} className="rounded-lg flex flex-wrap items-center gap-2 border border-ds-borda bg-ds-superficie p-3">
+        <strong className="ds-caps">{required.label}</strong>
+        <span className={`px-2 py-0.5 ds-caps ${cor}`}>{situacao?.label ?? 'Não enviado'}</span>
         <span className="ml-auto flex flex-wrap gap-1.5">
           {enviado ? <>
-            <a href={`/api/instructor-documents/${enviado.id}`} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-1.5 border border-black/15 px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] hover:bg-black hover:text-white">Ver</a>
-            {enviado.status !== 'approved' ? <button type="button" onClick={() => onDecide(enviado.id, 'approved')} className="inline-flex h-9 items-center gap-1.5 bg-[#daf2df] px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#17642d] hover:bg-[#17642d] hover:text-white">Aprovar</button> : null}
-            {enviado.status !== 'rejected' ? <button type="button" onClick={() => onDecide(enviado.id, 'rejected')} className="inline-flex h-9 items-center gap-1.5 border border-[#b62525]/40 px-3 text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#b62525] hover:bg-[#b62525] hover:text-white">Recusar</button> : null}
-          </> : <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#999]">Aguardando o instrutor</span>}
+            <a href={`/api/instructor-documents/${enviado.id}`} target="_blank" rel="noopener" className="rounded-md inline-flex h-9 items-center gap-1.5 border border-ds-borda px-3 ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv">Ver</a>
+            {enviado.status !== 'approved' ? <button type="button" onClick={() => onDecide(enviado.id, 'approved')} className="rounded-md inline-flex h-9 items-center gap-1.5 bg-ds-sucesso-suave px-3 ds-botao text-ds-sucesso hover:bg-ds-sucesso hover:text-ds-texto-inv">Aprovar</button> : null}
+            {enviado.status !== 'rejected' ? <button type="button" onClick={() => onDecide(enviado.id, 'rejected')} className="rounded-md inline-flex h-9 items-center gap-1.5 border border-ds-perigo px-3 ds-botao text-ds-perigo hover:bg-ds-perigo hover:text-ds-texto-inv">Recusar</button> : null}
+          </> : <span className="ds-caps text-ds-texto-2">Aguardando o instrutor</span>}
         </span>
       </li>;
     })}</ul>
@@ -91,20 +91,20 @@ function InstructorEdit({ instructor, notify, reload }: { instructor: CompanyIns
     }
   }
 
-  const campo = (chave: keyof DadosInstrutor, rotulo: string, extra: { type?: string; required?: boolean; largo?: boolean } = {}) => <label key={chave} className={extra.largo ? 'sm:col-span-2' : ''} htmlFor={`instrutor-${instructor.id}-${chave}`}><span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[0.1em]">{rotulo}</span><Input id={`instrutor-${instructor.id}-${chave}`} type={extra.type ?? 'text'} required={extra.required ?? false} value={draft[chave]} onChange={(e) => setDraft({ ...draft, [chave]: e.target.value })} className={fieldClass} /></label>;
+  const campo = (chave: keyof DadosInstrutor, rotulo: string, extra: { type?: string; required?: boolean; largo?: boolean } = {}) => <label key={chave} className={extra.largo ? 'sm:col-span-2' : ''} htmlFor={`instrutor-${instructor.id}-${chave}`}><span className="mb-1.5 block ds-caps">{rotulo}</span><Input id={`instrutor-${instructor.id}-${chave}`} type={extra.type ?? 'text'} required={extra.required ?? false} value={draft[chave]} onChange={(e) => setDraft({ ...draft, [chave]: e.target.value })} className={fieldClass} /></label>;
 
   return <div>
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div className="min-w-0">
-        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107]">Dados do instrutor</span>
-        <p className="mt-1 text-[11px] leading-relaxed text-[#888]">O e-mail é o login. O nome e o registro MTE/RE saem nos documentos.</p>
+        <span className="ds-caps text-ds-amarelo-texto">Dados do instrutor</span>
+        <p className="mt-1 text-[11px] leading-relaxed text-ds-texto-2">O e-mail é o login. O nome e o registro MTE/RE saem nos documentos.</p>
       </div>
-      <button type="button" onClick={() => { setDraft(inicial()); setAberto((v) => !v); }} className="inline-flex h-10 shrink-0 items-center gap-2 border border-black/15 bg-white px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">
+      <button type="button" onClick={() => { setDraft(inicial()); setAberto((v) => !v); }} className="rounded-md inline-flex h-10 shrink-0 items-center gap-2 border border-ds-borda bg-ds-superficie px-3 ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv">
         <Pencil className="size-3.5" />{aberto ? 'Fechar' : 'Editar dados'}
       </button>
     </div>
 
-    {aberto ? <form onSubmit={salvar} className="mt-4 grid gap-3 border border-black/10 bg-white p-4 sm:grid-cols-2">
+    {aberto ? <form onSubmit={salvar} className="rounded-lg mt-4 grid gap-3 border border-ds-borda bg-ds-superficie p-4 sm:grid-cols-2">
       {campo('name', 'Nome completo', { required: true })}
       {campo('document', 'CPF', { required: true })}
       {campo('email', 'E-mail (login)', { type: 'email', required: true })}
@@ -112,7 +112,7 @@ function InstructorEdit({ instructor, notify, reload }: { instructor: CompanyIns
       {campo('professionalRegistry', 'Registro MTE / RE')}
       {campo('baseCity', 'Cidade base')}
       {campo('specialties', 'Especialidades / NRs', { largo: true })}
-      <Button type="submit" disabled={salvando} className="mt-1 h-11 rounded-none bg-[#f2ad19] text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900] sm:col-span-2">
+      <Button type="submit" disabled={salvando} className="mt-1 h-11 bg-ds-amarelo ds-botao text-ds-texto hover:bg-[#eab900] sm:col-span-2">
         {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar dados
       </Button>
     </form> : null}
@@ -133,39 +133,39 @@ function InstructorRow({ instructor, turmas, documents, aberta, alternar, acoes,
   const pendente = instructor.status === 'pending';
   const semRegistro = !registroValido(instructor.professional_registry);
 
-  return <article className="border border-black/10 bg-white">
-    <button type="button" onClick={alternar} aria-expanded={aberta} className="flex w-full items-center gap-4 p-4 text-left hover:bg-[#fff8e8]">
-      <span className="flex size-11 shrink-0 items-center justify-center bg-black text-[#f2ad19]"><UserRound className="size-5" /></span>
+  return <article className="border border-ds-borda bg-ds-superficie">
+    <button type="button" onClick={alternar} aria-expanded={aberta} className="flex w-full items-center gap-4 p-4 text-left hover:bg-ds-amarelo-suave">
+      <span className="rounded-md flex size-11 shrink-0 items-center justify-center bg-black text-ds-amarelo"><UserRound className="size-5" /></span>
       <span className="min-w-0 flex-1">
-        <strong className="block truncate text-sm font-extrabold uppercase tracking-[0.04em]">{instructor.name}</strong>
-        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#777]">
+        <strong className="block truncate ds-body-s font-semibold">{instructor.name}</strong>
+        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ds-texto-2">
           <span>{instructor.document}</span>
           <span>{instructor.base_city || 'Sem cidade base'}</span>
-          <span className="truncate font-bold text-[#8a6107]">{instructor.specialties}</span>
+          <span className="truncate font-bold text-ds-amarelo-texto">{instructor.specialties}</span>
           <span>{turmas === 1 ? '1 turma' : `${turmas} turmas`}</span>
         </span>
       </span>
-      {semRegistro ? <span className="hidden shrink-0 items-center gap-1.5 bg-[#fff5f5] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] md:inline-flex"><TriangleAlert className="size-3.5" />Sem registro</span> : null}
-      <span className={`shrink-0 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] ${pendente ? 'bg-[#fff0d2] text-[#8a6107]' : 'bg-[#daf2df] text-[#17642d]'}`}>{pendente ? 'Aguardando' : 'Ativo'}</span>
-      <ChevronDown className={`size-4 shrink-0 text-black/35 transition ${aberta ? 'rotate-180' : ''}`} />
+      {semRegistro ? <span className="hidden shrink-0 items-center gap-1.5 bg-ds-perigo-suave px-2.5 py-1 ds-caps text-ds-perigo md:inline-flex"><TriangleAlert className="size-3.5" />Sem registro</span> : null}
+      <span className={`shrink-0 px-2.5 py-1 ds-caps ${pendente ? 'bg-ds-amarelo-suave text-ds-amarelo-texto' : 'bg-ds-sucesso-suave text-ds-sucesso'}`}>{pendente ? 'Aguardando' : 'Ativo'}</span>
+      <ChevronDown className={`size-4 shrink-0 text-ds-texto-2 transition ${aberta ? 'rotate-180' : ''}`} />
     </button>
 
-    {aberta ? <div className="space-y-5 border-t border-black/8 bg-[#f7f7f4] p-5">
-      {semRegistro ? <p className="border-l-4 border-[#b62525] bg-[#fff5f5] p-3 text-xs leading-relaxed text-[#b62525]">
+    {aberta ? <div className="space-y-5 border-t border-ds-borda bg-ds-muted p-5">
+      {semRegistro ? <p className="border-l-4 border-ds-perigo bg-ds-perigo-suave p-3 text-xs leading-relaxed text-ds-perigo">
         <strong>Registro profissional em branco ou zerado.</strong> Nos documentos deste instrutor sai apenas a assinatura da responsável técnica — preencha o MTE/RE no cadastro para que ele volte a assinar.
       </p> : null}
       <dl className="grid gap-2 text-xs sm:grid-cols-2">
-        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">E-mail</dt><dd className="break-all text-right font-bold">{instructor.email}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Telefone</dt><dd className="text-right font-bold">{instructor.phone || '—'}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Registro MTE/RE</dt><dd className={`text-right font-bold ${semRegistro ? 'text-[#b62525]' : ''}`}>{instructor.professional_registry || 'Não informado'}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-black/8 pb-2"><dt className="text-[#777]">Turmas atribuídas</dt><dd className="text-right font-bold">{turmas}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">E-mail</dt><dd className="break-all text-right font-bold">{instructor.email}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Telefone</dt><dd className="text-right font-bold">{instructor.phone || '—'}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Registro MTE/RE</dt><dd className={`text-right font-bold ${semRegistro ? 'text-ds-perigo' : ''}`}>{instructor.professional_registry || 'Não informado'}</dd></div>
+        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Turmas atribuídas</dt><dd className="text-right font-bold">{turmas}</dd></div>
       </dl>
       <InstructorEdit instructor={instructor} notify={notify} reload={reload} />
       <InstructorDocumentsReview instructorId={instructor.id} documents={documents} onDecide={onDecide} />
       <div className="flex flex-wrap gap-2">
-        {pendente ? <Button type="button" onClick={acoes.approve} className="h-11 rounded-none bg-[#f2ad19] px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#ff9900]"><Check className="size-4" />Aprovar acesso</Button> : null}
-        <button type="button" onClick={acoes.reset} className="inline-flex h-11 items-center gap-2 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#555] hover:border-black hover:bg-black hover:text-white"><KeyRound className="size-3.5" />Redefinir senha</button>
-        <button type="button" onClick={acoes.remove} className="ml-auto inline-flex h-11 items-center gap-2 border border-[#b62525]/40 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] hover:bg-[#b62525] hover:text-white"><Trash2 className="size-3.5" />Excluir</button>
+        {pendente ? <Button type="button" onClick={acoes.approve} className="h-11 bg-ds-amarelo px-4 ds-botao text-ds-texto hover:bg-[#eab900]"><Check className="size-4" />Aprovar acesso</Button> : null}
+        <button type="button" onClick={acoes.reset} className="rounded-md inline-flex h-11 items-center gap-2 border border-ds-borda bg-ds-superficie px-4 ds-botao text-ds-texto-2 hover:border-black hover:bg-ds-inverso hover:text-ds-texto-inv"><KeyRound className="size-3.5" />Redefinir senha</button>
+        <button type="button" onClick={acoes.remove} className="rounded-md ml-auto inline-flex h-11 items-center gap-2 border border-ds-perigo bg-ds-superficie px-4 ds-botao text-ds-perigo hover:bg-ds-perigo hover:text-ds-texto-inv"><Trash2 className="size-3.5" />Excluir</button>
       </div>
     </div> : null}
   </article>;
@@ -264,13 +264,13 @@ export function CompanyInstructors({ data, reload, notify }: { data: CompanyDash
     {resetAccess ? <AccessCredentials eyebrow={`Nova senha de ${resetAccess.name}`} note={resetAccess.active ? 'Anote agora: a senha aparece somente desta vez. A senha antiga já não funciona e, no próximo acesso, o instrutor terá de criar uma nova.' : 'Anote agora: a senha aparece somente desta vez. Atenção: este acesso ainda está inativo — aprove o instrutor para ele conseguir entrar.'} email={resetAccess.email} password={resetAccess.temporaryPassword} onDismiss={() => setResetAccess(null)} /> : null}
 
     {aba === 'lista' ? <>
-      {semRegistro > 0 ? <button type="button" onClick={() => setFiltro('sem_registro')} className="flex w-full items-center gap-3 border-l-4 border-[#b62525] bg-[#fff5f5] p-4 text-left hover:bg-[#ffecec]">
-        <TriangleAlert className="size-5 shrink-0 text-[#b62525]" />
-        <span className="text-xs font-bold text-[#b62525]">{semRegistro === 1 ? '1 instrutor está sem registro do MTE/RE' : `${semRegistro} instrutores estão sem registro do MTE/RE`} e não assinam os documentos. Ver quais →</span>
+      {semRegistro > 0 ? <button type="button" onClick={() => setFiltro('sem_registro')} className="flex w-full items-center gap-3 border-l-4 border-ds-perigo bg-ds-perigo-suave p-4 text-left hover:bg-ds-perigo-suave">
+        <TriangleAlert className="size-5 shrink-0 text-ds-perigo" />
+        <span className="text-xs font-bold text-ds-perigo">{semRegistro === 1 ? '1 instrutor está sem registro do MTE/RE' : `${semRegistro} instrutores estão sem registro do MTE/RE`} e não assinam os documentos. Ver quais →</span>
       </button> : null}
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-black/35" /><Input aria-label="Buscar instrutor" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar nome, CPF, e-mail ou especialidade" className={`${fieldClass} pl-11`} /></div>
+        <div className="relative flex-1"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ds-texto-2" /><Input aria-label="Buscar instrutor" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar nome, CPF, e-mail ou especialidade" className={`${fieldClass} pl-11`} /></div>
         <label className="sm:w-60" htmlFor="instrutores-filtro"><span className="sr-only">Filtrar instrutores</span>
           <select id="instrutores-filtro" value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)} className={selectClass}>
             <option value="todos">Todos</option>
@@ -296,10 +296,10 @@ export function CompanyInstructors({ data, reload, notify }: { data: CompanyDash
 
     {aba === 'agenda' ? <CompanyAvailability data={data} /> : null}
 
-    {aba === 'criar' ? <form onSubmit={save} className="max-w-3xl border border-black/10 bg-white p-6 md:p-8">
-      <span className="eyebrow text-[#8a6107]">Cadastro profissional</span>
-      <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Novo instrutor</h2>
-      <p className="mt-3 max-w-xl text-xs leading-relaxed text-[#777]">O registro do MTE/RE é o que autoriza a assinatura dele nos certificados. Deixado em branco (ou zerado), os documentos saem só com a assinatura da responsável técnica.</p>
+    {aba === 'criar' ? <form onSubmit={save} className="rounded-lg max-w-3xl border border-ds-borda bg-ds-superficie p-6 md:p-8">
+      <span className="eyebrow text-ds-amarelo-texto">Cadastro profissional</span>
+      <h2 className="mt-2 ds-h4">Novo instrutor</h2>
+      <p className="mt-3 max-w-xl text-xs leading-relaxed text-ds-texto-2">O registro do MTE/RE é o que autoriza a assinatura dele nos certificados. Deixado em branco (ou zerado), os documentos saem só com a assinatura da responsável técnica.</p>
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <label htmlFor="instrutor-nome"><span className={labelClass}>Nome completo</span><Input id="instrutor-nome" required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className={fieldClass} /></label>
         <label htmlFor="instrutor-cpf"><span className={labelClass}>CPF</span><Input id="instrutor-cpf" required value={draft.document} onChange={(e) => setDraft({ ...draft, document: e.target.value })} className={fieldClass} /></label>
@@ -309,7 +309,7 @@ export function CompanyInstructors({ data, reload, notify }: { data: CompanyDash
         <label htmlFor="instrutor-cidade"><span className={labelClass}>Cidade base</span><Input id="instrutor-cidade" required value={draft.baseCity} onChange={(e) => setDraft({ ...draft, baseCity: e.target.value })} className={fieldClass} /></label>
         <label className="md:col-span-2" htmlFor="instrutor-especialidades"><span className={labelClass}>Especialidades / NRs</span><Input id="instrutor-especialidades" required value={draft.specialties} onChange={(e) => setDraft({ ...draft, specialties: e.target.value })} className={fieldClass} /></label>
       </div>
-      <Button type="submit" className="mt-6 h-13 rounded-none bg-[#f2ad19] px-8 text-[11px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900]"><Plus className="size-4" />Salvar e gerar acesso</Button>
+      <Button type="submit" className="mt-6 h-12 bg-ds-amarelo px-8 ds-botao text-ds-texto hover:bg-[#eab900]"><Plus className="size-4" />Salvar e gerar acesso</Button>
     </form> : null}
   </div>;
 }

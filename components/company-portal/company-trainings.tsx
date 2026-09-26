@@ -1,41 +1,51 @@
 'use client';
 
-import { AlertTriangle, CalendarDays, CalendarPlus, Check, ChevronDown, ChevronRight, Clock3, Loader2, MessageCircle, Pencil, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
+import { AlertTriangle, Award, CalendarDays, CalendarPlus, Check, CheckCircle2, ChevronRight, Circle, Clock3, FileText, ImageIcon, Loader2, MessageCircle, Pencil, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import type { SyntheticEvent } from 'react';
+import type { ReactNode, SyntheticEvent } from 'react';
 import { ptBR } from 'date-fns/locale';
 
-import { dateFromIso, EmptyState, fieldClass, formatDate, formatWindow, isoFromDate, labelClass, selectClass, StatusTag, SubTabs } from '@/components/company-portal/company-ui';
-import { Button } from '@/components/ui/button';
+import { dateFromIso, formatDate, formatDayMonth, formatWindow, isoFromDate } from '@/components/company-portal/company-ui';
+import { areaClasses, Botao, botaoClasses, BotaoIcone, Campo, campoClasses, Cartao, Faixa, Pilula, selectClasses, tabelaClasses as tb, Tag, TopoDePagina, Vazio, type Tom } from '@/components/ds/base';
+import { Interruptor, PainelLateral } from '@/components/ds/interativo';
 import { Calendar } from '@/components/ui/calendar';
-import { Input } from '@/components/ui/input';
 import type { CompanyDashboardData, CompanyInstructor, CompanyTraining, TrainingSession } from '@/lib/company-types';
-import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTraining, removeTrainingDay, renameTraining, updateTrainingDay, updateTrainingDetails } from '@/lib/mock-company-database';
+import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTraining, generateCertificates, readInstructorDocuments, removeTrainingDay, renameTraining, updateTrainingDay, updateTrainingDetails } from '@/lib/mock-company-database';
 import type { NovoDia } from '@/lib/mock-company-database';
 import { dataDoDia as dataDaTurma, proximoDiaDaTurma as proximoDia } from '@/lib/dias-da-turma';
 import { nrInfo } from '@/lib/nr-catalog';
 import { cargaHorariaPadrao } from '@/lib/nr-programs';
 import { scheduleWindow, trainingReminderMessage, trainingScheduleMessage, whatsappLink } from '@/lib/whatsapp';
+import { cn } from '@/lib/utils';
 
-type Aba = 'agenda' | 'lista' | 'concluidas' | 'criar';
 type Notify = (message: string) => void;
 type Reload = () => Promise<void>;
+type Vista = 'tabela' | 'agenda' | 'criar';
+type Filtro = 'todas' | 'scheduled' | 'in_progress' | 'atrasadas' | 'sem_instrutor' | 'aguardando' | 'completed';
 
 const NORMAS = ['NR 05', 'NR 06', 'NR 10', 'NR 10 SEP', 'NR 11', 'NR 12', 'NR 18', 'NR 20', 'NR 23', 'NR 31', 'NR 33', 'NR 34', 'NR 35', 'EMERGÊNCIAS QUÍMICAS'];
+/** Validade oferecida no cadastro e na emissão. Só aparece no portal; o PDF não muda. */
+const VALIDADES = [0, 6, 12, 24, 36, 48, 60];
 
 /** Só dígitos: o CNPJ é digitado com e sem pontuação, e as duas têm de achar. */
 function digitos(value: string) {
   return (value ?? '').replace(/\D/g, '');
 }
 
+function rotuloValidade(meses: number, aPartirDe?: string) {
+  if (!meses) return 'Não informada';
+  return `${meses} meses${aPartirDe ? ` a partir de ${formatDate(aPartirDe)}` : ''}`;
+}
 
-// Turmas em aberto agrupadas pelo próximo dia a dar: a lista corrida misturava tudo.
-const GRUPOS = [
-  { id: 'atrasadas', titulo: 'Atrasadas', texto: 'dia já passou e não foi encerrado' },
-  { id: 'hoje', titulo: 'Hoje', texto: '' },
-  { id: 'semana', titulo: 'Próximos 7 dias', texto: '' },
-  { id: 'depois', titulo: 'Mais adiante', texto: '' },
-] as const;
+/** Situação da turma para a tabela: inclui "dia vencido" e "aguardando certificados". */
+export function situacaoDaTurma(training: CompanyTraining, hojeIso: string): { tom: Tom; texto: string } {
+  if (training.status === 'completed') {
+    return training.certificate_generated_at ? { tom: 'sucesso', texto: 'Concluída' } : { tom: 'sinal', texto: 'Aguardando certificados' };
+  }
+  if (dataDaTurma(training) < hojeIso) return { tom: 'perigo', texto: 'Dia vencido' };
+  if (training.status === 'in_progress') return { tom: 'atencao', texto: 'Em andamento' };
+  return { tom: 'info', texto: 'Agendada' };
+}
 
 // ---------------------------------------------------------------------------
 // Ações de um dia e de uma turma
@@ -83,28 +93,26 @@ function DayRow({ training, session, instructors, reload, notify }: { training: 
       }))
     : null;
 
-  return <div className={`grid gap-3 border-t border-black/8 p-4 sm:grid-cols-[64px_minmax(0,1fr)] ${encerrado ? 'bg-[#f7f7f4]' : ''}`}>
-    <div className="flex items-start gap-2 sm:block">
-      <strong className="font-heading text-2xl font-black leading-none text-[#f2ad19]">{session.day_number}</strong>
-      <span className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-[#999] sm:mt-1 sm:block">de {total}</span>
-    </div>
-    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(140px,auto)_minmax(180px,auto)_minmax(180px,1fr)_auto]">
-      <Input type="date" aria-label={`Data do dia ${session.day_number}`} disabled={salvando} value={session.session_date} onChange={(e) => void salvar({ sessionDate: e.target.value })} className={`${fieldClass} w-full min-w-[140px]`} />
-      <div className="grid grid-cols-2 gap-2">
-        <Input type="time" aria-label={`Início do dia ${session.day_number}`} disabled={salvando} value={session.start_time} onChange={(e) => void salvar({ startTime: e.target.value })} className={`${fieldClass} w-full min-w-[84px]`} />
-        <Input type="time" aria-label={`Fim do dia ${session.day_number}`} disabled={salvando} value={session.end_time} onChange={(e) => void salvar({ endTime: e.target.value })} className={`${fieldClass} w-full min-w-[84px]`} />
+  return <div className={cn('flex flex-col gap-3 border-t border-ds-borda py-4', encerrado && 'opacity-80')}>
+    <div className="flex items-center gap-2">
+      <span className="ds-caps text-ds-texto-2">Dia {session.day_number} de {total}</span>
+      {encerrado ? <Tag tom="sucesso">Encerrado</Tag> : session.status === 'in_progress' ? <Tag tom="atencao">Em andamento</Tag> : null}
+      {salvando ? <Loader2 className="size-4 animate-spin text-ds-amarelo-texto" /> : null}
+      <div className="ml-auto flex items-center gap-2">
+        {!encerrado && aviso ? <a href={aviso} target="_blank" rel="noreferrer" className={botaoClasses('fantasma', 'P')}><MessageCircle />Avisar</a> : null}
+        {total > 1 ? <BotaoIcone rotulo={`Remover o dia ${session.day_number}`} tom="perigo" className="size-9" onClick={() => void removerDia()} disabled={salvando}><X /></BotaoIcone> : null}
       </div>
-      <select aria-label={`Instrutor do dia ${session.day_number}`} disabled={salvando} value={session.instructor_id ?? ''} onChange={(e) => void salvar({ instructorId: e.target.value || null })} className={`${selectClass} min-w-[180px] ${session.instructor_id ? '' : 'border-[#b62525] text-[#b62525]'}`}>
+    </div>
+    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <input type="date" aria-label={`Data do dia ${session.day_number}`} disabled={salvando} value={session.session_date} onChange={(e) => void salvar({ sessionDate: e.target.value })} className={campoClasses} />
+      <div className="grid grid-cols-2 gap-2">
+        <input type="time" aria-label={`Início do dia ${session.day_number}`} disabled={salvando} value={session.start_time} onChange={(e) => void salvar({ startTime: e.target.value })} className={campoClasses} />
+        <input type="time" aria-label={`Fim do dia ${session.day_number}`} disabled={salvando} value={session.end_time} onChange={(e) => void salvar({ endTime: e.target.value })} className={campoClasses} />
+      </div>
+      <select aria-label={`Instrutor do dia ${session.day_number}`} disabled={salvando} value={session.instructor_id ?? ''} onChange={(e) => void salvar({ instructorId: e.target.value || null })} aria-invalid={!session.instructor_id} className={cn(selectClasses, 'sm:col-span-2', !session.instructor_id && 'text-ds-perigo')}>
         <option value="">Sem instrutor — escalar depois</option>
         {instructors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
-      <div className="flex items-center gap-2">
-        {total > 1 ? <button type="button" onClick={() => void removerDia()} disabled={salvando} aria-label={`Remover o dia ${session.day_number}`} title="Remover este dia" className="flex size-11 shrink-0 items-center justify-center border border-black/15 bg-white text-[#777] hover:border-[#b62525] hover:text-[#b62525] disabled:opacity-40"><X className="size-4" /></button> : null}
-        {salvando ? <Loader2 className="size-4 animate-spin text-[#8a6107]" /> : null}
-        {encerrado ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#17642d]"><Check className="size-4" />Encerrado</span>
-          : aviso ? <a href={aviso} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center gap-2 whitespace-nowrap border border-black/15 px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#1a7a43] hover:bg-[#25D366] hover:text-black"><MessageCircle className="size-4" />Avisar</a>
-          : null}
-      </div>
     </div>
   </div>;
 }
@@ -129,27 +137,28 @@ function AddDay({ training, instructors, reload, notify }: { training: CompanyTr
     finally { setSalvando(false); }
   }
 
-  if (!aberto) {
-    return <div className="border-t border-black/8 px-4 py-3"><button type="button" onClick={() => setAberto(true)} className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107] hover:text-black"><Plus className="size-4" />Adicionar dia</button></div>;
-  }
-  return <form onSubmit={salvar} className="grid gap-2 border-t border-black/8 bg-[#fffdf7] p-4 sm:grid-cols-[1fr_auto_auto] xl:grid-cols-[minmax(140px,auto)_auto_auto_minmax(180px,1fr)_auto_auto]">
-    <Input required type="date" aria-label="Data do novo dia" value={dia.date} onChange={(e) => setDia({ ...dia, date: e.target.value })} className={fieldClass} />
-    <Input type="time" aria-label="Início do novo dia" value={dia.startTime} onChange={(e) => setDia({ ...dia, startTime: e.target.value })} className={`${fieldClass} sm:w-28`} />
-    <Input type="time" aria-label="Fim do novo dia" value={dia.endTime} onChange={(e) => setDia({ ...dia, endTime: e.target.value })} className={`${fieldClass} sm:w-28`} />
-    <select aria-label="Instrutor do novo dia" value={dia.instructorId ?? ''} onChange={(e) => setDia({ ...dia, instructorId: e.target.value || null })} className={`${selectClass} sm:col-span-3 xl:col-span-1`}>
-      <option value="">Sem instrutor — escalar depois</option>
-      {instructors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-    </select>
-    <Button type="submit" disabled={salvando} className="h-12 rounded-none bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900]">{salvando ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}Adicionar</Button>
-    <button type="button" onClick={() => setAberto(false)} className="h-12 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">Cancelar</button>
+  if (!aberto) return <div className="border-t border-ds-borda pt-3"><button type="button" onClick={() => setAberto(true)} className={botaoClasses('link', 'P')}><Plus />Adicionar dia</button></div>;
+  return <form onSubmit={salvar} className="flex flex-col gap-2 rounded-lg border-t border-ds-borda bg-ds-amarelo-suave/50 p-3">
+    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <input required type="date" aria-label="Data do novo dia" value={dia.date} onChange={(e) => setDia({ ...dia, date: e.target.value })} className={campoClasses} />
+      <div className="grid grid-cols-2 gap-2">
+        <input type="time" aria-label="Início do novo dia" value={dia.startTime} onChange={(e) => setDia({ ...dia, startTime: e.target.value })} className={campoClasses} />
+        <input type="time" aria-label="Fim do novo dia" value={dia.endTime} onChange={(e) => setDia({ ...dia, endTime: e.target.value })} className={campoClasses} />
+      </div>
+      <select aria-label="Instrutor do novo dia" value={dia.instructorId ?? ''} onChange={(e) => setDia({ ...dia, instructorId: e.target.value || null })} className={cn(selectClasses, 'sm:col-span-2')}>
+        <option value="">Sem instrutor — escalar depois</option>
+        {instructors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+      </select>
+    </div>
+    <div className="flex gap-2"><Botao type="submit" tamanho="P" disabled={salvando}>{salvando ? <Loader2 className="animate-spin" /> : <Plus />}Adicionar</Botao><Botao tipo="fantasma" tamanho="P" onClick={() => setAberto(false)}>Cancelar</Botao></div>
   </form>;
 }
 
-type DadosTreinamento = { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string };
+type DadosTreinamento = { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string; validityMonths: number };
 
 /** O que sai no certificado e na lista: cliente, norma, título, carga horária, endereço e conteúdo. */
 function TrainingDetails({ training, clients, reload, notify }: { training: CompanyTraining; clients: CompanyDashboardData['clients']; reload: Reload; notify: Notify }) {
-  const inicial = (): DadosTreinamento => ({ clientId: training.client_id, nr: training.nr, title: training.title, duration: training.duration, location: training.location, contentProgram: training.content_program ?? '', theme: training.theme ?? '' });
+  const inicial = (): DadosTreinamento => ({ clientId: training.client_id, nr: training.nr, title: training.title, duration: training.duration, location: training.location, contentProgram: training.content_program ?? '', theme: training.theme ?? '', validityMonths: training.validity_months ?? 0 });
   const [aberto, setAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [draft, setDraft] = useState<DadosTreinamento>(inicial);
@@ -161,7 +170,7 @@ function TrainingDetails({ training, clients, reload, notify }: { training: Comp
     try {
       await updateTrainingDetails(training.id, draft);
       notify(training.status === 'completed'
-        ? 'Dados salvos. A turma já foi encerrada: gere os documentos de novo (aba QR e participantes) para refletir a mudança.'
+        ? 'Dados salvos. A turma já foi encerrada: gere os certificados de novo para refletir a mudança.'
         : 'Dados do treinamento salvos.');
       setAberto(false);
       await reload();
@@ -169,53 +178,49 @@ function TrainingDetails({ training, clients, reload, notify }: { training: Comp
     finally { setSalvando(false); }
   }
 
-  if (!aberto) {
-    return <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-black/8 pb-3">
-      <span className="text-[11px] text-[#777]">Cliente, norma, título do certificado, carga horária, endereço e conteúdo programático.</span>
-      <button type="button" onClick={() => { setDraft(inicial()); setAberto(true); }} className="inline-flex h-10 items-center gap-2 border border-black/15 bg-white px-3 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white"><Pencil className="size-3.5" />Editar dados do treinamento</button>
-    </div>;
-  }
-  return <form onSubmit={salvar} className="mb-3 space-y-4 border border-black/10 bg-white p-4">
+  if (!aberto) return <dl className="grid gap-x-4 gap-y-2 ds-body-s sm:grid-cols-[140px_1fr]">
+    <dt className="text-ds-texto-2">Título no certificado</dt><dd className="font-medium">{training.title}</dd>
+    <dt className="text-ds-texto-2">Carga horária</dt><dd>{training.duration || '—'}</dd>
+    <dt className="text-ds-texto-2">Endereço</dt><dd>{training.location || '—'}</dd>
+    <dt className="text-ds-texto-2">Validade</dt><dd>{rotuloValidade(training.validity_months ?? 0)}</dd>
+    {training.theme ? <><dt className="text-ds-texto-2">Tema</dt><dd>{training.theme}</dd></> : null}
+    <dd className="sm:col-span-2"><button type="button" onClick={() => { setDraft(inicial()); setAberto(true); }} className={botaoClasses('fantasma', 'P', 'mt-1')}><Pencil />Editar dados do treinamento</button></dd>
+  </dl>;
+
+  return <form onSubmit={salvar} className="flex flex-col gap-4 rounded-lg border border-ds-borda p-4">
     <ClientPicker clients={clients} value={draft.clientId} onChange={(id) => setDraft({ ...draft, clientId: id })} />
-    <div className="grid gap-3 sm:grid-cols-[130px_1fr]">
-      <label htmlFor={`editar-nr-${training.id}`}><span className={labelClass}>Norma</span>
-        <select id={`editar-nr-${training.id}`} value={draft.nr} onChange={(e) => setDraft({ ...draft, nr: e.target.value })} className={selectClass}>{normas.map((nr) => <option key={nr}>{nr}</option>)}</select>
-      </label>
-      <label htmlFor={`editar-titulo-${training.id}`}><span className={labelClass}>Título no certificado</span>
-        <Input id={`editar-titulo-${training.id}`} required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} className={fieldClass} />
-      </label>
+    <div className="grid gap-3 sm:grid-cols-[140px_1fr]">
+      <Campo rotulo="Norma"><select value={draft.nr} onChange={(e) => setDraft({ ...draft, nr: e.target.value })} className={selectClasses}>{normas.map((nr) => <option key={nr}>{nr}</option>)}</select></Campo>
+      <Campo rotulo="Título no certificado"><input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} className={campoClasses} /></Campo>
     </div>
     <div className="grid gap-3 sm:grid-cols-2">
-      <label htmlFor={`editar-carga-${training.id}`}><span className={labelClass}>Carga horária</span>
-        <Input id={`editar-carga-${training.id}`} required value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: e.target.value })} className={fieldClass} />
-      </label>
-      <label htmlFor={`editar-local-${training.id}`}><span className={labelClass}>Endereço do treinamento</span>
-        <Input id={`editar-local-${training.id}`} required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} className={fieldClass} />
-      </label>
+      <Campo rotulo="Carga horária"><input required value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: e.target.value })} className={campoClasses} /></Campo>
+      <Campo rotulo="Validade do certificado" ajuda="Só no portal do cliente; o PDF não muda."><select value={draft.validityMonths} onChange={(e) => setDraft({ ...draft, validityMonths: Number(e.target.value) })} className={selectClasses}>{VALIDADES.map((m) => <option key={m} value={m}>{rotuloValidade(m)}</option>)}</select></Campo>
     </div>
-    <label htmlFor={`editar-tema-${training.id}`}><span className={labelClass}>Tema da turma</span>
-      <Input id={`editar-tema-${training.id}`} value={draft.theme} onChange={(e) => setDraft({ ...draft, theme: e.target.value })} placeholder="Ex.: Reciclagem para a equipe de manutenção" className={fieldClass} />
-      <span className="mt-2 block text-[11px] leading-relaxed text-[#888]">Vai na mensagem de escala do instrutor, para ele saber o que preparar. <strong>Não aparece em nenhum documento.</strong></span>
-    </label>
-    <label htmlFor={`editar-conteudo-${training.id}`}><span className={labelClass}>Conteúdo programático (aparece na lista)</span>
-      <textarea id={`editar-conteudo-${training.id}`} rows={4} value={draft.contentProgram} onChange={(e) => setDraft({ ...draft, contentProgram: e.target.value })} className="w-full border border-black/16 bg-white p-3 text-sm outline-none focus:border-[#f2ad19] focus:ring-2 focus:ring-[#f2ad19]/30" />
-    </label>
-    <div className="flex flex-wrap gap-2">
-      <Button type="submit" disabled={salvando} className="h-11 rounded-none bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900]">{salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar dados</Button>
-      <button type="button" onClick={() => setAberto(false)} className="h-11 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">Cancelar</button>
-    </div>
+    <Campo rotulo="Endereço do treinamento"><input required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} className={campoClasses} /></Campo>
+    <Campo rotulo="Tema da turma" ajuda="Vai na mensagem de escala do instrutor. Não aparece em nenhum documento."><input value={draft.theme} onChange={(e) => setDraft({ ...draft, theme: e.target.value })} placeholder="Ex.: Reciclagem para a equipe de manutenção" className={campoClasses} /></Campo>
+    <Campo rotulo="Conteúdo programático (aparece na lista)"><textarea rows={4} value={draft.contentProgram} onChange={(e) => setDraft({ ...draft, contentProgram: e.target.value })} className={areaClasses} /></Campo>
+    <div className="flex flex-wrap gap-2"><Botao type="submit" disabled={salvando}>{salvando ? <Loader2 className="animate-spin" /> : <Check />}Salvar dados</Botao><Botao tipo="fantasma" onClick={() => setAberto(false)}>Cancelar</Botao></div>
   </form>;
 }
 
-function TrainingActions({ training, clients, instructors, faltaLista, reload, notify }: { training: CompanyTraining; clients: CompanyDashboardData['clients']; instructors: CompanyInstructor[]; faltaLista: boolean; reload: Reload; notify: Notify }) {
+function Secao({ titulo, children, acao }: { titulo: string; children: ReactNode; acao?: ReactNode }) {
+  return <section className="flex flex-col gap-3 border-b border-ds-borda pb-5">
+    <div className="flex items-center gap-2"><h3 className="flex-1 ds-caps text-ds-texto-2">{titulo}</h3>{acao}</div>
+    {children}
+  </section>;
+}
+
+/** Ficha da turma no painel lateral: dias, dados, identificação e ações. */
+function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoExcluir }: { training: CompanyTraining; data: CompanyDashboardData; instructors: CompanyInstructor[]; reload: Reload; notify: Notify; emitir: () => void; aoExcluir: () => void }) {
   const [ocupado, setOcupado] = useState('');
   const [confirmarSemLista, setConfirmarSemLista] = useState('');
   const [identificacao, setIdentificacao] = useState(training.internal_label);
   const concluido = training.status === 'completed';
+  const faltaLista = !data.files.some((file) => file.kind === 'attendance' && file.training_id === training.id);
 
   // Quem ainda deve alguma coisa: instrutor de dia não encerrado. O link do
-  // WhatsApp é montado aqui mesmo, sem passar pelo servidor — assim o botão
-  // já vale antes de a cobrança por e-mail ser disparada.
+  // WhatsApp é montado aqui mesmo, sem passar pelo servidor.
   const devedores = [...new Map((training.sessions ?? [])
     .filter((dia) => dia.status !== 'completed' && dia.instructor_id)
     .map((dia) => [dia.instructor_id as string, dia]))
@@ -223,14 +228,7 @@ function TrainingActions({ training, clients, instructors, faltaLista, reload, n
     .map((dia) => {
       const instrutor = instructors.find((item) => item.id === dia.instructor_id);
       const url = instrutor?.phone
-        ? whatsappLink(instrutor.phone, trainingReminderMessage({
-            instructorName: instrutor.name,
-            nr: training.nr,
-            title: training.title,
-            clientName: training.client_name,
-            dateLabel: formatDate(dia.session_date),
-            faltaLista,
-          }))
+        ? whatsappLink(instrutor.phone, trainingReminderMessage({ instructorName: instrutor.name, nr: training.nr, title: training.title, clientName: training.client_name, dateLabel: formatDate(dia.session_date), faltaLista }))
         : null;
       return { nome: instrutor?.name ?? 'Instrutor', url };
     });
@@ -263,68 +261,102 @@ function TrainingActions({ training, clients, instructors, faltaLista, reload, n
 
   async function remover() {
     if (!window.confirm(`Excluir o treinamento "${training.nr} - ${training.title}" e todos os seus participantes e arquivos? Esta ação não pode ser desfeita.`)) return;
-    try { await deleteTraining(training.id); notify('Treinamento excluído.'); await reload(); }
+    try { await deleteTraining(training.id); notify('Treinamento excluído.'); aoExcluir(); await reload(); }
     catch (error) { notify(error instanceof Error ? error.message : 'Erro ao excluir o treinamento.'); }
   }
 
-  return <div className="border-t border-black/8 bg-[#f7f7f4] p-4">
-    {confirmarSemLista ? <div className="mb-3 border-2 border-[#b62525] bg-[#fff5f5] p-4">
-      <strong className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-[0.04em] text-[#b62525]"><AlertTriangle className="size-4" />Encerrar sem a lista assinada?</strong>
-      <p className="mt-2 text-xs leading-relaxed text-[#666]">{confirmarSemLista} Os certificados serão emitidos mesmo assim e a ressalva fica registrada na Atividade com o seu nome.</p>
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button type="button" onClick={() => setConfirmarSemLista('')} className="inline-flex h-11 flex-1 items-center justify-center border border-black/20 bg-white text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">Cancelar</button>
-        <button type="button" onClick={() => void encerrar(true)} disabled={ocupado === 'encerrando'} className="inline-flex h-11 flex-[2] items-center justify-center gap-2 bg-[#b62525] text-[10px] font-extrabold uppercase tracking-[0.1em] text-white hover:bg-[#8f1c1c] disabled:opacity-50">{ocupado === 'encerrando' ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Encerrar assim mesmo</button>
+  return <div className="flex flex-col gap-5">
+    {confirmarSemLista ? <Faixa tom="perigo" titulo="Encerrar sem a lista assinada?" acao={<div className="flex gap-2"><Botao tipo="fantasma" tamanho="P" onClick={() => setConfirmarSemLista('')}>Cancelar</Botao><Botao tipo="perigo" tamanho="P" onClick={() => void encerrar(true)} disabled={ocupado === 'encerrando'}>{ocupado === 'encerrando' ? <Loader2 className="animate-spin" /> : <Check />}Encerrar assim mesmo</Botao></div>}>{confirmarSemLista} Os certificados saem mesmo assim e a ressalva fica registrada na Atividade com o seu nome.</Faixa> : null}
+
+    <Secao titulo="Ações">
+      <div className="flex flex-wrap gap-2">
+        {concluido ? <Botao onClick={emitir}><Award />{training.certificate_generated_at ? 'Certificados' : 'Emitir certificados'}</Botao> : <>
+          <Botao onClick={() => void encerrar(false)} disabled={Boolean(ocupado)}>{ocupado === 'encerrando' ? <Loader2 className="animate-spin" /> : <Check />}Encerrar turma</Botao>
+          {cobraveisPorWhats.map((item) => <a key={item.nome} href={item.url as string} target="_blank" rel="noreferrer" className={botaoClasses('fantasma', 'M')}><MessageCircle />{cobraveisPorWhats.length > 1 ? `Cobrar ${item.nome.split(' ')[0]}` : 'Cobrar no WhatsApp'}</a>)}
+        </>}
+        <a href={`/lista-presenca/${training.id}`} target="_blank" rel="noopener" className={botaoClasses('fantasma', 'M')}><FileText />Lista (PDF)</a>
       </div>
-    </div> : null}
+      {devedores.length > 0 && devedores.every((item) => !item.url) && !concluido ? <p className="ds-caption text-ds-texto-2">Sem telefone no cadastro do instrutor não dá para cobrar por WhatsApp: inclua o número em Instrutores.</p> : null}
+    </Secao>
 
-    <TrainingDetails training={training} clients={clients} reload={reload} notify={notify} />
+    <Secao titulo={`Dias · ${training.sessions.length}`}>
+      <div>{training.sessions.map((dia) => <DayRow key={dia.id} training={training} session={dia} instructors={instructors} reload={reload} notify={notify} />)}</div>
+      <AddDay training={training} instructors={instructors} reload={reload} notify={notify} />
+    </Secao>
 
-    <div className="mb-3 flex flex-col gap-2 border-b border-black/8 pb-3 sm:flex-row sm:items-center">
-      <label htmlFor={`identificacao-${training.id}`} className="shrink-0 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#777]">Identificação da turma</label>
-      <Input id={`identificacao-${training.id}`} value={identificacao} onChange={(e) => setIdentificacao(e.target.value)} onBlur={() => void renomear()} placeholder="Ex.: Turma A - manhã" className={`${fieldClass} flex-1`} />
-      <span className="shrink-0 text-[11px] text-[#999]">Não aparece em documento</span>
-    </div>
+    <Secao titulo="Dados do treinamento"><TrainingDetails training={training} clients={data.clients} reload={reload} notify={notify} /></Secao>
 
-    <div className="flex flex-wrap gap-2">
-      {concluido ? null : <>
-        {cobraveisPorWhats.map((item) => <a key={item.nome} href={item.url as string} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center gap-2 bg-[#25D366] px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#1fb855]"><MessageCircle className="size-4" />{cobraveisPorWhats.length > 1 ? `Cobrar ${item.nome.split(' ')[0]} no WhatsApp` : 'Cobrar no WhatsApp'}</a>)}
-        <button type="button" onClick={() => void encerrar(false)} disabled={Boolean(ocupado)} className="inline-flex h-11 items-center gap-2 bg-black px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-white hover:bg-[#f2ad19] hover:text-black disabled:opacity-50">{ocupado === 'encerrando' ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Encerrar turma</button>
-      </>}
-      <a href={`/lista-presenca/${training.id}`} target="_blank" rel="noopener" className="inline-flex h-11 items-center gap-2 border border-black/15 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] hover:bg-black hover:text-white">Lista (PDF)</a>
-      <button type="button" onClick={() => void remover()} className="ml-auto inline-flex h-11 items-center gap-2 border border-[#b62525]/40 bg-white px-4 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] hover:bg-[#b62525] hover:text-white"><Trash2 className="size-4" />Excluir</button>
-    </div>
+    <Secao titulo="Identificação da turma">
+      <Campo rotulo="Nome interno" ajuda="Separa duas turmas do mesmo treinamento. Não aparece em documento."><input value={identificacao} onChange={(e) => setIdentificacao(e.target.value)} onBlur={() => void renomear()} placeholder="Ex.: Turma A - manhã" className={campoClasses} /></Campo>
+    </Secao>
 
-    {devedores.length > 0 && devedores.every((item) => !item.url) && !concluido ? <p className="mt-3 border-t border-black/8 pt-3 text-[11px] text-[#888]">Sem telefone no cadastro do instrutor não dá para cobrar por WhatsApp — inclua o número na aba Instrutores.</p> : null}
+    <button type="button" onClick={() => void remover()} className={botaoClasses('fantasma', 'M', 'w-fit text-ds-perigo hover:border-ds-perigo')}><Trash2 />Excluir treinamento</button>
   </div>;
 }
 
-/** Uma turma na lista: cabeçalho sempre visível, dias e ações ao abrir. */
-function TrainingRow({ training, clients, instructors, faltaLista, reload, notify, aberta, alternar }: { training: CompanyTraining; clients: CompanyDashboardData['clients']; instructors: CompanyInstructor[]; faltaLista: boolean; reload: Reload; notify: Notify; aberta: boolean; alternar: () => void }) {
-  const dias = training.sessions ?? [];
-  const proxima = proximoDia(training);
-  const semInstrutor = dias.filter((dia) => !dia.instructor_id).length;
-  return <article id={`turma-${training.id}`} className="border border-black/10 bg-white">
-    <button type="button" onClick={alternar} aria-expanded={aberta} className="flex w-full items-center gap-4 p-4 text-left hover:bg-[#fff8e8]">
-      <span className="flex size-11 shrink-0 items-center justify-center bg-black font-heading text-xs font-black text-[#f2ad19]">{training.nr}</span>
-      <span className="min-w-0 flex-1">
-        <strong className="block truncate text-sm font-extrabold uppercase tracking-[0.04em]">{training.internal_label || training.title}</strong>
-        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#777]">
-          <span className="font-bold text-[#8a6107]">{training.client_name}</span>
-          {training.internal_label ? <span className="truncate">{training.title}</span> : null}
-          <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-3.5" />{formatDate(proxima?.session_date ?? training.training_date)}{dias.length > 1 && proxima ? ` · dia ${proxima.day_number} de ${dias.length}` : ''}</span>
-          <span>{training.participant_count} inscrito(s)</span>
-        </span>
-      </span>
-      {semInstrutor > 0 ? <span className="hidden shrink-0 items-center gap-1.5 bg-[#fff5f5] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#b62525] sm:inline-flex"><UserRound className="size-3.5" />{semInstrutor} sem instrutor</span> : null}
-      <StatusTag status={training.status} />
-      <ChevronDown className={`size-4 shrink-0 text-black/35 transition ${aberta ? 'rotate-180' : ''}`} />
-    </button>
-    {aberta ? <>
-      {dias.map((dia) => <DayRow key={dia.id} training={training} session={dia} instructors={instructors} reload={reload} notify={notify} />)}
-      <AddDay training={training} instructors={instructors} reload={reload} notify={notify} />
-      <TrainingActions training={training} clients={clients} instructors={instructors} faltaLista={faltaLista} reload={reload} notify={notify} />
-    </> : null}
-  </article>;
+// ---------------------------------------------------------------------------
+// Painel "Emitir certificados" (Figma 18:1093)
+// ---------------------------------------------------------------------------
+
+export function EmitirCertificados({ training, data, aberto, onFechar, reload, notify }: { training: CompanyTraining; data: CompanyDashboardData; aberto: boolean; onFechar: () => void; reload: Reload; notify: Notify }) {
+  const [validade, setValidade] = useState(training.validity_months ?? 0);
+  const [avisar, setAvisar] = useState(data.mailConfigured);
+  const [emitindo, setEmitindo] = useState(false);
+  const [docsInstrutor, setDocsInstrutor] = useState<Awaited<ReturnType<typeof readInstructorDocuments>> | null>(null);
+  useEffect(() => {
+    if (!aberto) return;
+    let ativo = true;
+    readInstructorDocuments().then((docs) => { if (ativo) setDocsInstrutor(docs); }).catch(() => { if (ativo) setDocsInstrutor([]); });
+    return () => { ativo = false; };
+  }, [aberto]);
+
+  const pessoas = data.participants.filter((p) => p.training_id === training.id);
+  const aptos = pessoas.filter((p) => p.days_total > 0 && p.days_present >= p.days_total).length;
+  const fotos = data.files.filter((f) => f.training_id === training.id && f.kind === 'photo').length;
+  const documentos = data.files.filter((f) => f.training_id === training.id && f.kind !== 'photo' && !f.name.startsWith('certificado-')).length;
+  const ultimoDia = training.sessions[training.sessions.length - 1];
+  const instrutorFinal = data.instructors.find((i) => i.id === (ultimoDia?.instructor_id ?? training.instructor_id));
+  const assinatura = docsInstrutor?.find((d) => d.instructorId === instrutorFinal?.id && d.category === 'signature');
+  const jaEmitido = Boolean(training.certificate_generated_at);
+
+  async function emitir() {
+    setEmitindo(true);
+    try {
+      const r = await generateCertificates(training.id, { validityMonths: validade, notifyClient: avisar && data.mailConfigured });
+      const aviso = r.aviso === 'enviado' ? ' Cliente avisado por e-mail.' : r.aviso === 'sem-email' ? ' O cliente não tem e-mail de contato: aviso não enviado.' : r.aviso === 'falhou' ? ' O e-mail de aviso falhou; os certificados já estão no portal.' : '';
+      notify(`${r.documents.length} documento(s) gerados e publicados no portal do cliente.${aviso}`);
+      onFechar();
+      await reload();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao gerar os certificados.'); }
+    finally { setEmitindo(false); }
+  }
+
+  const item = (ok: boolean, titulo: string, detalhe: string, opcional = false) => <div className="flex items-center gap-3 border-b border-ds-borda py-3">
+    <span className={cn('flex size-[26px] shrink-0 items-center justify-center rounded-full', ok ? 'bg-ds-sucesso-suave text-ds-sucesso' : opcional ? 'bg-ds-muted text-ds-texto-2' : 'bg-ds-atencao-suave text-ds-atencao')}>{ok ? <CheckCircle2 className="size-3.5" /> : <Circle className="size-3.5" />}</span>
+    <div className="min-w-0 flex-1"><p className="ds-body-s font-medium">{titulo}</p><p className="ds-caption text-ds-texto-2">{detalhe}</p></div>
+  </div>;
+
+  return <PainelLateral aberto={aberto} onFechar={onFechar} sobretitulo={`Turma ${training.code}`} titulo={jaEmitido ? 'Certificados' : 'Emitir certificados'} subtitulo={`${training.nr} · ${training.title} · ${training.client_name} · ${formatDayMonth(ultimoDia?.session_date ?? training.training_date)}`}
+    acoes={<><Botao tipo="secundario" onClick={onFechar}>Cancelar</Botao><Botao className="flex-1" onClick={() => void emitir()} disabled={emitindo || aptos === 0}>{emitindo ? <Loader2 className="animate-spin" /> : null}{emitindo ? 'Gerando…' : jaEmitido ? `Gerar de novo (${aptos})` : `Emitir ${aptos} ${aptos === 1 ? 'certificado' : 'certificados'}`}{emitindo ? null : <ChevronRight />}</Botao></>}>
+    <div className="flex flex-col gap-5">
+      {jaEmitido ? <Faixa tom="sucesso">Gerados em {formatDate(training.certificate_generated_at as string)}. Gerar de novo substitui os PDFs dos alunos; arquivos enviados à mão ficam.</Faixa> : <Faixa tom="sinal">O certificado sai sozinho quando a turma é encerrada. Esta turma está sem certificado: emita aqui depois de conferir.</Faixa>}
+      <div>
+        <p className="ds-caps text-ds-texto-2">Antes de emitir</p>
+        {item(aptos > 0, 'Presença registrada', `${aptos} de ${pessoas.length} participantes com presença em todos os dias`)}
+        {item(fotos > 0, 'Fotos da prática enviadas', fotos ? `${fotos} ${fotos === 1 ? 'foto' : 'fotos'}` : 'Nenhuma foto ainda', true)}
+        {item(documentos > 0, 'Documentos da turma', documentos ? `${documentos} ${documentos === 1 ? 'arquivo' : 'arquivos'} (inclui a lista assinada)` : 'Nenhum documento ainda', true)}
+        {item(assinatura?.status === 'approved', 'Assinatura do instrutor', docsInstrutor === null ? 'Conferindo…' : !instrutorFinal ? 'Último dia sem instrutor escalado' : assinatura ? `${instrutorFinal.name} · ${assinatura.status === 'approved' ? 'assinatura aprovada' : 'assinatura aguardando aprovação'}` : `${instrutorFinal.name} · assinatura não enviada`)}
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-lg bg-ds-muted p-3.5"><p className="ds-h3 text-ds-sucesso">{aptos}</p><p className="ds-caption text-ds-texto-2">aptos</p></div>
+        <div className="rounded-lg bg-ds-muted p-3.5 text-ds-texto-2"><p className="ds-h3">{pessoas.length - aptos}</p><p className="ds-caption">ausentes</p></div>
+        <div className="rounded-lg bg-ds-muted p-3.5"><p className="ds-h3">{aptos}</p><p className="ds-caption text-ds-texto-2">certificados</p></div>
+      </div>
+      <Campo rotulo="Modelo de certificado" ajuda="O modelo acompanha a norma da turma."><select disabled className={selectClasses}><option>{training.nr} · padrão Space Light</option></select></Campo>
+      <Campo rotulo="Validade" ajuda="Aparece no portal do cliente e nas reciclagens; o PDF não muda."><select value={validade} onChange={(e) => setValidade(Number(e.target.value))} className={selectClasses}>{VALIDADES.map((m) => <option key={m} value={m}>{rotuloValidade(m, ultimoDia?.session_date)}</option>)}</select></Campo>
+      <Interruptor ligado={avisar && data.mailConfigured} onChange={setAvisar} disabled={!data.mailConfigured} rotulo="Avisar o cliente por e-mail" descricao={data.mailConfigured ? 'Certificados ficam disponíveis no portal do cliente.' : 'Envio de e-mail não configurado no servidor (RESEND_API_KEY). Os certificados vão para o portal mesmo assim.'} />
+    </div>
+  </PainelLateral>;
 }
 
 // ---------------------------------------------------------------------------
@@ -335,12 +367,10 @@ function Agenda({ data, reload, notify, abrirTurma }: { data: CompanyDashboardDa
   const [selecionada, setSelecionada] = useState<Date | undefined>(new Date());
   const instrutores = data.instructors.filter((item) => item.status === 'active');
 
-  // Cada dia do calendário aponta para a turma dele: é assim que a agenda
-  // mostra o que acontece na data, e não só quando a turma começou.
+  // Cada dia do calendário aponta para a turma dele.
   const porData = useMemo(() => {
     const mapa = new Map<string, { training: CompanyTraining; session: TrainingSession }[]>();
     for (const training of data.trainings) {
-      // Turma concluída sai da agenda: fica na aba Concluídas.
       if (training.status === 'completed') continue;
       for (const session of training.sessions ?? []) {
         const lista = mapa.get(session.session_date);
@@ -349,51 +379,30 @@ function Agenda({ data, reload, notify, abrirTurma }: { data: CompanyDashboardDa
     }
     return mapa;
   }, [data.trainings]);
-
   const comTreino = useMemo(() => [...porData.keys()].map(dateFromIso), [porData]);
-  const semEscala = useMemo(
-    () => [...porData.entries()].filter(([, itens]) => itens.some((item) => !item.session.instructor_id)).map(([iso]) => dateFromIso(iso)),
-    [porData],
-  );
-
+  const semEscala = useMemo(() => [...porData.entries()].filter(([, itens]) => itens.some((item) => !item.session.instructor_id)).map(([iso]) => dateFromIso(iso)), [porData]);
   const iso = selecionada ? isoFromDate(selecionada) : '';
   const doDia = porData.get(iso) ?? [];
 
-  return <div className="grid gap-6 xl:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)]">
-    <div className="h-fit border border-black/10 bg-white p-5 sm:p-7 xl:sticky xl:top-[96px]">
-      <Calendar mode="single" selected={selecionada} onSelect={setSelecionada} locale={ptBR}
-        modifiers={{ treino: comTreino, semEscala }}
-        modifiersClassNames={{ treino: 'bg-black text-[#f2ad19] font-bold', semEscala: 'ring-2 ring-[#b62525] ring-inset' }}
-        className="mx-auto w-full [--cell-size:--spacing(11)]" />
-      <div className="mt-5 flex flex-wrap gap-4 border-t border-black/10 pt-4 text-[10px] font-bold uppercase tracking-[0.1em] text-[#777]">
-        <span className="flex items-center gap-2"><i className="size-3 bg-black" />Dia de treinamento</span>
-        <span className="flex items-center gap-2"><i className="size-3 border-2 border-[#b62525]" />Falta instrutor</span>
-      </div>
-    </div>
-    <div>
-      <div className="mb-4">
-        <span className="eyebrow text-[#8a6107]">{selecionada ? formatDate(iso) : 'Escolha uma data'}</span>
-        <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">{doDia.length === 1 ? '1 turma neste dia' : `${doDia.length} turmas neste dia`}</h2>
-      </div>
-      <div className="space-y-4">
-        {doDia.map(({ training, session }) => <article key={session.id} className="border border-black/10 bg-white">
-          <button type="button" onClick={() => abrirTurma(training.id)} className="flex w-full items-start gap-4 p-5 text-left transition hover:bg-[#fff8e8]">
-            <span className="flex size-12 shrink-0 items-center justify-center bg-black font-heading text-sm font-black text-[#f2ad19]">{training.nr}</span>
-            <span className="min-w-0 flex-1">
-              <span className="flex flex-wrap items-center gap-2"><StatusTag status={session.status} /><span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#999]">Dia {session.day_number} de {training.sessions.length}</span></span>
-              <strong className="mt-3 block text-base font-extrabold uppercase leading-tight tracking-[0.05em]">{training.internal_label || training.title}</strong>
-              <span className="mt-2 block text-xs font-bold text-[#8a6107]">{training.client_name}{training.internal_label ? ` · ${training.title}` : ''}</span>
-              <span className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#666]">
-                {formatWindow(session) ? <span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" />{formatWindow(session)}</span> : null}
-                <span className="inline-flex items-center gap-1.5">{training.location}</span>
-              </span>
-            </span>
-            <ChevronRight className="mt-1 size-4 shrink-0 text-black/30" />
-          </button>
-          <DayRow training={training} session={session} instructors={instrutores} reload={reload} notify={notify} />
-        </article>)}
-        {doDia.length === 0 ? <EmptyState icon={CalendarDays} title="Nenhuma turma nesta data" text="Escolha outro dia no calendário ou crie um treinamento na aba Criar." /> : null}
-      </div>
+  return <div className="grid gap-5 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+    <Cartao className="h-fit p-5 xl:sticky xl:top-8">
+      <Calendar mode="single" selected={selecionada} onSelect={setSelecionada} locale={ptBR} modifiers={{ treino: comTreino, semEscala }} modifiersClassNames={{ treino: '[&>button]:bg-ds-inverso [&>button]:text-ds-amarelo [&>button]:font-semibold', semEscala: '[&>button]:ring-2 [&>button]:ring-ds-perigo [&>button]:ring-inset' }} className="mx-auto w-full [--cell-size:--spacing(11)]" />
+      <div className="mt-4 flex flex-wrap gap-4 border-t border-ds-borda pt-3 ds-caption text-ds-texto-2"><span className="flex items-center gap-2"><i className="size-3 rounded-sm bg-ds-inverso" />Dia de treinamento</span><span className="flex items-center gap-2"><i className="size-3 rounded-sm border-2 border-ds-perigo" />Falta instrutor</span></div>
+    </Cartao>
+    <div className="flex flex-col gap-3">
+      <div><span className="ds-caps text-ds-texto-2">{selecionada ? formatDate(iso) : 'Escolha uma data'}</span><h2 className="ds-h4">{doDia.length === 1 ? '1 turma neste dia' : `${doDia.length} turmas neste dia`}</h2></div>
+      {doDia.map(({ training, session }) => <Cartao key={session.id} className="px-5 pt-4">
+        <button type="button" onClick={() => abrirTurma(training.id)} className="flex w-full items-start gap-3 pb-3 text-left">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2"><span className="ds-mono text-ds-texto-2">{training.code}</span><span className="ds-caption text-ds-texto-2">Dia {session.day_number} de {training.sessions.length}</span></div>
+            <p className="mt-1 ds-body-s font-semibold">{training.nr} · {training.internal_label || training.title}</p>
+            <p className="ds-caption text-ds-texto-2">{training.client_name}{formatWindow(session) ? ` · ${formatWindow(session)}` : ''}{training.location ? ` · ${training.location}` : ''}</p>
+          </div>
+          <ChevronRight className="mt-1 size-4 shrink-0 text-ds-texto-2" />
+        </button>
+        <DayRow training={training} session={session} instructors={instrutores} reload={reload} notify={notify} />
+      </Cartao>)}
+      {doDia.length === 0 ? <Vazio icone={<CalendarDays />} titulo="Nenhuma turma nesta data" texto="Escolha outro dia no calendário ou crie uma turma nova." /> : null}
     </div>
   </div>;
 }
@@ -414,62 +423,38 @@ function ClientPicker({ clients, value, onChange }: { clients: CompanyDashboardD
   const alvoDigitos = digitos(busca);
   const filtrados = useMemo(() => {
     if (!alvo) return clients;
-    return clients.filter((client) =>
-      `${client.name} ${client.legal_name}`.toLowerCase().includes(alvo)
-      || (alvoDigitos.length > 0 && digitos(client.document).includes(alvoDigitos)));
+    return clients.filter((client) => `${client.name} ${client.legal_name}`.toLowerCase().includes(alvo) || (alvoDigitos.length > 0 && digitos(client.document).includes(alvoDigitos)));
   }, [clients, alvo, alvoDigitos]);
-
   const escolhido = clients.find((client) => client.id === value);
-
-  return <div>
-    <span className={labelClass}>Cliente</span>
-    <div className="relative">
-      <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-black/35" />
-      <Input aria-label="Buscar cliente por nome ou CNPJ" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou CNPJ" className={`${fieldClass} pl-11`} />
-    </div>
-    <select aria-label="Cliente do treinamento" required value={value} onChange={(e) => onChange(e.target.value)} size={Math.min(6, Math.max(3, filtrados.length))} className="mt-2 w-full border border-black/16 bg-white p-1 text-sm outline-none focus:border-[#f2ad19]">
-      {filtrados.map((client) => <option key={client.id} value={client.id} className="px-2 py-2">{client.name} · {client.document}</option>)}
+  return <div className="flex flex-col gap-2">
+    <span className="font-ds-sans text-sm leading-5 font-medium">Cliente</span>
+    <label className="relative"><Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ds-texto-2" /><input aria-label="Buscar cliente por nome ou CNPJ" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou CNPJ" className={cn(campoClasses, 'pl-10')} /></label>
+    <select aria-label="Cliente do treinamento" required value={value} onChange={(e) => onChange(e.target.value)} size={Math.min(6, Math.max(3, filtrados.length))} className="w-full rounded-md border border-ds-borda bg-ds-superficie p-1 ds-body-s outline-none focus:border-ds-borda-forte">
+      {filtrados.map((client) => <option key={client.id} value={client.id} className="rounded px-2 py-2">{client.name} · {client.document}</option>)}
     </select>
-    <p className="mt-2 text-[11px] text-[#888]">{filtrados.length === 0 ? 'Nenhum cliente com esse nome ou CNPJ.' : escolhido ? `Selecionado: ${escolhido.legal_name}` : 'Escolha um cliente na lista.'}</p>
+    <p className="ds-caption text-ds-texto-2">{filtrados.length === 0 ? 'Nenhum cliente com esse nome ou CNPJ.' : escolhido ? `Selecionado: ${escolhido.legal_name}` : 'Escolha um cliente na lista.'}</p>
   </div>;
 }
 
 function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; reload: Reload; notify: Notify; aoCriar: (id: string) => void }) {
   const instrutores = data.instructors.filter((item) => item.status === 'active');
   const [salvando, setSalvando] = useState(false);
-  const [draft, setDraft] = useState<Draft>({
-    clientId: data.clients[0]?.id || '',
-    nr: 'NR 23',
-    title: '',
-    internalLabel: '',
-    theme: '',
-    days: [diaVazio()],
-    contentProgram: nrInfo('NR 23')?.content ?? '',
-    duration: cargaHorariaPadrao('NR 23'),
-    location: '',
-  });
+  const [draft, setDraft] = useState<Draft>({ clientId: data.clients[0]?.id || '', nr: 'NR 23', title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: nrInfo('NR 23')?.content ?? '', duration: cargaHorariaPadrao('NR 23'), location: '' });
 
   function changeNr(nr: string) {
     setDraft((current) => {
       const previous = nrInfo(current.nr)?.content ?? '';
       const custom = current.contentProgram.trim() !== '' && current.contentProgram !== previous;
-      // A carga horária sugerida acompanha a norma, mas nunca sobrescreve o que
-      // a gestão já digitou à mão.
+      // A carga horária sugerida acompanha a norma, mas nunca sobrescreve o que foi digitado.
       const cargaIntocada = current.duration === cargaHorariaPadrao(current.nr);
-      return {
-        ...current,
-        nr,
-        contentProgram: custom ? current.contentProgram : (nrInfo(nr)?.content ?? ''),
-        duration: cargaIntocada ? cargaHorariaPadrao(nr) : current.duration,
-      };
+      return { ...current, nr, contentProgram: custom ? current.contentProgram : (nrInfo(nr)?.content ?? ''), duration: cargaIntocada ? cargaHorariaPadrao(nr) : current.duration };
     });
   }
   function setDia(index: number, campos: Partial<NovoDia>) {
     setDraft((current) => ({ ...current, days: current.days.map((dia, i) => (i === index ? { ...dia, ...campos } : dia)) }));
   }
   function addDia() {
-    // O dia novo repete o horário e o instrutor do anterior: é o caso comum, e
-    // trocar um deles é um clique.
+    // O dia novo repete o horário e o instrutor do anterior: é o caso comum.
     setDraft((current) => {
       const ultimo = current.days[current.days.length - 1];
       return { ...current, days: [...current.days, { date: '', startTime: ultimo?.startTime ?? '08:00', endTime: ultimo?.endTime ?? '18:00', instructorId: ultimo?.instructorId ?? null }] };
@@ -478,7 +463,6 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
   function removeDia(index: number) {
     setDraft((current) => ({ ...current, days: current.days.filter((_, i) => i !== index) }));
   }
-
   async function save(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     setSalvando(true);
@@ -492,199 +476,131 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
     finally { setSalvando(false); }
   }
 
-  return <form onSubmit={save} className="max-w-3xl border border-black/10 bg-white p-6 md:p-8">
-    <span className="eyebrow text-[#8a6107]">Nova turma</span>
-    <h2 className="mt-2 text-2xl font-extrabold uppercase tracking-[0.03em]">Criar treinamento</h2>
-    <p className="mt-3 max-w-xl text-xs leading-relaxed text-[#777]">Cada data vira um dia com instrutor próprio. Pode criar agora e escalar o instrutor depois, na Agenda — é comum a data ser fechada com o cliente antes de haver escala.</p>
-
-    <div className="mt-6 space-y-5">
-      <ClientPicker clients={data.clients} value={draft.clientId} onChange={(id) => setDraft({ ...draft, clientId: id })} />
-
-      <div className="grid gap-4 sm:grid-cols-[130px_1fr]">
-        <label htmlFor="training-nr"><span className={labelClass}>Norma</span>
-          <select id="training-nr" value={draft.nr} onChange={(e) => changeNr(e.target.value)} className={selectClass}>{NORMAS.map((nr) => <option key={nr}>{nr}</option>)}</select>
-        </label>
-        <label htmlFor="training-title"><span className={labelClass}>Título no certificado</span>
-          <Input id="training-title" required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Ex.: Treinamento de Brigada de Incêndio - Intermediário" className={fieldClass} />
-        </label>
-      </div>
-
-      <label htmlFor="training-label"><span className={labelClass}>Identificação da turma</span>
-        <Input id="training-label" value={draft.internalLabel} onChange={(e) => setDraft({ ...draft, internalLabel: e.target.value })} placeholder="Ex.: Turma A - manhã" className={fieldClass} />
-        <span className="mt-2 block text-[11px] leading-relaxed text-[#888]">Só para vocês separarem duas turmas do mesmo treinamento na agenda e nas listas. <strong>Não aparece em nenhum documento.</strong></span>
-      </label>
-
-      <label htmlFor="training-theme"><span className={labelClass}>Tema da turma</span>
-        <Input id="training-theme" value={draft.theme} onChange={(e) => setDraft({ ...draft, theme: e.target.value })} placeholder="Ex.: Reciclagem para a equipe de manutenção" className={fieldClass} />
-        <span className="mt-2 block text-[11px] leading-relaxed text-[#888]">Vai na mensagem de escala do instrutor, para ele saber o que preparar. <strong>Não aparece em nenhum documento.</strong></span>
-      </label>
-
-      <fieldset className="border border-black/12 p-4">
-        <legend className="px-2 text-[10px] font-extrabold uppercase tracking-[0.12em]">Dias do treinamento</legend>
-        <div className="space-y-3">{draft.days.map((dia, index) => <div key={index} className="grid gap-2 border-l-4 border-[#f2ad19] bg-[#fffdf7] p-3 sm:grid-cols-[auto_1fr_auto_auto_auto]">
-          <span className="self-center text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107] sm:w-12">Dia {index + 1}</span>
-          <Input required type="date" aria-label={`Data do dia ${index + 1}`} value={dia.date} onChange={(e) => setDia(index, { date: e.target.value })} className={fieldClass} />
-          <Input type="time" aria-label={`Início do dia ${index + 1}`} value={dia.startTime} onChange={(e) => setDia(index, { startTime: e.target.value })} className={`${fieldClass} sm:w-28`} />
-          <Input type="time" aria-label={`Fim do dia ${index + 1}`} value={dia.endTime} onChange={(e) => setDia(index, { endTime: e.target.value })} className={`${fieldClass} sm:w-28`} />
-          {draft.days.length > 1 ? <button type="button" onClick={() => removeDia(index)} aria-label={`Remover o dia ${index + 1}`} className="flex size-12 shrink-0 items-center justify-center border border-black/15 bg-white text-[#777] hover:border-[#b62525] hover:text-[#b62525]"><X className="size-4" /></button> : <span className="hidden sm:block sm:size-12" />}
-          <span className="block sm:col-span-5">
-            <select aria-label={`Instrutor do dia ${index + 1}`} value={dia.instructorId ?? ''} onChange={(e) => setDia(index, { instructorId: e.target.value || null })} className={selectClass}>
-              <option value="">Sem instrutor — escalar depois</option>
-              {instrutores.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.specialties}</option>)}
-            </select>
-          </span>
-        </div>)}</div>
-        <button type="button" onClick={addDia} className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.1em] text-[#8a6107] hover:text-black"><Plus className="size-4" />Adicionar dia</button>
-        <p className="mt-3 text-[11px] leading-relaxed text-[#888]">A lista de presença é impressa no 1º dia com uma coluna de assinatura por data. A foto dela é cobrada no último dia, na hora de encerrar.</p>
-      </fieldset>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label htmlFor="training-duration"><span className={labelClass}>Carga horária</span>
-          <Input id="training-duration" required value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: e.target.value })} className={fieldClass} />
-        </label>
-        <label htmlFor="training-location"><span className={labelClass}>Endereço do treinamento</span>
-          <Input id="training-location" required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} placeholder="Rua, número, bairro e cidade" className={fieldClass} />
-        </label>
-      </div>
-
-      <label htmlFor="training-content"><span className={labelClass}>Conteúdo programático (aparece na lista)</span>
-        <textarea id="training-content" rows={4} value={draft.contentProgram} onChange={(e) => setDraft({ ...draft, contentProgram: e.target.value })} placeholder="Tópicos do treinamento (aparecem na faixa da lista de presença)." className="w-full border border-black/16 bg-white p-3 text-sm outline-none focus:border-[#f2ad19] focus:ring-2 focus:ring-[#f2ad19]/30" />
-      </label>
+  return <Cartao className="max-w-3xl p-5 sm:p-7"><form onSubmit={save} className="flex flex-col gap-5">
+    <div><h2 className="ds-h4">Nova turma</h2><p className="ds-body-s text-ds-texto-2">Cada data vira um dia com instrutor próprio. Dá para criar agora e escalar depois, na agenda.</p></div>
+    <ClientPicker clients={data.clients} value={draft.clientId} onChange={(id) => setDraft({ ...draft, clientId: id })} />
+    <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
+      <Campo rotulo="Norma"><select value={draft.nr} onChange={(e) => changeNr(e.target.value)} className={selectClasses}>{NORMAS.map((nr) => <option key={nr}>{nr}</option>)}</select></Campo>
+      <Campo rotulo="Título no certificado"><input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Ex.: Treinamento de Brigada de Incêndio - Intermediário" className={campoClasses} /></Campo>
     </div>
-
-    <Button disabled={data.clients.length === 0 || salvando} type="submit" className="mt-6 h-13 w-full rounded-none bg-[#f2ad19] text-[11px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-[#ff9900] sm:w-auto sm:px-8">
-      {salvando ? <Loader2 className="size-4 animate-spin" /> : <CalendarPlus className="size-4" />}Criar treinamento e QR
-    </Button>
-    {data.clients.length === 0 ? <p className="mt-3 text-xs font-bold text-[#8a6107]">Cadastre um cliente antes de criar a turma.</p> : null}
-  </form>;
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Campo rotulo="Identificação da turma" ajuda="Não aparece em nenhum documento."><input value={draft.internalLabel} onChange={(e) => setDraft({ ...draft, internalLabel: e.target.value })} placeholder="Ex.: Turma A - manhã" className={campoClasses} /></Campo>
+      <Campo rotulo="Tema da turma" ajuda="Vai na escala do instrutor. Não aparece em documento."><input value={draft.theme} onChange={(e) => setDraft({ ...draft, theme: e.target.value })} placeholder="Ex.: Reciclagem da manutenção" className={campoClasses} /></Campo>
+    </div>
+    <fieldset className="flex flex-col gap-3 rounded-lg border border-ds-borda p-4">
+      <legend className="px-1 font-ds-sans text-sm font-medium">Dias do treinamento</legend>
+      {draft.days.map((dia, index) => <div key={index} className="flex flex-col gap-2 rounded-lg bg-ds-muted p-3">
+        <div className="flex items-center justify-between"><span className="ds-caps text-ds-texto-2">Dia {index + 1}</span>{draft.days.length > 1 ? <BotaoIcone rotulo={`Remover o dia ${index + 1}`} tom="perigo" className="size-8" onClick={() => removeDia(index)}><X /></BotaoIcone> : null}</div>
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <input required type="date" aria-label={`Data do dia ${index + 1}`} value={dia.date} onChange={(e) => setDia(index, { date: e.target.value })} className={campoClasses} />
+          <div className="grid grid-cols-2 gap-2">
+            <input type="time" aria-label={`Início do dia ${index + 1}`} value={dia.startTime} onChange={(e) => setDia(index, { startTime: e.target.value })} className={campoClasses} />
+            <input type="time" aria-label={`Fim do dia ${index + 1}`} value={dia.endTime} onChange={(e) => setDia(index, { endTime: e.target.value })} className={campoClasses} />
+          </div>
+          <select aria-label={`Instrutor do dia ${index + 1}`} value={dia.instructorId ?? ''} onChange={(e) => setDia(index, { instructorId: e.target.value || null })} className={cn(selectClasses, 'sm:col-span-2')}>
+            <option value="">Sem instrutor — escalar depois</option>
+            {instrutores.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.specialties}</option>)}
+          </select>
+        </div>
+      </div>)}
+      <button type="button" onClick={addDia} className={botaoClasses('link', 'P', 'w-fit')}><Plus />Adicionar dia</button>
+      <p className="ds-caption text-ds-texto-2">A lista de presença é impressa no 1º dia com uma coluna de assinatura por data. A foto dela é cobrada no último dia.</p>
+    </fieldset>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Campo rotulo="Carga horária"><input required value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: e.target.value })} className={campoClasses} /></Campo>
+      <Campo rotulo="Endereço do treinamento"><input required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} placeholder="Rua, número, bairro e cidade" className={campoClasses} /></Campo>
+    </div>
+    <Campo rotulo="Conteúdo programático (aparece na lista)"><textarea rows={4} value={draft.contentProgram} onChange={(e) => setDraft({ ...draft, contentProgram: e.target.value })} placeholder="Tópicos do treinamento." className={areaClasses} /></Campo>
+    <div><Botao type="submit" disabled={data.clients.length === 0 || salvando}>{salvando ? <Loader2 className="animate-spin" /> : <CalendarPlus />}Criar turma e QR</Botao></div>
+    {data.clients.length === 0 ? <Faixa tom="sinal">Cadastre um cliente antes de criar a turma.</Faixa> : null}
+  </form></Cartao>;
 }
 
 // ---------------------------------------------------------------------------
+// Tela de turmas (Figma 18:170)
+// ---------------------------------------------------------------------------
 
 export function CompanyTrainings({ data, reload, notify, turmaAlvo = null }: { data: CompanyDashboardData; reload: Reload; notify: Notify; turmaAlvo?: string | null }) {
-  // Quem chega pela Visão geral ou pela agenda já entra na lista com a turma
-  // aberta. A seção remonta ao trocar de aba do portal, então basta o inicial.
-  const [aba, setAba] = useState<Aba>(turmaAlvo ? 'lista' : 'agenda');
+  const [vista, setVista] = useState<Vista>('tabela');
   const [busca, setBusca] = useState('');
-  const [filtro, setFiltro] = useState<'todos' | 'scheduled' | 'in_progress' | 'sem_instrutor'>('todos');
+  const [filtro, setFiltro] = useState<Filtro>('todas');
   const [aberta, setAberta] = useState<string | null>(turmaAlvo);
+  const [emissao, setEmissao] = useState<string | null>(null);
   const [criada, setCriada] = useState<string | null>(null);
 
-  // Rolar depois que o React pintou a linha; senão o elemento ainda não existe.
-  const rolarAteTurma = (id: string) => {
-    requestAnimationFrame(() => document.getElementById(`turma-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-  };
-
-  useEffect(() => {
-    if (turmaAlvo) rolarAteTurma(turmaAlvo);
-  }, [turmaAlvo]);
-
-  const abrirTurma = (id: string) => {
-    setAba('lista');
-    setFiltro('todos');
-    setBusca('');
-    setAberta(id);
-    rolarAteTurma(id);
-  };
-
   const instrutores = data.instructors.filter((item) => item.status === 'active');
+  const hojeIso = isoFromDate(new Date());
   const alvo = busca.trim().toLowerCase();
-  const casaBusca = (training: CompanyTraining) => !alvo || `${training.title} ${training.internal_label} ${training.nr} ${training.client_name} ${training.code}`.toLowerCase().includes(alvo);
-  // Concluídas ficam fora da agenda e da lista: têm aba própria.
-  const abertas = useMemo(() => data.trainings.filter((training) => training.status !== 'completed'), [data.trainings]);
-  const concluidas = useMemo(
-    () => data.trainings.filter((training) => training.status === 'completed').sort((a, b) => dataDaTurma(b).localeCompare(dataDaTurma(a))),
-    [data.trainings],
-  );
-  const filtradas = abertas.filter((training) => {
-    if (!casaBusca(training)) return false;
-    if (filtro === 'todos') return true;
-    if (filtro === 'sem_instrutor') return (training.sessions ?? []).some((dia) => !dia.instructor_id);
-    return training.status === filtro;
-  });
-  const agora = new Date();
-  const hojeIso = isoFromDate(agora);
-  const emUmaSemana = isoFromDate(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 7));
-  const grupos = GRUPOS.map((grupo) => ({
-    ...grupo,
-    turmas: filtradas.filter((training) => {
-      const dia = dataDaTurma(training);
-      if (grupo.id === 'atrasadas') return dia < hojeIso;
-      if (grupo.id === 'hoje') return dia === hojeIso;
-      if (grupo.id === 'semana') return dia > hojeIso && dia <= emUmaSemana;
-      return dia > emUmaSemana;
-    }).sort((a, b) => dataDaTurma(a).localeCompare(dataDaTurma(b))),
-  })).filter((grupo) => grupo.turmas.length > 0);
-  const concluidasFiltradas = concluidas.filter(casaBusca);
-
-  // Turmas que já receberam a foto da lista assinada: muda o texto da cobrança.
-  const turmasComLista = useMemo(
-    () => new Set(data.files.filter((file) => file.kind === 'attendance').map((file) => file.training_id)),
-    [data.files],
-  );
-  const semEscala = abertas.filter((training) => (training.sessions ?? []).some((dia) => !dia.instructor_id)).length;
+  const casa = (t: CompanyTraining) => !alvo || `${t.title} ${t.internal_label} ${t.nr} ${t.client_name} ${t.code}`.toLowerCase().includes(alvo);
+  const semInstrutor = (t: CompanyTraining) => t.status !== 'completed' && (t.sessions ?? []).some((dia) => !dia.instructor_id);
+  const regras: Record<Filtro, (t: CompanyTraining) => boolean> = {
+    todas: () => true,
+    scheduled: (t) => t.status === 'scheduled' && dataDaTurma(t) >= hojeIso,
+    in_progress: (t) => t.status === 'in_progress' && dataDaTurma(t) >= hojeIso,
+    atrasadas: (t) => t.status !== 'completed' && dataDaTurma(t) < hojeIso,
+    sem_instrutor: semInstrutor,
+    aguardando: (t) => t.status === 'completed' && !t.certificate_generated_at,
+    completed: (t) => t.status === 'completed',
+  };
+  const contar = (f: Filtro) => data.trainings.filter(regras[f]).length;
+  // Em aberto primeiro, pela data do próximo dia; concluídas depois, da mais recente.
+  const ordenadas = useMemo(() => [...data.trainings].sort((a, b) => {
+    const ca = a.status === 'completed' ? 1 : 0;
+    const cb = b.status === 'completed' ? 1 : 0;
+    if (ca !== cb) return ca - cb;
+    return ca ? dataDaTurma(b).localeCompare(dataDaTurma(a)) : dataDaTurma(a).localeCompare(dataDaTurma(b));
+  }), [data.trainings]);
+  const lista = ordenadas.filter((t) => regras[filtro](t) && casa(t));
+  const turmaAberta = aberta ? data.trainings.find((t) => t.id === aberta) : undefined;
+  const turmaEmissao = emissao ? data.trainings.find((t) => t.id === emissao) : undefined;
   const nova = criada ? data.trainings.find((item) => item.id === criada) : undefined;
-  const linha = (training: CompanyTraining) => <TrainingRow key={training.id} training={training} clients={data.clients} instructors={instrutores} faltaLista={!turmasComLista.has(training.id)} reload={reload} notify={notify}
-    aberta={aberta === training.id} alternar={() => setAberta((atual) => (atual === training.id ? null : training.id))} />;
 
-  return <div className="space-y-6">
-    <SubTabs label="Seções de treinamentos" active={aba} onChange={(id) => setAba(id)} tabs={[
-      { id: 'agenda', label: 'Agenda' },
-      { id: 'lista', label: 'Em aberto', count: abertas.length },
-      { id: 'concluidas', label: 'Concluídas', count: concluidas.length },
-      { id: 'criar', label: 'Criar' },
-    ]} />
+  const pilulas: Array<[Filtro, string]> = [['todas', 'Todas'], ['scheduled', 'Agendadas'], ['in_progress', 'Em andamento'], ['atrasadas', 'Dia vencido'], ['sem_instrutor', 'Sem instrutor'], ['aguardando', 'Aguardando certificados'], ['completed', 'Concluídas']];
 
-    {semEscala > 0 && aba !== 'criar' && aba !== 'concluidas' ? <button type="button" onClick={() => { setAba('lista'); setFiltro('sem_instrutor'); }} className="flex w-full items-center gap-3 border-l-4 border-[#b62525] bg-[#fff5f5] p-4 text-left hover:bg-[#ffecec]">
-      <AlertTriangle className="size-5 shrink-0 text-[#b62525]" />
-      <span className="text-xs font-bold text-[#b62525]">{semEscala === 1 ? '1 turma tem dia sem instrutor escalado.' : `${semEscala} turmas têm dias sem instrutor escalado.`} Ver quais →</span>
-    </button> : null}
+  return <div className="flex flex-col gap-6">
+    <TopoDePagina titulo="Turmas" subtitulo="Todas as turmas de todos os clientes, do agendamento ao certificado." acoes={<>
+      <Botao tipo="secundario" onClick={() => setVista(vista === 'agenda' ? 'tabela' : 'agenda')}>{vista === 'agenda' ? 'Tabela' : 'Agenda'}<CalendarDays /></Botao>
+      <Botao onClick={() => setVista('criar')}>Nova turma<Plus /></Botao>
+    </>} />
 
-    {aba === 'agenda' ? <Agenda data={data} reload={reload} notify={notify} abrirTurma={abrirTurma} /> : null}
+    {vista === 'agenda' ? <Agenda data={data} reload={reload} notify={notify} abrirTurma={(id) => setAberta(id)} /> : null}
 
-    {aba === 'lista' ? <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-black/35" /><Input aria-label="Buscar turma" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por título, cliente, NR ou código" className={`${fieldClass} pl-11`} /></div>
-        <label className="sm:w-64" htmlFor="turmas-filtro"><span className="sr-only">Filtrar por situação</span>
-          <select id="turmas-filtro" value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)} className={selectClass}>
-            <option value="todos">Todas as situações</option>
-            <option value="scheduled">Agendadas</option>
-            <option value="in_progress">Em andamento</option>
-
-            <option value="sem_instrutor">Sem instrutor escalado</option>
-          </select>
-        </label>
-      </div>
-      {grupos.map((grupo) => <section key={grupo.id} className="space-y-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b-2 border-black pb-2 pt-3">
-          <h3 className={`text-sm font-extrabold uppercase tracking-[0.08em] ${grupo.id === 'atrasadas' ? 'text-[#b62525]' : ''}`}>{grupo.titulo}</h3>
-          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#777]">{grupo.turmas.length === 1 ? '1 turma' : `${grupo.turmas.length} turmas`}{grupo.texto ? ` · ${grupo.texto}` : ''}</span>
-        </div>
-        {grupo.turmas.map(linha)}
-      </section>)}
-      {filtradas.length === 0 ? <EmptyState icon={CalendarPlus} title="Nenhuma turma em aberto" text={abertas.length === 0 ? 'Crie uma turma na aba Criar. As encerradas ficam em Concluídas.' : 'Ajuste a busca ou o filtro de situação.'} /> : null}
-    </div> : null}
-
-    {aba === 'concluidas' ? <div className="space-y-4">
-      <div className="relative"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-black/35" /><Input aria-label="Buscar turma concluída" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por título, cliente, NR ou código" className={`${fieldClass} pl-11`} /></div>
-      <p className="text-xs text-[#777]">Turmas encerradas, da mais recente para a mais antiga. Abra uma para ver ou editar dados, dias e documentos.</p>
-      {concluidasFiltradas.map(linha)}
-      {concluidasFiltradas.length === 0 ? <EmptyState icon={Check} title="Nenhuma turma concluída" text={concluidas.length === 0 ? 'A turma aparece aqui quando o último dia é encerrado.' : 'Ajuste a busca.'} /> : null}
-    </div> : null}
-
-    {aba === 'criar' ? <div className="space-y-4">
-      {nova ? <div className="border-l-4 border-[#25D366] bg-black p-5 text-white">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <span className="eyebrow text-[#25D366]">Turma criada</span>
-            <h3 className="mt-2 text-lg font-extrabold uppercase leading-tight tracking-[0.05em]">{nova.nr} · {nova.title}</h3>
-            <p className="mt-2 text-xs leading-relaxed text-white/60">{(nova.sessions ?? []).some((dia) => !dia.instructor_id) ? 'Escale o instrutor de cada dia na Agenda — de lá você também avisa cada um pelo WhatsApp.' : 'Instrutores escalados. Avise cada um pela Agenda.'}</p>
-          </div>
-          <button type="button" onClick={() => setCriada(null)} aria-label="Fechar aviso" className="shrink-0 text-white/40 hover:text-white"><X className="size-4" /></button>
-        </div>
-        <button type="button" onClick={() => { setAba('agenda'); setCriada(null); }} className="mt-4 inline-flex h-12 items-center gap-2 bg-[#f2ad19] px-5 text-[10px] font-extrabold uppercase tracking-[.1em] text-black hover:bg-[#ff9900]"><CalendarDays className="size-4" />Abrir na agenda</button>
-      </div> : null}
+    {vista === 'criar' ? <div className="flex flex-col gap-4">
+      {nova ? <Faixa tom="sucesso" titulo={`Turma criada: ${nova.nr} · ${nova.title}`} acao={<Botao tamanho="P" tipo="escuro" onClick={() => { setAberta(nova.id); setVista('tabela'); setCriada(null); }}>Abrir a ficha</Botao>}>{(nova.sessions ?? []).some((dia) => !dia.instructor_id) ? 'Escale o instrutor de cada dia na ficha da turma; de lá você avisa cada um pelo WhatsApp.' : 'Instrutores escalados. Avise cada um pela ficha da turma.'}</Faixa> : null}
+      <button type="button" onClick={() => setVista('tabela')} className={botaoClasses('link', 'P', 'w-fit')}>← Voltar às turmas</button>
       <Criar data={data} reload={reload} notify={notify} aoCriar={setCriada} />
     </div> : null}
+
+    {vista === 'tabela' ? <>
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {pilulas.map(([id, rotulo]) => { const n = contar(id); if (n === 0 && id !== 'todas' && id !== filtro && (id === 'atrasadas' || id === 'sem_instrutor' || id === 'aguardando')) return null; return <Pilula key={id} ativa={filtro === id} onClick={() => setFiltro(id)} className={cn((id === 'atrasadas' || id === 'sem_instrutor') && filtro !== id && 'border-ds-perigo/40 text-ds-perigo')}>{rotulo} · {n}</Pilula>; })}
+        </div>
+        <label className="relative xl:ml-auto xl:w-72"><Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ds-texto-2" /><input aria-label="Buscar turma" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar turma, cliente ou NR" className={cn(campoClasses, 'min-h-10 py-2 pl-10 ds-body-s')} /></label>
+      </div>
+      {contar('sem_instrutor') > 0 && filtro !== 'sem_instrutor' ? <Faixa tom="perigo" acao={<Botao tamanho="P" tipo="fantasma" onClick={() => setFiltro('sem_instrutor')}>Ver quais</Botao>}><span className="inline-flex items-center gap-2"><AlertTriangle className="size-4 text-ds-perigo" />{contar('sem_instrutor') === 1 ? '1 turma tem dia sem instrutor escalado.' : `${contar('sem_instrutor')} turmas têm dias sem instrutor escalado.`}</span></Faixa> : null}
+      {lista.length ? <div className={tb.moldura}><div className={tb.rolagem}><table className={cn(tb.tabela, 'min-w-[860px]')}>
+        <thead className={tb.cabeca}><tr><th className={tb.th}>Turma</th><th className={tb.th}>Cliente</th><th className={tb.th}>Treinamento</th><th className={tb.th}>Data</th><th className={tb.th}>Instrutor</th><th className={tb.th}>Status</th></tr></thead>
+        <tbody>{lista.map((t) => {
+          const dia = proximoDia(t);
+          const instrutor = dia?.instructor_name ?? (dia ? null : t.instructor);
+          const sit = situacaoDaTurma(t, hojeIso);
+          return <tr key={t.id} onClick={() => setAberta(t.id)} className={cn(tb.linha, tb.linhaClicavel, (aberta === t.id || emissao === t.id) && 'bg-ds-amarelo-suave')}>
+            <td className={tb.td}><span className={tb.codigo}>{t.code}</span></td>
+            <td className={cn(tb.td, 'font-medium')}><button type="button" onClick={(e) => { e.stopPropagation(); setAberta(t.id); }} className="text-left ds-foco">{t.client_name}{t.internal_label ? <span className="block ds-caption font-normal text-ds-texto-2">{t.internal_label}</span> : null}</button></td>
+            <td className={cn(tb.td, 'max-w-[220px] truncate')} title={t.title}>{t.nr} · {t.title}</td>
+            <td className={cn(tb.td, 'whitespace-nowrap')}>{formatDayMonth(dia?.session_date ?? t.training_date)}{t.sessions.length > 1 && dia ? <span className="block ds-caption text-ds-texto-2">dia {dia.day_number} de {t.sessions.length}</span> : null}</td>
+            <td className={cn(tb.td, !instrutor && t.status !== 'completed' && 'text-ds-perigo')}>{instrutor || (t.status === 'completed' ? '—' : 'A definir')}</td>
+            <td className={tb.td}>{sit.texto === 'Aguardando certificados' ? <button type="button" onClick={(e) => { e.stopPropagation(); setEmissao(t.id); }} className="ds-foco rounded"><Tag tom={sit.tom}>{sit.texto}</Tag></button> : <Tag tom={sit.tom}>{sit.texto}</Tag>}</td>
+          </tr>;
+        })}</tbody>
+      </table></div></div> : <Vazio icone={<CalendarPlus />} titulo="Nenhuma turma neste filtro" texto={data.trainings.length === 0 ? 'Crie a primeira turma em "Nova turma".' : 'Ajuste a busca ou o filtro.'} />}
+    </> : null}
+
+    {turmaAberta ? <PainelLateral aberto onFechar={() => setAberta(null)} largura={560} sobretitulo={`Turma ${turmaAberta.code}`} titulo={`${turmaAberta.nr} · ${turmaAberta.internal_label || turmaAberta.title}`} subtitulo={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="inline-flex items-center gap-1.5"><UserRound className="size-3.5" />{turmaAberta.client_name}</span><span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" />{turmaAberta.duration}</span><span className="inline-flex items-center gap-1.5"><ImageIcon className="size-3.5" />{turmaAberta.file_count} arquivos</span><Tag tom={situacaoDaTurma(turmaAberta, hojeIso).tom}>{situacaoDaTurma(turmaAberta, hojeIso).texto}</Tag></span>}>
+      <FichaDaTurma key={turmaAberta.id} training={turmaAberta} data={data} instructors={instrutores} reload={reload} notify={notify} emitir={() => { setEmissao(turmaAberta.id); setAberta(null); }} aoExcluir={() => setAberta(null)} />
+    </PainelLateral> : null}
+
+    {turmaEmissao ? <EmitirCertificados key={turmaEmissao.id} training={turmaEmissao} data={data} aberto onFechar={() => setEmissao(null)} reload={reload} notify={notify} /> : null}
   </div>;
 }
