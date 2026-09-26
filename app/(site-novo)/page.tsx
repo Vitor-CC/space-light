@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { botao, linhaDeBotoes } from '@/components/site-novo/botao';
 import { Confirmar } from '@/components/site-novo/confirmar';
 import { DadosEstruturados } from '@/components/site-novo/dados-estruturados';
+import { CardNorma } from '@/components/site-novo/card-norma';
 import { DocSection } from '@/components/site-novo/doc-section';
 import { Figura } from '@/components/site-novo/figura';
 import { ListaDeItens } from '@/components/site-novo/lista-de-itens';
@@ -189,39 +190,10 @@ export default function HomeSiteNovo() {
           </p>
         </div>
 
-        {/* No celular cada norma é um bloco; a partir de 1024, uma linha de
-            índice: código, nome, descrição e link. */}
-        <ul data-surgir className="mt-10 border-t border-doc-ink">
+        <ul data-surgir className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {NORMAS.map((norma) => (
-            <li key={norma.slug} className="border-b border-doc-rule-strong">
-              <Link
-                href={rotas.norma(norma.slug)}
-                className="doc-focus group grid grid-cols-[5rem_minmax(0,1fr)] gap-x-4 py-5 lg:grid-cols-[6rem_minmax(0,13rem)_minmax(0,1fr)_auto] lg:items-baseline lg:gap-x-6 lg:py-6"
-              >
-                <span className="font-doc-mono text-2xl leading-none font-semibold text-doc-mark lg:text-3xl">
-                  {norma.codigo}
-                </span>
-                <span className="min-w-0 lg:contents">
-                  <span
-                    className={cn(
-                      texto.tituloItem,
-                      'block decoration-sl-gold decoration-2 underline-offset-4 group-hover:underline',
-                    )}
-                  >
-                    {norma.nome}
-                  </span>
-                  <span className="mt-2 block text-sm leading-relaxed text-doc-ink-muted lg:mt-0 lg:text-base">
-                    {norma.linha}
-                  </span>
-                  <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold underline decoration-sl-gold decoration-2 underline-offset-4 group-hover:decoration-doc-ink lg:mt-0 lg:justify-self-end">
-                    <span className="lg:max-xl:sr-only">Ver treinamento</span>
-                    <ArrowRight
-                      className="size-4 transition-transform duration-200 group-hover:translate-x-1"
-                      aria-hidden="true"
-                    />
-                  </span>
-                </span>
-              </Link>
+            <li key={norma.slug} className="flex">
+              <CardNorma norma={norma} />
             </li>
           ))}
         </ul>

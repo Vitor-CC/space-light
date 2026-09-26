@@ -1,3 +1,4 @@
+import { CardNorma } from '@/components/site-novo/card-norma';
 import { ArrowDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
@@ -223,27 +224,10 @@ export function PaginaDeNorma({ norma }: { norma: NormaComPagina }) {
         tom="folha"
       >
         <h2 className={texto.tituloSecao}>Outras normas</h2>
-        <ul
-          data-surgir
-          className="mt-8 border-t border-doc-ink md:grid md:grid-cols-2 md:gap-x-10"
-        >
+        <ul data-surgir className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {outras.map((item) => (
-            <li key={item.slug} className="border-b border-doc-rule-strong">
-              <Link
-                href={rotas.norma(item.slug)}
-                className="doc-focus group flex items-center gap-4 py-4"
-              >
-                <span className="w-16 shrink-0 font-doc-mono text-base font-semibold text-doc-mark">
-                  {item.codigo}
-                </span>
-                <span className="min-w-0 flex-1 font-semibold decoration-sl-gold decoration-2 underline-offset-4 group-hover:underline">
-                  {item.nome}
-                </span>
-                <ArrowRight
-                  className="size-4 shrink-0 transition-transform duration-200 group-hover:translate-x-1"
-                  aria-hidden="true"
-                />
-              </Link>
+            <li key={item.slug} className="flex">
+              <CardNorma norma={item} />
             </li>
           ))}
         </ul>

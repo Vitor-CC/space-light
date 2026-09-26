@@ -9,7 +9,7 @@ import { rotas } from '@/lib/site-novo/rotas';
 import { cn } from '@/lib/utils';
 
 const itemNav =
-  'doc-focus inline-flex h-10 items-center gap-1.5 px-3 text-sm font-semibold text-doc-ink decoration-sl-gold decoration-2 underline-offset-[10px] hover:underline';
+  'doc-focus inline-flex h-10 items-center gap-1 font-ds-sans text-sm leading-5 font-medium text-ds-texto-inv decoration-ds-amarelo decoration-2 underline-offset-[10px] hover:underline';
 
 /**
  * Navegação a partir de 1024. "Treinamentos" abre o índice das normas, que
@@ -23,7 +23,7 @@ export function DesktopNav() {
       aria-label="Navegação principal"
       className="hidden lg:block"
     >
-      <NavigationMenu.List className="flex items-center">
+      <NavigationMenu.List className="flex items-center gap-9">
         <NavigationMenu.Item>
           <NavigationMenu.Trigger
             className={cn(itemNav, 'data-popup-open:underline')}
@@ -33,7 +33,7 @@ export function DesktopNav() {
               <ChevronDown className="size-4" aria-hidden="true" />
             </NavigationMenu.Icon>
           </NavigationMenu.Trigger>
-          <NavigationMenu.Content className="w-[27rem] p-2">
+          <NavigationMenu.Content className="w-[27rem] p-2 text-ds-texto">
             <ul>
               {NORMAS.map((norma) => (
                 <li
@@ -43,12 +43,12 @@ export function DesktopNav() {
                   <NavigationMenu.Link
                     closeOnClick
                     render={<Link href={rotas.norma(norma.slug)} />}
-                    className="doc-focus flex items-baseline gap-4 px-3 py-3 hover:bg-doc-paper"
+                    className="doc-focus flex items-baseline gap-4 rounded-md px-3 py-3 hover:bg-ds-muted"
                   >
-                    <span className="w-12 shrink-0 font-doc-mono text-sm font-semibold text-doc-mark">
+                    <span className="w-12 shrink-0 ds-caps text-ds-amarelo-texto">
                       {norma.codigo}
                     </span>
-                    <span className="text-sm font-semibold">{norma.nome}</span>
+                    <span className="ds-body-s font-medium">{norma.nome}</span>
                   </NavigationMenu.Link>
                 </li>
               ))}
@@ -67,6 +67,15 @@ export function DesktopNav() {
 
         <NavigationMenu.Item>
           <NavigationMenu.Link
+            render={<Link href={rotas.portalCliente} />}
+            className={itemNav}
+          >
+            Portal do cliente
+          </NavigationMenu.Link>
+        </NavigationMenu.Item>
+
+        <NavigationMenu.Item>
+          <NavigationMenu.Link
             render={<Link href={rotas.contato} />}
             className={itemNav}
           >
@@ -76,15 +85,14 @@ export function DesktopNav() {
       </NavigationMenu.List>
 
       <NavigationMenu.Portal>
-        {/* sideOffset 17: o topo do popup encosta no fio inferior do cabeçalho
-            (72px de altura, gatilho de 40px centralizado, + 1px de fio). */}
+        {/* sideOffset: o popup abre logo abaixo do fio inferior do cabeçalho. */}
         <NavigationMenu.Positioner
           side="bottom"
           align="start"
-          sideOffset={17}
+          sideOffset={20}
           className="doc-ui z-50 h-(--positioner-height) w-(--positioner-width) max-w-(--available-width)"
         >
-          <NavigationMenu.Popup className="relative h-(--popup-height) w-(--popup-width) border border-t-0 border-doc-rule-strong bg-doc-sheet text-doc-ink outline-none">
+          <NavigationMenu.Popup className="relative h-(--popup-height) w-(--popup-width) rounded-lg border border-ds-borda bg-ds-superficie text-ds-texto shadow-xl outline-none">
             <NavigationMenu.Viewport className="relative size-full overflow-hidden" />
           </NavigationMenu.Popup>
         </NavigationMenu.Positioner>

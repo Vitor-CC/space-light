@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { IBM_Plex_Mono, IBM_Plex_Sans, Montserrat } from 'next/font/google';
+import { Archivo, IBM_Plex_Mono, IBM_Plex_Sans, Montserrat } from 'next/font/google';
 
 import { SITE_URL } from '@/lib/site-url';
 import './globals.css';
@@ -17,6 +17,14 @@ const plexSans = IBM_Plex_Sans({
   variable: '--font-plex-sans',
   subsets: ['latin'],
   weight: ['400', '500', '600'],
+  display: 'swap',
+});
+
+// Archivo ExtraBold: só o código grande do card de norma ("NR 23").
+const archivo = Archivo({
+  variable: '--font-archivo',
+  subsets: ['latin'],
+  weight: ['800'],
   display: 'swap',
 });
 
@@ -61,7 +69,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body
-        className={`${montserrat.variable} ${plexSans.variable} ${plexMono.variable} antialiased`}
+        className={`${montserrat.variable} ${plexSans.variable} ${plexMono.variable} ${archivo.variable} antialiased`}
       >
         {children}
       </body>

@@ -28,7 +28,7 @@ export function MobileMenu() {
     <Sheet open={aberto} onOpenChange={setAberto}>
       <SheetTrigger
         aria-label="Abrir menu"
-        className="doc-focus flex size-10 items-center justify-center border border-doc-rule-strong text-doc-ink lg:hidden"
+        className="doc-focus flex size-10 items-center justify-center rounded-md border border-ds-borda-inv text-ds-texto-inv lg:hidden"
       >
         <Menu className="size-5" aria-hidden="true" />
       </SheetTrigger>
@@ -38,21 +38,21 @@ export function MobileMenu() {
         className="doc-ui gap-0 overflow-y-auto border-doc-rule-strong bg-doc-paper text-doc-ink shadow-none data-[side=right]:w-full data-[side=right]:sm:max-w-md"
       >
         <div className="flex h-header shrink-0 items-center justify-between border-b border-doc-rule-strong px-5">
-          <SheetTitle className="font-doc-mono text-xs font-normal text-doc-ink-muted">
+          <SheetTitle className="ds-caps text-ds-texto-2">
             Menu
           </SheetTitle>
           <button
             type="button"
             onClick={fechar}
             aria-label="Fechar menu"
-            className="doc-focus flex size-10 items-center justify-center border border-doc-rule-strong"
+            className="doc-focus flex size-10 items-center justify-center rounded-md border border-ds-borda"
           >
             <X className="size-5" aria-hidden="true" />
           </button>
         </div>
 
         <nav aria-label="Navegação principal" className="px-5 pb-10">
-          <p className="pt-6 pb-2 font-doc-mono text-xs text-doc-ink-muted">
+          <p className="pt-6 pb-2 ds-caps text-ds-texto-2">
             Treinamentos
           </p>
           <ul className="border-t border-doc-rule-strong">
@@ -63,7 +63,7 @@ export function MobileMenu() {
                   onClick={fechar}
                   className="doc-focus flex items-baseline gap-4 py-3"
                 >
-                  <span className="w-14 shrink-0 font-doc-mono text-sm font-semibold text-doc-mark">
+                  <span className="w-14 shrink-0 ds-caps text-ds-amarelo-texto">
                     {norma.codigo}
                   </span>
                   <span className="text-sm font-semibold">{norma.nome}</span>
@@ -89,6 +89,15 @@ export function MobileMenu() {
                 className={linkDeLista}
               >
                 Contato
+              </Link>
+            </li>
+            <li className={linhaDeLista}>
+              <Link
+                href={rotas.portalCliente}
+                onClick={fechar}
+                className={linkDeLista}
+              >
+                Portal do cliente
               </Link>
             </li>
             <li className={linhaDeLista}>

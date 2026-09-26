@@ -1,20 +1,18 @@
 /**
- * Escala de texto do site novo, pensada primeiro para 375px. Work Sans nos
- * títulos, Open Sans no corpo, monoespaçada só em rótulo, código e número.
+ * Escala de texto do site, pensada primeiro para 375px, nos estilos do Design
+ * System 2026: Montserrat nos títulos e rótulos, IBM Plex Sans no corpo,
+ * monoespaçada só em código e número.
  */
 export const texto = {
-  eyebrow:
-    'font-heading text-xs font-bold tracking-[0.16em] text-doc-mark uppercase',
-  tituloPagina:
-    'font-heading text-[clamp(2.75rem,1.6rem+5vw,6rem)] leading-[0.92] font-black text-balance uppercase',
-  tituloSecao:
-    'font-heading text-[clamp(2rem,1.2rem+3.4vw,3.75rem)] leading-[0.95] font-extrabold text-balance uppercase',
-  tituloItem: 'font-heading text-lg leading-tight font-bold lg:text-xl',
-  corpo: 'max-w-measure text-base leading-relaxed lg:text-lg',
+  eyebrow: 'ds-caps text-doc-mark',
+  tituloPagina: 'ds-h1 text-balance',
+  tituloSecao: 'ds-h2 text-balance',
+  tituloItem: 'ds-h4',
+  corpo: 'max-w-measure ds-body-m',
   apoio:
-    'max-w-measure text-base leading-relaxed text-doc-ink-muted lg:text-lg',
+    'max-w-measure ds-body-m text-doc-ink-muted',
   rotulo: 'font-doc-mono text-xs text-doc-ink-muted',
-  link: 'doc-focus font-semibold underline decoration-sl-gold decoration-2 underline-offset-4 hover:decoration-doc-ink',
+  link: 'doc-focus font-semibold underline decoration-ds-amarelo decoration-2 underline-offset-4 hover:decoration-doc-ink',
 } as const;
 
 /**

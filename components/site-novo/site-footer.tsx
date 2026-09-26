@@ -1,145 +1,59 @@
-import Image from 'next/image';
 import Link from 'next/link';
 
+import { Logo } from '@/components/ds/base';
 import { REDES, WHATSAPP } from '@/lib/site-novo/contato';
 import { NORMAS } from '@/lib/site-novo/normas';
 import { rotas } from '@/lib/site-novo/rotas';
 
-const titulo = 'pb-3 font-doc-mono text-xs text-doc-ink-muted';
-const lista = 'grid gap-2.5';
-const link =
-  'doc-focus text-sm decoration-sl-gold decoration-2 underline-offset-4 hover:underline';
+const titulo = 'ds-caps text-ds-texto-inv-2';
+const lista = 'flex flex-col gap-3.5';
+const link = 'doc-focus ds-body-s text-ds-texto-inv decoration-ds-amarelo decoration-2 underline-offset-4 hover:underline';
 
-/** Rodapé na mesma grade do documento: a linha da margem desce até o fim. */
+/** Rodapé do Figma ("Site / Footer"): marca à esquerda, quatro colunas de links e a linha de base. */
 export function SiteFooter() {
   return (
-    <footer className="bg-doc-paper text-doc-ink">
-      <div className="doc-shell">
-        <div className="doc-grid border-t border-doc-rule-strong">
-          <div className="pt-10 lg:pt-12 lg:pr-8">
-            <Image
-              src="/images/branding/space-light-logo-oficial.png"
-              alt="Space Light Engenharia"
-              width={260}
-              height={49}
-              className="h-7 w-auto"
-            />
+    <footer className="dark bg-ds-inverso text-ds-texto-inv">
+      <div className="mx-auto flex max-w-[90rem] flex-col gap-16 px-5 pt-16 pb-10 md:px-10 lg:gap-[72px] lg:pt-24 xl:px-[120px]">
+        <div className="flex flex-col gap-12 lg:flex-row lg:justify-between">
+          <div className="flex max-w-[340px] flex-col gap-5">
+            <Logo cor="claro" />
+            <p className="ds-body-s text-ds-texto-inv-2">Treinamentos corporativos em Normas Regulamentadoras. Base em São Paulo, atendimento em âmbito nacional.</p>
           </div>
 
-          <div className="min-w-0 pt-6 pb-10 lg:border-l lg:border-doc-rule-strong lg:pt-12 lg:pl-12">
-            <p className="max-w-measure text-sm leading-relaxed text-doc-ink-muted">
-              Treinamentos corporativos em Normas Regulamentadoras. Base em São
-              Paulo, atendimento em âmbito nacional.
-            </p>
+          <div className="grid gap-x-16 gap-y-10 sm:grid-cols-2 xl:flex xl:gap-16">
+            <nav aria-label="Páginas" className={lista}>
+              <p className={titulo}>Páginas</p>
+              <Link href={rotas.inicio} className={link}>Início</Link>
+              <Link href={rotas.treinamentos} className={link}>Treinamentos</Link>
+              <Link href={rotas.comoTrabalhamos} className={link}>Como trabalhamos</Link>
+              <Link href={rotas.portalCliente} className={link}>Portal do cliente</Link>
+              <Link href={rotas.contato} className={link}>Solicitar proposta</Link>
+            </nav>
 
-            <div className="mt-10 grid gap-x-8 gap-y-10 sm:grid-cols-2 xl:grid-cols-4">
-              <nav aria-label="Páginas">
-                <p className={titulo}>Páginas</p>
-                <ul className={lista}>
-                  <li>
-                    <Link href={rotas.inicio} className={link}>
-                      Início
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href={rotas.comoTrabalhamos} className={link}>
-                      Como trabalhamos
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href={rotas.contato} className={link}>
-                      Solicitar proposta
-                    </Link>
-                  </li>
-                </ul>
-              </nav>
+            <nav aria-label="Treinamentos" className={lista}>
+              <p className={titulo}>Treinamentos</p>
+              {NORMAS.map((norma) => <Link key={norma.slug} href={rotas.norma(norma.slug)} className={link}>{norma.codigo} · {norma.nome}</Link>)}
+            </nav>
 
-              <nav aria-label="Treinamentos">
-                <p className={titulo}>Treinamentos</p>
-                <ul className={lista}>
-                  {NORMAS.map((norma) => (
-                    <li key={norma.slug}>
-                      <Link
-                        href={rotas.norma(norma.slug)}
-                        className="doc-focus group flex items-baseline gap-3 text-sm"
-                      >
-                        <span className="w-12 shrink-0 font-doc-mono text-xs font-semibold text-doc-mark">
-                          {norma.codigo}
-                        </span>
-                        <span className="decoration-sl-gold decoration-2 underline-offset-4 group-hover:underline">
-                          {norma.nome}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
+            <nav aria-label="Portais" className={lista}>
+              <p className={titulo}>Portais</p>
+              <Link href={rotas.portalCliente} className={link}>Área do cliente</Link>
+              <Link href={rotas.portalInstrutor} className={link}>Área do instrutor</Link>
+              <Link href={rotas.portalEmpresa} className={link}>Área da empresa</Link>
+            </nav>
 
-              <nav aria-label="Portais">
-                <p className={titulo}>Portais</p>
-                <ul className={lista}>
-                  <li>
-                    <Link href={rotas.portalCliente} className={link}>
-                      Área do cliente
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href={rotas.portalInstrutor} className={link}>
-                      Área do instrutor
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href={rotas.portalEmpresa} className={link}>
-                      Área da empresa
-                    </Link>
-                  </li>
-                </ul>
-              </nav>
-
-              <div>
-                <p className={titulo}>Contato</p>
-                <ul className={lista}>
-                  <li>
-                    <a
-                      href={WHATSAPP.link}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={link}
-                    >
-                      WhatsApp{' '}
-                      <span className="font-doc-mono text-xs tabular-nums">
-                        {WHATSAPP.numero}
-                      </span>
-                    </a>
-                  </li>
-                  <li>
-                    <a
-                      href={REDES.instagram}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={link}
-                    >
-                      Instagram
-                    </a>
-                  </li>
-                  <li>
-                    <a
-                      href={REDES.facebook}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={link}
-                    >
-                      Facebook
-                    </a>
-                  </li>
-                </ul>
-              </div>
+            <div className={lista}>
+              <p className={titulo}>Contato</p>
+              <a href={WHATSAPP.link} target="_blank" rel="noreferrer" className={link}>WhatsApp {WHATSAPP.numero}</a>
+              <a href={REDES.instagram} target="_blank" rel="noreferrer" className={link}>Instagram</a>
+              <a href={REDES.facebook} target="_blank" rel="noreferrer" className={link}>Facebook</a>
             </div>
-
-            <p className="mt-12 border-t border-doc-rule-strong pt-5 font-doc-mono text-xs text-doc-ink-muted">
-              © Space Light Engenharia
-            </p>
           </div>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-ds-borda-inv pt-6 ds-caption text-ds-texto-inv-2 sm:flex-row sm:justify-between">
+          <p>© {new Date().getFullYear()} Space Light Engenharia</p>
+          <p>Treinamentos em NR com teoria aplicada e prática supervisionada.</p>
         </div>
       </div>
     </footer>
