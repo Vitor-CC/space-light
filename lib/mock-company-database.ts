@@ -85,6 +85,8 @@ export async function uploadCompanyFiles(input: {
   trainingId: string;
   kind: 'photo' | 'document' | 'attendance';
   files: File[];
+  /** Dia a que a lista assinada pertence; sem ele, o servidor usa o último. */
+  sessionId?: string;
   onProgress?: (done: number, total: number, name: string) => void;
 }) {
   const saved: string[] = [];
@@ -95,6 +97,7 @@ export async function uploadCompanyFiles(input: {
     body.append('clientId', input.clientId);
     body.append('trainingId', input.trainingId);
     body.append('kind', input.kind);
+    if (input.sessionId) body.append('sessionId', input.sessionId);
     body.append('files', file);
     try {
       const response = await fetch('/api/company/files', { method: 'POST', body });

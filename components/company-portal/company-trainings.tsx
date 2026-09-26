@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Award, CalendarDays, CalendarPlus, Check, CheckCircle2, ChevronRight, Circle, Clock3, FileText, ImageIcon, Loader2, MessageCircle, Pencil, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
+import { AlertTriangle, Award, CalendarDays, CalendarPlus, Check, CheckCircle2, ChevronRight, Circle, Clock3, FileText, ImageIcon, Loader2, MessageCircle, Pencil, Plus, Search, Trash2, Upload, UserRound, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode, SyntheticEvent } from 'react';
 import { ptBR } from 'date-fns/locale';
@@ -10,7 +10,7 @@ import { areaClasses, Botao, botaoClasses, BotaoIcone, Campo, campoClasses, Cart
 import { Interruptor, PainelLateral } from '@/components/ds/interativo';
 import { Calendar } from '@/components/ui/calendar';
 import type { CompanyDashboardData, CompanyInstructor, CompanyTraining, TrainingSession } from '@/lib/company-types';
-import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTraining, generateCertificates, readInstructorDocuments, removeTrainingDay, renameTraining, updateTrainingDay, updateTrainingDetails } from '@/lib/mock-company-database';
+import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTraining, generateCertificates, readInstructorDocuments, removeTrainingDay, renameTraining, updateTrainingDay, updateTrainingDetails, uploadCompanyFiles } from '@/lib/mock-company-database';
 import type { NovoDia } from '@/lib/mock-company-database';
 import { dataDoDia as dataDaTurma, proximoDiaDaTurma as proximoDia } from '@/lib/dias-da-turma';
 import { nrInfo } from '@/lib/nr-catalog';
@@ -248,6 +248,21 @@ function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoE
     finally { setOcupado(''); }
   }
 
+  // A equipe pode enviar a lista no lugar do instrutor (foto ou PDF escaneado).
+  async function enviarLista(arquivos: File[]) {
+    if (!arquivos.length) return;
+    setOcupado('lista');
+    try {
+      const ultimoDia = training.sessions[training.sessions.length - 1];
+      const resultado = await uploadCompanyFiles({ clientId: training.client_id, trainingId: training.id, kind: 'attendance', files: arquivos, sessionId: ultimoDia?.id });
+      if (!resultado.saved) notify('A lista não foi enviada. Use foto (JPG, PNG, HEIC) ou PDF.');
+      else if (resultado.rejected.length) notify(`Lista enviada, mas ${resultado.rejected.join(', ')} ficou de fora. Use foto (JPG, PNG, HEIC) ou PDF.`);
+      else notify(resultado.saved === 1 ? 'Lista assinada enviada.' : `${resultado.saved} páginas da lista assinada enviadas.`);
+      await reload();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao enviar a lista.'); }
+    finally { setOcupado(''); }
+  }
+
   async function renomear() {
     if (identificacao.trim() === training.internal_label) return;
     setOcupado('renomeando');
@@ -275,7 +290,12 @@ function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoE
           {cobraveisPorWhats.map((item) => <a key={item.nome} href={item.url as string} target="_blank" rel="noreferrer" className={botaoClasses('fantasma', 'M')}><MessageCircle />{cobraveisPorWhats.length > 1 ? `Cobrar ${item.nome.split(' ')[0]}` : 'Cobrar no WhatsApp'}</a>)}
         </>}
         <a href={`/lista-presenca/${training.id}`} target="_blank" rel="noopener" className={botaoClasses('fantasma', 'M')}><FileText />Lista (PDF)</a>
+        <label className={botaoClasses('fantasma', 'M', ocupado ? 'pointer-events-none opacity-60' : 'cursor-pointer')}>
+          {ocupado === 'lista' ? <Loader2 className="animate-spin" /> : <Upload />}Enviar lista assinada
+          <input type="file" accept="image/*,application/pdf" multiple className="sr-only" onChange={(e) => { const arquivos = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; void enviarLista(arquivos); }} />
+        </label>
       </div>
+      <p className={cn('ds-caption', faltaLista ? 'text-ds-perigo' : 'text-ds-texto-2')}>{faltaLista ? 'Lista assinada ainda não enviada. A equipe pode enviar no lugar do instrutor.' : 'Lista assinada enviada.'}</p>
       {devedores.length > 0 && devedores.every((item) => !item.url) && !concluido ? <p className="ds-caption text-ds-texto-2">Sem telefone no cadastro do instrutor não dá para cobrar por WhatsApp: inclua o número em Instrutores.</p> : null}
     </Secao>
 

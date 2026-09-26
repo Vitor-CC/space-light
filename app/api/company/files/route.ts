@@ -4,6 +4,7 @@ import {
   deleteFileRow,
   findFileById,
   findTrainingForClient,
+  listTrainingSessions,
   newFileId,
   registerStoredFile,
 } from '@/db/company-repository';
@@ -31,7 +32,10 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const clientId = String(form.get('clientId') ?? '');
   const trainingId = String(form.get('trainingId') ?? '');
-  const kind = String(form.get('kind') ?? '') === 'photo' ? 'photo' : 'document';
+  const pedido = String(form.get('kind') ?? '');
+  // A lista assinada também pode vir da equipe, no lugar do instrutor: é ela
+  // que destrava o encerramento do último dia.
+  const kind = pedido === 'photo' ? 'photo' : pedido === 'attendance' ? 'attendance' : 'document';
   const uploads = form.getAll('files').filter((item): item is File => item instanceof File);
 
   if (!clientId || !trainingId) {
@@ -53,7 +57,25 @@ export async function POST(request: Request) {
     );
   }
 
-  const accepted = kind === 'photo' ? ACCEPTED_PHOTO_TYPES : ACCEPTED_DOCUMENT_TYPES;
+  // A folha assinada chega em foto (do celular) ou em PDF (escaneada) e fica
+  // no dia a que pertence; sem dia informado, vale o último, que é quando a
+  // lista é cobrada.
+  let sessionId: string | null = null;
+  if (kind === 'attendance') {
+    const dias = await listTrainingSessions(trainingId);
+    const pedidoDia = String(form.get('sessionId') ?? '');
+    const dia = pedidoDia ? dias.find((item) => item.id === pedidoDia) : dias[dias.length - 1];
+    if (!dia) {
+      return NextResponse.json({ error: 'Dia não encontrado nesta turma.' }, { status: 400 });
+    }
+    sessionId = dia.id;
+  }
+  const accepted =
+    kind === 'photo'
+      ? ACCEPTED_PHOTO_TYPES
+      : kind === 'attendance'
+        ? [...ACCEPTED_PHOTO_TYPES, 'application/pdf']
+        : ACCEPTED_DOCUMENT_TYPES;
   const saved: string[] = [];
   const rejected: string[] = [];
 
@@ -82,6 +104,7 @@ export async function POST(request: Request) {
         contentType,
         size: file.size,
         kind,
+        sessionId,
         createdByUserId: user.id,
       });
       saved.push(file.name);
