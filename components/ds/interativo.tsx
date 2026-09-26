@@ -5,6 +5,7 @@
  * aviso flutuante e a moldura dos portais (menu lateral preto do Figma).
  */
 import { LogOut, Menu, X } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
@@ -46,12 +47,12 @@ export function Segmentado<T extends string>({ opcoes, ativa, onChange, rotulo, 
 export function Interruptor({ ligado, onChange, rotulo, descricao, name, disabled }: { ligado: boolean; onChange: (valor: boolean) => void; rotulo: ReactNode; descricao?: ReactNode; name?: string; disabled?: boolean }) {
   const id = useId();
   return <div className="flex items-center gap-3">
-    <button id={id} type="button" role="switch" aria-checked={ligado} disabled={disabled} onClick={() => onChange(!ligado)} className={cn('relative h-[22px] w-10 shrink-0 rounded-full transition-colors ds-foco disabled:opacity-45', ligado ? 'bg-ds-inverso' : 'bg-ds-borda')}>
+    <button id={id} type="button" role="switch" aria-checked={ligado} aria-labelledby={`${id}-rotulo`} disabled={disabled} onClick={() => onChange(!ligado)} className={cn('relative h-[22px] w-10 shrink-0 rounded-full transition-colors ds-foco disabled:opacity-45', ligado ? 'bg-ds-inverso' : 'bg-ds-borda')}>
       <span className={cn('absolute top-[3px] size-4 rounded-full transition-all', ligado ? 'left-[21px] bg-ds-amarelo' : 'left-[3px] bg-ds-superficie')} />
     </button>
     {name ? <input type="hidden" name={name} value={ligado ? '1' : ''} /> : null}
     <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
-      <span className="block ds-body-s font-medium text-ds-texto">{rotulo}</span>
+      <span id={`${id}-rotulo`} className="block ds-body-s font-medium text-ds-texto">{rotulo}</span>
       {descricao ? <span className="block ds-caption text-ds-texto-2">{descricao}</span> : null}
     </label>
   </div>;
@@ -60,7 +61,7 @@ export function Interruptor({ ligado, onChange, rotulo, descricao, name, disable
 /* ─── Painel lateral (drawer da direita) ────────────────────────────────── */
 
 export function PainelLateral({ aberto, onFechar, sobretitulo, titulo, subtitulo, children, acoes, largura = 440 }: { aberto: boolean; onFechar: () => void; sobretitulo?: ReactNode; titulo: ReactNode; subtitulo?: ReactNode; children: ReactNode; acoes?: ReactNode; largura?: number }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDialogElement>(null);
   const tituloId = useId();
   useEffect(() => {
     if (!aberto) return;
@@ -75,7 +76,7 @@ export function PainelLateral({ aberto, onFechar, sobretitulo, titulo, subtitulo
   if (!aberto) return null;
   return <div className="fixed inset-0 z-[80]">
     <button type="button" aria-label="Fechar painel" onClick={onFechar} className="absolute inset-0 bg-black/40" />
-    <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="absolute inset-y-0 right-0 flex w-full flex-col bg-ds-superficie shadow-[-12px_0_40px_rgba(0,0,0,0.2)] outline-none" style={{ maxWidth: largura }}>
+    <dialog open ref={ref} tabIndex={-1} aria-modal="true" aria-labelledby={tituloId} className="absolute inset-y-0 right-0 left-auto m-0 flex h-full max-h-none w-full flex-col border-0 bg-ds-superficie p-0 text-ds-texto shadow-[-12px_0_40px_rgba(0,0,0,0.2)] outline-none" style={{ maxWidth: largura }}>
       <div className="flex flex-col gap-2 border-b border-ds-borda px-5 pt-6 pb-5 sm:px-7 sm:pt-7">
         <div className="flex items-center justify-between gap-3">
           <span className="min-w-0 truncate ds-mono text-ds-texto-2">{sobretitulo}</span>
@@ -86,7 +87,7 @@ export function PainelLateral({ aberto, onFechar, sobretitulo, titulo, subtitulo
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-7">{children}</div>
       {acoes ? <div className="flex gap-2.5 border-t border-ds-borda px-5 py-5 sm:px-7">{acoes}</div> : null}
-    </div>
+    </dialog>
   </div>;
 }
 
@@ -145,7 +146,7 @@ export function PortalShell<T extends string>({ area, itens, ativo, onNavegar, u
   const navegar = (id: T) => { setMenuAberto(false); onNavegar(id); window.scrollTo({ top: 0 }); };
 
   const menu = <div className="flex h-full flex-col gap-8 px-4 pt-7 pb-6">
-    <a href="/" aria-label="Space Light Engenharia — site" className="w-fit"><Logo cor="claro" /></a>
+    <Link href="/" aria-label="Space Light Engenharia — site" className="w-fit"><Logo cor="claro" /></Link>
     <span className="ds-caps text-ds-amarelo">{area}</span>
     <nav aria-label={`Navegação · ${area}`} className="flex flex-1 flex-col gap-1 overflow-y-auto">
       {itens.map((item) => <ItemMenu key={item.id} ativo={item.id === ativo} icone={item.icone} rotulo={item.rotulo} selo={item.selo} onClick={() => navegar(item.id)} />)}

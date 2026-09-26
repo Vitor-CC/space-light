@@ -4,7 +4,7 @@ import { ArrowRight, Award, CalendarDays, ChevronRight, Clock3, Download, Eye, F
 import { useMemo, useState } from 'react';
 
 import { Certificados, Documentos, Galeria, Perfil, Sino, Solicitar } from '@/components/client-portal/cliente-secoes';
-import { BotaoZip, dataCurta, rotuloDoStatus, situacaoCertificado, slug, tomDoStatus, vencimento, type Secao } from '@/components/client-portal/cliente-util';
+import { BotaoZip, dataCurta, diasAte, rotuloDoStatus, situacaoCertificado, slug, tomDoStatus, vencimento, type Secao } from '@/components/client-portal/cliente-util';
 import { BarraProgresso, botaoClasses, campoClasses, Cartao, CartaoCabecalho, Indicador, LinhaArquivo, Meta, Pilula, tabelaClasses as tb, Tag, TopoDePagina, Vazio } from '@/components/ds/base';
 import { Abas, Aviso, PortalShell, useAviso } from '@/components/ds/interativo';
 import type { ClientPortalData, ClientTraining } from '@/lib/client-portal-data';
@@ -57,8 +57,9 @@ function VisaoGeral({ data, nome, navegar, abrirTurma }: { data: ClientPortalDat
   const normas = new Set(data.trainings.filter((t) => concluidas.has(t.id)).map((t) => t.nr));
   const certificados = data.participants.filter((p) => p.certificateFileId).length;
   const comValidade = data.trainings.filter((t) => t.expiresAt).sort((a, b) => (a.expiresAt ?? '').localeCompare(b.expiresAt ?? ''));
-  const proximas = comValidade.filter((t) => (t.expiresAt ?? '') >= new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10));
-  const em90 = comValidade.filter((t) => { const v = vencimento(t.expiresAt as string); return v.tom === 'perigo' || v.tom === 'atencao' || v.texto.startsWith('vence em') && Number(v.texto.match(/\d+/)?.[0]) <= 90; });
+  // Vencidas há mais de um ano saem da lista: aí já é turma nova, não reciclagem.
+  const proximas = comValidade.filter((t) => diasAte(t.expiresAt as string) >= -365);
+  const em90 = proximas.filter((t) => diasAte(t.expiresAt as string) <= 90);
   const maisUrgente = em90[0] ?? proximas[0];
 
   return <div className="flex flex-col gap-7">

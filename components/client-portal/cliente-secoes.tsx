@@ -3,7 +3,7 @@
 import { Award, Bell, Building2, CheckCircle2, Download, Eye, FileText, ImageIcon, Loader2, MessageCircle, Search, Send } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { SyntheticEvent } from 'react';
 
 import { BotaoZip, NORMAS_PEDIDO, dataCurta, diasAte, situacaoCertificado, slug, type Secao } from '@/components/client-portal/cliente-util';
@@ -233,6 +233,18 @@ export function Perfil({ data }: { data: ClientPortalData }) {
 type Notificacao = { id: string; quando: string; titulo: string; texto: string; destino: { secao: Secao; turma?: string } };
 
 const CHAVE_VISTO = 'sl-cliente-notificacoes-visto';
+const EVENTO_VISTO = 'sl-notificacoes-vistas';
+
+// Lidas ficam no navegador (localStorage). useSyncExternalStore evita a
+// diferença entre servidor e cliente: no servidor, nada foi visto ainda.
+function assinarVistos(aviso: () => void) {
+  window.addEventListener('storage', aviso);
+  window.addEventListener(EVENTO_VISTO, aviso);
+  return () => { window.removeEventListener('storage', aviso); window.removeEventListener(EVENTO_VISTO, aviso); };
+}
+function lerVistos() {
+  try { return window.localStorage.getItem(CHAVE_VISTO) ?? '[]'; } catch { return '[]'; }
+}
 
 function notificacoes(data: ClientPortalData): Notificacao[] {
   const itens: Notificacao[] = [];
@@ -262,11 +274,9 @@ function notificacoes(data: ClientPortalData): Notificacao[] {
 export function Sino({ data, navegar }: { data: ClientPortalData; navegar: (secao: Secao, turma?: string) => void }) {
   const itens = useMemo(() => notificacoes(data), [data]);
   const [aberto, setAberto] = useState(false);
-  const [vistos, setVistos] = useState<Set<string>>(new Set());
+  const bruto = useSyncExternalStore(assinarVistos, lerVistos, () => '[]');
+  const vistos = useMemo(() => { try { return new Set(JSON.parse(bruto) as string[]); } catch { return new Set<string>(); } }, [bruto]);
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    try { setVistos(new Set(JSON.parse(window.localStorage.getItem(CHAVE_VISTO) ?? '[]') as string[])); } catch { /* sem armazenamento: tudo conta como novo */ }
-  }, []);
   useEffect(() => {
     if (!aberto) return;
     const fora = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setAberto(false); };
@@ -279,8 +289,8 @@ export function Sino({ data, navegar }: { data: ClientPortalData; navegar: (seca
   function abrir() {
     setAberto((v) => !v);
     const todos = new Set([...vistos, ...itens.map((i) => i.id)]);
-    setVistos(todos);
-    try { window.localStorage.setItem(CHAVE_VISTO, JSON.stringify([...todos].slice(-200))); } catch { /* ignora */ }
+    try { window.localStorage.setItem(CHAVE_VISTO, JSON.stringify([...todos].slice(-200))); } catch { /* sem armazenamento: segue contando como novo */ }
+    window.dispatchEvent(new Event(EVENTO_VISTO));
   }
   return <div ref={ref} className="relative">
     <BotaoIcone rotulo={naoLidas ? `Notificações (${naoLidas} novas)` : 'Notificações'} onClick={abrir} aria-expanded={aberto}><Bell /></BotaoIcone>

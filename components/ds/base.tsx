@@ -154,7 +154,8 @@ export function Faixa({ tom = 'sinal', titulo, children, acao, className }: { to
 
 export function BarraProgresso({ valor, total, escura, className }: { valor: number; total: number; escura?: boolean; className?: string }) {
   const pct = total > 0 ? Math.min(100, Math.round((valor / total) * 100)) : 0;
-  return <div role="progressbar" aria-valuenow={valor} aria-valuemin={0} aria-valuemax={total} className={cn('h-2 w-full overflow-hidden rounded-full', escura ? 'h-1.5 bg-black/18' : 'bg-ds-muted', className)}>
+  // Decorativa: o número ("6 de 7") sempre aparece em texto ao lado.
+  return <div aria-hidden className={cn('h-2 w-full overflow-hidden rounded-full', escura ? 'h-1.5 bg-black/18' : 'bg-ds-muted', className)}>
     <div className={cn('h-full rounded-full', escura ? 'bg-ds-inverso' : 'ds-degrade')} style={{ width: `${pct}%` }} />
   </div>;
 }
