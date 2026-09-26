@@ -1,23 +1,26 @@
 import type { Metadata } from 'next';
-import { IBM_Plex_Mono, Open_Sans, Work_Sans } from 'next/font/google';
+import { IBM_Plex_Mono, IBM_Plex_Sans, Montserrat } from 'next/font/google';
 
 import { SITE_URL } from '@/lib/site-url';
 import './globals.css';
 
-const workSans = Work_Sans({
-  variable: '--font-work-sans',
+// Design System 2026 (Figma): Montserrat nos títulos, botões e rótulos em
+// caixa alta; IBM Plex Sans no texto corrido e na interface.
+const montserrat = Montserrat({
+  variable: '--font-montserrat',
   subsets: ['latin'],
+  weight: ['500', '600', '700'],
   display: 'swap',
 });
 
-const openSans = Open_Sans({
-  variable: '--font-open-sans',
+const plexSans = IBM_Plex_Sans({
+  variable: '--font-plex-sans',
   subsets: ['latin'],
+  weight: ['400', '500', '600'],
   display: 'swap',
 });
 
-// Monoespaçada do site novo: código de norma, numeração, rótulo de margem e
-// dado de tabela — nunca parágrafo. Só declara a variável; nada existente usa.
+// Monoespaçada: código de turma, numeração e dado de tabela — nunca parágrafo.
 const plexMono = IBM_Plex_Mono({
   variable: '--font-plex-mono',
   subsets: ['latin'],
@@ -58,7 +61,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body
-        className={`${workSans.variable} ${openSans.variable} ${plexMono.variable} antialiased`}
+        className={`${montserrat.variable} ${plexSans.variable} ${plexMono.variable} antialiased`}
       >
         {children}
       </body>

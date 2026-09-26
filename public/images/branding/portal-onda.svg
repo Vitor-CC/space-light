@@ -1,0 +1,15 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="620" height="200" viewBox="0 0 620 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Onda" clip-path="url(#clip0_0_60)">
+<path id="Vector" d="M0 110C150 170 330 160 450 110C530 76 580 60 620 64V200H0V110Z" fill="url(#paint0_linear_0_60)"/>
+<path id="Vector_2" d="M0 92C150 152 330 142 450 92C530 58 580 42 620 46" stroke="white" stroke-width="1.5"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_60" x1="0" y1="-6.96949e-07" x2="620" y2="-6.96949e-07" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FAC600"/>
+<stop offset="1" stop-color="#EB9336"/>
+</linearGradient>
+<clipPath id="clip0_0_60">
+<rect width="620" height="200" fill="white"/>
+</clipPath>
+</defs>
+</svg>

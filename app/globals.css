@@ -21,31 +21,184 @@
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-destructive: var(--destructive);
-  --font-sans: var(--font-open-sans);
-  --font-heading: var(--font-work-sans);
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-xl: 0;
+  --font-sans: var(--font-plex-sans);
+  --font-heading: var(--font-montserrat);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
 }
 
 :root {
-  --background: #f5f5f2;
-  --foreground: #0b0b0b;
-  --card: #ffffff;
-  --card-foreground: #0b0b0b;
-  --primary: #f2ad19;
-  --primary-foreground: #000000;
-  --secondary: #30302f;
-  --secondary-foreground: #ffffff;
-  --muted: #e6e8e9;
-  --muted-foreground: #666666;
-  --accent: #ff9900;
-  --accent-foreground: #000000;
-  --destructive: #c32020;
-  --border: #d4d4cf;
-  --input: #d4d4cf;
-  --ring: #f2ad19;
+  --background: var(--ds-muted);
+  --foreground: var(--ds-texto);
+  --card: var(--ds-superficie);
+  --card-foreground: var(--ds-texto);
+  --primary: var(--ds-amarelo);
+  --primary-foreground: var(--ds-texto);
+  --secondary: var(--ds-inverso);
+  --secondary-foreground: var(--ds-texto-inv);
+  --muted: var(--ds-muted);
+  --muted-foreground: var(--ds-texto-2);
+  --accent: var(--ds-amarelo-suave);
+  --accent-foreground: var(--ds-texto);
+  --destructive: var(--ds-perigo);
+  --border: var(--ds-borda);
+  --input: var(--ds-borda);
+  --ring: var(--ds-amarelo);
+}
+
+/*
+ * DESIGN SYSTEM 2026 — Figma "Space Light — Redesign Site + Portais",
+ * página "01 · Design System". Os nomes seguem as variáveis do Figma
+ * (brand/amarelo → --ds-amarelo, text/secondary → --ds-texto-2 …).
+ * Site e portais leem daqui; os semânticos do shadcn acima apontam para cá.
+ */
+:root {
+  --ds-amarelo: #fac600;
+  --ds-amarelo-suave: #fff4c7;
+  /* Amarelo como texto sobre fundo claro (o #fac600 não passa AA em texto). */
+  --ds-amarelo-texto: #8a6200;
+  /* Fim do degradê do símbolo e dos blocos de destaque. */
+  --ds-laranja: #eb9336;
+
+  --ds-texto: #000000;
+  --ds-texto-2: #595959;
+  --ds-texto-inv: #ffffff;
+  --ds-texto-inv-2: #a6a6a6;
+
+  --ds-superficie: #ffffff;
+  --ds-muted: #f4f3ef;
+  --ds-inverso: #000000;
+  --ds-inverso-2: #161616;
+
+  --ds-borda: #e4e2dc;
+  --ds-borda-forte: #000000;
+  --ds-borda-inv: #2b2b2b;
+
+  --ds-sucesso: #1f8a57;
+  --ds-sucesso-suave: #ddf1e6;
+  --ds-atencao: #a86a00;
+  --ds-atencao-suave: #fbefd6;
+  --ds-perigo: #c8342b;
+  --ds-perigo-suave: #f8dedc;
+  --ds-info: #2e63d6;
+  --ds-info-suave: #dfe8fb;
+
+  --ds-degrade: linear-gradient(90deg, var(--ds-amarelo), var(--ds-laranja));
+}
+
+@theme inline {
+  --font-ds-display: var(--font-montserrat), Arial, Helvetica, sans-serif;
+  --font-ds-sans: var(--font-plex-sans), Arial, Helvetica, sans-serif;
+  --font-ds-mono:
+    var(--font-plex-mono), ui-monospace, 'SFMono-Regular', Menlo, Consolas,
+    monospace;
+
+  --color-ds-amarelo: var(--ds-amarelo);
+  --color-ds-amarelo-suave: var(--ds-amarelo-suave);
+  --color-ds-amarelo-texto: var(--ds-amarelo-texto);
+  --color-ds-laranja: var(--ds-laranja);
+  --color-ds-texto: var(--ds-texto);
+  --color-ds-texto-2: var(--ds-texto-2);
+  --color-ds-texto-inv: var(--ds-texto-inv);
+  --color-ds-texto-inv-2: var(--ds-texto-inv-2);
+  --color-ds-superficie: var(--ds-superficie);
+  --color-ds-muted: var(--ds-muted);
+  --color-ds-inverso: var(--ds-inverso);
+  --color-ds-inverso-2: var(--ds-inverso-2);
+  --color-ds-borda: var(--ds-borda);
+  --color-ds-borda-forte: var(--ds-borda-forte);
+  --color-ds-borda-inv: var(--ds-borda-inv);
+  --color-ds-sucesso: var(--ds-sucesso);
+  --color-ds-sucesso-suave: var(--ds-sucesso-suave);
+  --color-ds-atencao: var(--ds-atencao);
+  --color-ds-atencao-suave: var(--ds-atencao-suave);
+  --color-ds-perigo: var(--ds-perigo);
+  --color-ds-perigo-suave: var(--ds-perigo-suave);
+  --color-ds-info: var(--ds-info);
+  --color-ds-info-suave: var(--ds-info-suave);
+}
+
+/* Estilos de texto do Figma. "letterSpacing 14" no Figma = 14% = 0.14em. */
+@utility ds-caps {
+  font-family: var(--font-ds-display);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+@utility ds-caps-l {
+  font-family: var(--font-ds-display);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+@utility ds-h1 {
+  font-family: var(--font-ds-display);
+  font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+@utility ds-h2 {
+  font-family: var(--font-ds-display);
+  font-size: clamp(2rem, 1.6rem + 1.4vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+@utility ds-h3 {
+  font-family: var(--font-ds-display);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 32px;
+  letter-spacing: -0.01em;
+}
+@utility ds-h4 {
+  font-family: var(--font-ds-display);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 26px;
+  letter-spacing: -0.005em;
+}
+@utility ds-botao {
+  font-family: var(--font-ds-display);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+@utility ds-body-m {
+  font-family: var(--font-ds-sans);
+  font-size: 16px;
+  line-height: 24px;
+}
+@utility ds-body-s {
+  font-family: var(--font-ds-sans);
+  font-size: 14px;
+  line-height: 20px;
+}
+@utility ds-caption {
+  font-family: var(--font-ds-sans);
+  font-size: 12px;
+  line-height: 16px;
+}
+@utility ds-mono {
+  font-family: var(--font-ds-mono);
+  font-size: 14px;
+  line-height: 20px;
+}
+@utility ds-degrade {
+  background-image: var(--ds-degrade);
+}
+@utility ds-foco {
+  &:focus-visible {
+    outline: 2px solid var(--ds-texto);
+    outline-offset: 2px;
+  }
 }
 
 /*
@@ -101,8 +254,8 @@
 :root {
   --sl-black: #000000;
   --sl-graphite: #30302f;
-  --sl-gold: #f2ad19;
-  --sl-orange: #ff9900;
+  --sl-gold: var(--ds-amarelo);
+  --sl-orange: var(--ds-laranja);
   --sl-gray: #666666;
   --sl-gray-light: #e6e8e9;
   --sl-off-white: #f7f6f2;
@@ -111,7 +264,7 @@
   --sl-error: #c32020;
   /* Dourado escuro para texto sobre fundo claro. O ouro puro não passa AA em
      texto (≈1,8:1 no off-white); este dá ≈5:1. Antes era escrito na mão. */
-  --sl-gold-ink: #8a6107;
+  --sl-gold-ink: var(--ds-amarelo-texto);
 
   --doc-paper: var(--sl-off-white);
   --doc-sheet: var(--sl-white);
@@ -239,7 +392,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-open-sans), Arial, Helvetica, sans-serif;
+    font-family: var(--font-ds-sans);
   }
 
   h1,
@@ -247,12 +400,12 @@
   h3,
   h4,
   .font-heading {
-    font-family: var(--font-work-sans), Arial, Helvetica, sans-serif;
+    font-family: var(--font-ds-display);
   }
 
   ::selection {
-    background: #f2ad19;
-    color: #000000;
+    background: var(--ds-amarelo);
+    color: var(--ds-texto);
   }
 }
 
@@ -263,11 +416,11 @@
   }
 
   .eyebrow {
-    font-family: var(--font-work-sans), Arial, Helvetica, sans-serif;
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.18em;
-    line-height: 1.3;
+    font-family: var(--font-ds-display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    line-height: 16px;
     text-transform: uppercase;
   }
 
@@ -288,7 +441,7 @@
     left: 0;
     height: 2px;
     content: '';
-    background: #f2ad19;
+    background: var(--ds-amarelo);
     transition: right 220ms ease;
   }
 
@@ -302,7 +455,7 @@
 
   .section-title {
     max-width: 760px;
-    font-family: var(--font-work-sans), Arial, Helvetica, sans-serif;
+    font-family: var(--font-ds-display);
     font-size: clamp(2.5rem, 5vw, 5.4rem);
     font-weight: 900;
     /* Acompanha o clamp acima: no celular o título cai para 2.5rem, e o
