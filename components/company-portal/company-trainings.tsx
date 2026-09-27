@@ -23,7 +23,8 @@ type Reload = () => Promise<void>;
 type Vista = 'tabela' | 'agenda' | 'criar';
 type Filtro = 'todas' | 'scheduled' | 'in_progress' | 'atrasadas' | 'sem_instrutor' | 'aguardando' | 'completed';
 
-const NORMAS = ['NR 05', 'NR 06', 'NR 10', 'NR 10 SEP', 'NR 11', 'NR 12', 'NR 18', 'NR 20', 'NR 23', 'NR 31', 'NR 33', 'NR 34', 'NR 35', 'EMERGÊNCIAS QUÍMICAS'];
+// NR 13, 15 e 16 são só laudo: não entram aqui (decisão de 27/09/2026).
+const NORMAS = ['NR 05', 'NR 06', 'NR 07', 'NR 07 LEI LUCAS', 'NR 10', 'NR 10 SEP', 'NR 11', 'NR 12', 'NR 18', 'NR 20', 'NR 23', 'NR 26', 'NR 31', 'NR 33', 'NR 34', 'NR 35', 'EMERGÊNCIAS QUÍMICAS'];
 /** Validade oferecida no cadastro e na emissão. Só aparece no portal; o PDF não muda. */
 const VALIDADES = [0, 6, 12, 24, 36, 48, 60];
 

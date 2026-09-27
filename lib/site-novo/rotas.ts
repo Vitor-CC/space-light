@@ -11,6 +11,7 @@ export const rotas = {
   treinamentos: `${inicio}#treinamentos`,
   comoTrabalhamos: `${inicio}#como-trabalhamos`,
   contato: `${SITE_BASE}/contato`,
+  laudos: `${SITE_BASE}/laudos`,
   /** Formulário de proposta com a norma já marcada. */
   proposta: (slug: string) => `${SITE_BASE}/contato?treinamento=${slug}`,
   norma: (slug: string) => `${SITE_BASE}/treinamentos/${slug}`,

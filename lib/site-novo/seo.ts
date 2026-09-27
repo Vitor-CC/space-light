@@ -22,6 +22,10 @@ const absoluto = (caminho: string) => new URL(caminho, SITE_URL).href;
 export const imagemOg = (nome: 'home' | NormaComPagina['slug']) =>
   `/images/brand-v2/og/space-light-og-${nome}.jpg`;
 
+/** A imagem da norma sai da foto dela; norma ainda sem foto usa a da home. */
+export const imagemOgDaNorma = (norma: NormaComPagina) =>
+  imagemOg(norma.pagina.figura ? norma.slug : 'home');
+
 /**
  * Title, description, canônico e Open Graph de uma página. O `openGraph` do
  * filho substitui o do layout raiz inteiro (não mescla), então vai completo.
@@ -98,7 +102,7 @@ export function dadosDaNorma(norma: NormaComPagina) {
         serviceType: 'Treinamento em Norma Regulamentadora',
         description: norma.pagina.exige,
         url,
-        image: absoluto(imagemOg(norma.slug)),
+        image: absoluto(imagemOgDaNorma(norma)),
         provider: provedor,
         areaServed: BRASIL,
       },

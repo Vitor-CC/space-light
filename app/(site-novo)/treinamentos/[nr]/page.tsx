@@ -8,7 +8,7 @@ import { rotas } from '@/lib/site-novo/rotas';
 import {
   NOME_DA_EMPRESA,
   dadosDaNorma,
-  imagemOg,
+  imagemOgDaNorma,
   metadadosDaPagina,
 } from '@/lib/site-novo/seo';
 
@@ -30,8 +30,8 @@ export async function generateMetadata({
     titulo: `Treinamento ${norma.codigo} — ${norma.nome} | ${NOME_DA_EMPRESA}`,
     descricao: norma.pagina.exige,
     caminho: rotas.norma(norma.slug),
-    imagem: imagemOg(norma.slug),
-    alt: norma.pagina.figura.alt,
+    imagem: imagemOgDaNorma(norma),
+    alt: norma.pagina.figura?.alt ?? `Treinamento ${norma.codigo} — ${norma.nome}, Space Light Engenharia`,
   });
 }
 

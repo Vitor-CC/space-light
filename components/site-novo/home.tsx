@@ -24,6 +24,7 @@ import {
   TEXTOS,
 } from '@/lib/site-novo/home';
 import { ETAPAS } from '@/lib/site-novo/metodo';
+import { LAUDOS } from '@/lib/site-novo/laudos';
 import { NORMAS, NORMA_MAIS_APLICADA } from '@/lib/site-novo/normas';
 import { rotas } from '@/lib/site-novo/rotas';
 import { cn } from '@/lib/utils';
@@ -117,6 +118,14 @@ export function Treinamentos() {
         </li>
       </ul>
       <p className="hidden items-center gap-2 ds-caption text-ds-texto-2 lg:flex"><span aria-hidden="true" className="size-2.5 bg-ds-inverso" />Em destaque: NR 23, o treinamento mais aplicado pela Space Light.</p>
+
+      {/* Laudos (NR 13, 15 e 16) não são treinamento: faixa própria, fora da grade e da numeração das seções. */}
+      <Link href={rotas.laudos} className="doc-focus group flex flex-col gap-3 rounded-md bg-ds-inverso p-5 text-ds-texto-inv lg:flex-row lg:items-center lg:gap-8 lg:p-7">
+        <span className="ds-caps text-ds-amarelo">Laudos técnicos</span>
+        <span className="flex flex-wrap gap-2">{LAUDOS.map((laudo) => <span key={laudo.slug} className="rounded-sm bg-ds-inverso-2 px-2.5 py-1 font-ds-display text-sm leading-5 font-extrabold text-ds-amarelo">{laudo.codigo}</span>)}</span>
+        <span className="flex-1 ds-body-s text-ds-texto-inv-2">Caldeiras e vasos de pressão, insalubridade e periculosidade.</span>
+        <span className="inline-flex items-center gap-2 ds-botao">Ver laudos<ArrowRight className="size-[18px] transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span>
+      </Link>
     </div>
   </section>;
 }

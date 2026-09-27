@@ -64,6 +64,7 @@ export function MobileMenu() {
             </li>
           </ul> : null}
         </div>
+        <Link href={rotas.laudos} onClick={fechar} className={linha}><span className="flex-1">Laudos técnicos</span><ChevronRight className="size-5" aria-hidden="true" /></Link>
         <Link href={rotas.comoTrabalhamos} onClick={fechar} className={linha}><span className="flex-1">Como trabalhamos</span><ChevronRight className="size-5" aria-hidden="true" /></Link>
         <Link href={rotas.portalCliente} onClick={fechar} className={linha}><span className="flex-1">Portal do cliente</span><ChevronRight className="size-5" aria-hidden="true" /></Link>
         <Link href={rotas.contato} onClick={fechar} className={linha}><span className="flex-1">Contato</span><ChevronRight className="size-5" aria-hidden="true" /></Link>

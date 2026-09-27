@@ -60,7 +60,7 @@ export function DesktopNav() {
           <div className="flex overflow-hidden rounded-xl bg-ds-superficie text-ds-texto shadow-[0_24px_48px_-8px_rgba(0,0,0,0.3)]">
             <div className="flex min-w-0 flex-1 flex-col gap-4 px-8 py-7">
               <p className="ds-caps text-ds-texto-2">Treinamentos regulamentares</p>
-              <ul className="grid grid-cols-2 gap-x-2 gap-y-1">
+              <ul className="grid grid-cols-2 gap-x-2 gap-y-1 xl:grid-cols-3">
                 {NORMAS.map((norma) => {
                   const destaque = norma.slug === NORMA_MAIS_APLICADA;
                   return <li key={norma.slug}>
@@ -80,6 +80,7 @@ export function DesktopNav() {
               <div className="flex flex-col gap-2.5">
                 <p className="ds-h4 text-ds-amarelo">Não achou sua NR?</p>
                 <p className="ds-body-s text-ds-texto-inv-2">A Space Light atende outras Normas Regulamentadoras além destas. Conte o que a sua operação exige.</p>
+                <Link href={rotas.laudos} onClick={fechar} className="doc-focus mt-2 inline-flex w-fit items-center gap-2 ds-body-s font-medium text-ds-amarelo hover:underline underline-offset-4">Laudos NR 13, 15 e 16<ArrowRight className="size-4" aria-hidden="true" /></Link>
               </div>
               <div className="flex flex-col gap-2.5">
                 <Link href={rotas.contato} onClick={fechar} className={botao({ className: 'w-full' })}>Solicitar proposta<ArrowRight className="size-[18px]" aria-hidden="true" /></Link>

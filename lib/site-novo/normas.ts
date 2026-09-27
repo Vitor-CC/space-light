@@ -1,9 +1,10 @@
 import { NR23_PROGRAM } from '@/lib/nr23-program';
 import { imagemMarca } from '@/lib/site-novo/imagens';
+import { LAUDOS } from '@/lib/site-novo/laudos';
 import { TREINAMENTO_OUTRO } from '@/lib/site-novo/proposta';
 
 /**
- * As sete normas do site novo. Menu, rodapé e grade da home leem daqui, e a
+ * As normas de treinamento do site. Menu, rodapé e grade da home leem daqui, e a
  * página de cada norma sai de `pagina` — sem ela, a rota da norma dá 404.
  *
  * O conteúdo de cada página foi escrito a partir do texto oficial da norma
@@ -37,7 +38,8 @@ export type PaginaDaNorma = {
   };
   /** Conteúdo mínimo que a própria norma define, quando define. */
   conteudoMinimo?: { titulo: string; origem: string; itens: readonly string[] };
-  figura: { src: string; alt: string; legenda: string };
+  /** Foto da norma. Norma nova fica sem foto até a imagem própria existir: foto de outra norma enganaria. */
+  figura?: { src: string; alt: string; legenda: string };
 };
 
 export type Norma = {
@@ -638,6 +640,397 @@ const PAGINA_NR23: PaginaDaNorma = {
 /** A NR 23 é a mais aplicada pela Space: vem em destaque na home e ganha o selo na página dela. */
 export const NORMA_MAIS_APLICADA = 'nr-23';
 
+
+/*
+ * NR 07 — Portaria SEPRT nº 6.734/2020, alterada até a Portaria MTP nº 567/2022
+ * (PCMSO). A NR 07 atual não exige curso; o treinamento da Space é de primeiros
+ * socorros, para empresas e para escolas pela Lei nº 13.722/2018 (Lei Lucas).
+ */
+const PAGINA_NR07: PaginaDaNorma = {
+  exige:
+    'Primeiros socorros para empresas e para escolas, que pela Lei Lucas precisam capacitar professores e funcionários.',
+  exigencias: [
+    'A NR 07 estabelece o PCMSO, o programa que acompanha a saúde dos trabalhadores a partir dos riscos da operação.',
+    'Nas escolas, a Lei nº 13.722/2018 (Lei Lucas) exige curso anual de primeiros socorros para parte dos professores e funcionários.',
+  ],
+  pontos: [
+    'Curso ofertado todo ano, para capacitação ou reciclagem (Lei Lucas, art. 1º)',
+    'Conteúdo compatível com a faixa etária do público atendido (art. 2º)',
+    'Kit de primeiros socorros na escola, conforme orientação especializada',
+    'Certificação e nomes dos capacitados afixados em local visível (art. 3º)',
+  ],
+  aviso:
+    'A NR 07 não obriga um curso de primeiros socorros; a obrigação das escolas vem da Lei Lucas. Nas empresas, o treinamento entra como medida de resposta a emergências.',
+  fontes: [
+    {
+      rotulo: 'NR 07, com alterações até a Portaria MTP nº 567/2022',
+      url: `${NRS_VIGENTES}/nr-07-atualizada-2022-1.pdf`,
+    },
+    {
+      rotulo: 'Lei nº 13.722, de 4 de outubro de 2018 (Lei Lucas)',
+      url: 'https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13722.htm',
+    },
+  ],
+  funcoes: [
+    'Professores e funcionários de escolas e de recreação infantil',
+    'Brigadistas e equipes de apoio a emergências',
+    'Portaria, recepção e atendimento ao público',
+    'Lideranças e técnicos de segurança',
+  ],
+  situacoes: [
+    'Escola que precisa cumprir a Lei Lucas no ano letivo',
+    'Reciclagem anual da equipe capacitada',
+    'Abertura de unidade ou ampliação do quadro',
+    'Operação em que a resposta rápida a acidentes faz diferença',
+  ],
+  aplicacao: [
+    {
+      titulo: 'Diagnóstico',
+      texto:
+        'Entendemos o ambiente, o público atendido e os acidentes mais prováveis no dia a dia.',
+    },
+    {
+      titulo: 'Planejamento',
+      texto:
+        'Separamos a turma de empresa da turma escolar e adaptamos à faixa etária quando é Lei Lucas.',
+    },
+    {
+      titulo: 'Teoria aplicada',
+      texto:
+        'Avaliação da vítima, acionamento do socorro e condutas nas emergências mais comuns.',
+    },
+    {
+      titulo: 'Prática supervisionada',
+      texto:
+        'Simulações de atendimento com situações da rotina da empresa ou da escola.',
+    },
+    REGISTRO,
+  ],
+};
+
+/*
+ * NR 12 — texto consolidado no gov.br (atualização 2025). Capacitação: item
+ * 12.16; conteúdo mínimo: Anexo II, item 1.
+ */
+const PAGINA_NR12: PaginaDaNorma = {
+  exige:
+    'Proteções nas máquinas e capacitação de quem opera, mantém ou inspeciona, antes de assumir a função.',
+  exigencias: [
+    'A NR 12 exige proteções e dispositivos de segurança que impeçam o acesso às zonas de perigo das máquinas.',
+    'Quem opera, mantém ou inspeciona recebe capacitação do empregador, com o conteúdo do Anexo II da norma.',
+  ],
+  pontos: [
+    'Capacitação antes de assumir a função, sem ônus e na jornada (item 12.16.3)',
+    'Etapas teórica e prática para a operação segura (Anexo II)',
+    'Supervisão de profissional legalmente habilitado',
+    'Bloqueio da máquina em inspeção, limpeza, lubrificação e manutenção',
+  ],
+  fontes: [
+    {
+      rotulo: 'NR 12, texto consolidado publicado no gov.br (atualização 2025)',
+      url: `${NRS_VIGENTES}/nr-12-atualizada-2025.pdf`,
+    },
+  ],
+  funcoes: [
+    'Operadores de máquinas e equipamentos de produção',
+    'Equipes de manutenção mecânica e elétrica',
+    'Responsáveis por inspeção, limpeza e lubrificação',
+    'Lideranças de produção e de segurança',
+  ],
+  situacoes: [
+    'Admissão ou mudança de função de operadores',
+    'Máquina nova, reformada ou com proteção alterada',
+    'Incidentes com partes móveis ou prensamento',
+    'Adequação apontada em fiscalização ou auditoria',
+  ],
+  aplicacao: [
+    {
+      titulo: 'Diagnóstico',
+      texto:
+        'Levantamos as máquinas da operação, as proteções existentes e as intervenções mais comuns.',
+    },
+    {
+      titulo: 'Planejamento',
+      texto:
+        'Organizamos o conteúdo pelos equipamentos que a turma usa, seguindo o Anexo II.',
+    },
+    {
+      titulo: 'Teoria aplicada',
+      texto:
+        'Zonas de perigo, função das proteções, riscos mecânicos e elétricos e método de trabalho seguro.',
+    },
+    {
+      titulo: 'Prática supervisionada',
+      texto:
+        'Reconhecimento das proteções e bloqueio da máquina antes de intervir, com o instrutor acompanhando.',
+    },
+    REGISTRO,
+  ],
+  conteudoMinimo: {
+    titulo: 'O que a capacitação deve cobrir',
+    origem: 'NR 12, Anexo II, item 1',
+    itens: [
+      'Riscos de cada máquina e equipamento e as proteções específicas contra cada um',
+      'Funcionamento das proteções: como e por que devem ser usadas',
+      'Quando uma proteção pode ser removida, e por quem',
+      'O que fazer se uma proteção for danificada ou perder a função',
+      'Princípios de segurança na utilização da máquina ou equipamento',
+      'Segurança para riscos mecânicos, elétricos e outros relevantes',
+      'Método de trabalho seguro e permissão de trabalho',
+      'Bloqueio durante inspeção, limpeza, lubrificação e manutenção',
+    ],
+  },
+};
+
+/*
+ * NR 18 — texto consolidado no gov.br (atualização 2026). O curso da Space é o
+ * de operador de PEMT: itens 18.12.34 a 18.12.42; carga horária no Anexo I.
+ */
+const PAGINA_NR18: PaginaDaNorma = {
+  exige:
+    'Capacitação do operador de plataforma elevatória móvel de trabalho (PEMT) e inspeção antes de cada uso.',
+  exigencias: [
+    'A NR 18 exige que o operador de PEMT seja capacitado pelo empregador e inspecione o local de trabalho todos os dias.',
+    'O Anexo I da norma fixa 4 horas para a capacitação do operador de PEMT, com atualização de 4 horas a cada 2 anos.',
+  ],
+  pontos: [
+    'Inspeção diária do local de trabalho pelo operador (item 18.12.37)',
+    'Inspeção visual e teste funcional antes de cada turno (item 18.12.38)',
+    'Trabalhador na plataforma com SPIQ conectado à ancoragem (item 18.12.42)',
+    'Capacitação compatível com o equipamento utilizado (item 18.14.2)',
+  ],
+  fontes: [
+    {
+      rotulo: 'NR 18, texto consolidado publicado no gov.br (atualização 2026)',
+      url: `${NRS_VIGENTES}/NR18atualizada2026I.pdf`,
+    },
+  ],
+  funcoes: [
+    'Operadores de plataforma elevatória em obras e manutenção',
+    'Equipes de montagem, instalação e manutenção predial',
+    'Encarregados e mestres de obra',
+    'Técnicos de segurança da obra',
+  ],
+  situacoes: [
+    'Início de obra ou serviço com uso de PEMT',
+    'Atualização a cada 2 anos',
+    'Chegada de plataforma de outro modelo',
+    'Incidentes com tombamento, colisão ou queda',
+  ],
+  aplicacao: [
+    {
+      titulo: 'Diagnóstico',
+      texto:
+        'Entendemos a obra, o modelo de plataforma e as condições do piso e do entorno.',
+    },
+    {
+      titulo: 'Planejamento',
+      texto:
+        'Organizamos o conteúdo pelo equipamento e pelas tarefas que a turma executa.',
+    },
+    {
+      titulo: 'Teoria aplicada',
+      texto:
+        'Riscos da operação, estabilidade, capacidade de carga e uso do sistema de proteção contra quedas.',
+    },
+    {
+      titulo: 'Prática supervisionada',
+      texto:
+        'Inspeção antes do uso, teste funcional e comandos de emergência, com o instrutor acompanhando.',
+    },
+    REGISTRO,
+  ],
+};
+
+/*
+ * NR 20 — redação da Portaria SEPRT nº 1.360/2019, texto consolidado no gov.br
+ * (atualização 2025). Capacitação: item 20.12; critérios no Anexo I.
+ */
+const PAGINA_NR20: PaginaDaNorma = {
+  exige:
+    'Gestão de segurança nas instalações com inflamáveis e combustíveis e capacitação conforme a classe e a atividade.',
+  exigencias: [
+    'A NR 20 classifica as instalações em classes, pela atividade e pela quantidade armazenada, e define a gestão de cada uma.',
+    'O curso exigido depende da atividade do trabalhador, da classe da instalação e do contato direto com o processo.',
+  ],
+  pontos: [
+    'Seis tipos de curso, da Iniciação ao Avançado II e ao Específico (item 20.12.3)',
+    'Parte prática nos cursos Básico, Intermediário e Avançados',
+    'Atualização periódica, com prazo definido pela norma',
+    'Capacitação a cargo do empregador, durante o expediente',
+  ],
+  fontes: [
+    {
+      rotulo: 'NR 20, texto consolidado publicado no gov.br (atualização 2025)',
+      url: `${NRS_VIGENTES}/nr-20-atualizada-2025.pdf`,
+    },
+  ],
+  funcoes: [
+    'Trabalhadores que abastecem, armazenam ou transferem inflamáveis',
+    'Equipes de manutenção e inspeção das instalações',
+    'Brigadistas de áreas com inflamáveis',
+    'Lideranças de operação e de segurança',
+  ],
+  situacoes: [
+    'Admissão em instalação classe I, II ou III',
+    'Modificação significativa na instalação',
+    'Acidentes ou incidentes com inflamáveis',
+    'Atualização periódica prevista na norma',
+  ],
+  aplicacao: [
+    {
+      titulo: 'Diagnóstico',
+      texto:
+        'Identificamos a classe da instalação e a atividade de cada grupo para definir o curso certo.',
+    },
+    {
+      titulo: 'Planejamento',
+      texto:
+        'Montamos a turma pelo tipo de curso exigido, com a parte prática quando a norma pede.',
+    },
+    {
+      titulo: 'Teoria aplicada',
+      texto:
+        'Propriedades dos inflamáveis, fontes de ignição, controle de riscos e resposta a emergências.',
+    },
+    {
+      titulo: 'Prática supervisionada',
+      texto:
+        'Uso dos sistemas de segurança contra incêndio com inflamáveis existentes na instalação.',
+    },
+    REGISTRO,
+  ],
+};
+
+/*
+ * NR 26 — redação da Portaria MTP nº 2.770/2022. Treinamento: item 26.5.2.
+ */
+const PAGINA_NR26: PaginaDaNorma = {
+  exige:
+    'Sinalização de segurança e identificação dos produtos químicos, com treinamento sobre rótulos e fichas.',
+  exigencias: [
+    'A NR 26 define a sinalização por cor e a classificação e rotulagem dos produtos químicos pelo GHS, da ONU.',
+    'Quem usa produto químico deve ser treinado para entender o rótulo e a ficha com dados de segurança.',
+  ],
+  pontos: [
+    'Rótulo com pictograma, palavra de advertência e frases de perigo e precaução',
+    'Acesso dos trabalhadores às fichas com dados de segurança (item 26.5.1)',
+    'Treinamento sobre perigos, uso seguro e emergências (item 26.5.2)',
+    'Cores de segurança conforme as normas técnicas oficiais',
+  ],
+  fontes: [
+    {
+      rotulo: 'NR 26, redação da Portaria MTP nº 2.770/2022',
+      url: `${ARQUIVOS_NRS}/nr-26-atualizada-2022.pdf`,
+    },
+  ],
+  funcoes: [
+    'Quem manuseia, armazena ou transporta produtos químicos',
+    'Equipes de limpeza, manutenção e laboratório',
+    'Almoxarifado e recebimento de materiais',
+    'Lideranças e técnicos de segurança',
+  ],
+  situacoes: [
+    'Entrada de produto químico novo na operação',
+    'Admissão de trabalhadores que usam químicos',
+    'Revisão das fichas com dados de segurança',
+    'Incidentes com derramamento ou exposição',
+  ],
+  aplicacao: [
+    {
+      titulo: 'Diagnóstico',
+      texto:
+        'Levantamos os produtos químicos usados e onde eles ficam armazenados.',
+    },
+    {
+      titulo: 'Planejamento',
+      texto:
+        'Organizamos o conteúdo com os rótulos e as fichas dos produtos da própria empresa.',
+    },
+    {
+      titulo: 'Teoria aplicada',
+      texto:
+        'Pictogramas, palavras de advertência, frases de perigo e leitura da ficha com dados de segurança.',
+    },
+    {
+      titulo: 'Prática supervisionada',
+      texto:
+        'Leitura de rótulos e fichas reais e simulação de resposta a derramamento.',
+    },
+    REGISTRO,
+  ],
+  conteudoMinimo: {
+    titulo: 'O que o treinamento deve cobrir',
+    origem: 'NR 26, item 26.5.2',
+    itens: [
+      'Compreender a rotulagem preventiva e a ficha com dados de segurança do produto químico',
+      'Perigos, riscos e medidas preventivas para o uso seguro',
+      'Procedimentos para atuação em situações de emergência com o produto químico',
+    ],
+  },
+};
+
+/*
+ * NR 31 — texto consolidado no gov.br (atualização 2024). O curso da Space é
+ * de prevenção de acidentes com animais peçonhentos (itens 31.3.10 e 31.3.10.1).
+ */
+const PAGINA_NR31: PaginaDaNorma = {
+  exige:
+    'Segurança no trabalho rural, com prevenção e resposta a acidentes com animais peçonhentos.',
+  exigencias: [
+    'A NR 31 trata da segurança na agricultura, pecuária, silvicultura, exploração florestal e aquicultura.',
+    'Em acidente com animal peçonhento, após os primeiros socorros, o trabalhador vai direto à unidade de saúde indicada.',
+  ],
+  pontos: [
+    'Remoção do acidentado em urgência sem ônus para o trabalhador (item 31.3.10)',
+    'Encaminhamento imediato após os primeiros socorros (item 31.3.10.1)',
+    'Perneira contra picadas entre os EPIs previstos pela norma',
+    'Medidas de prevenção registradas no PGRTR',
+  ],
+  fontes: [
+    {
+      rotulo: 'NR 31, texto consolidado publicado no gov.br (atualização 2024)',
+      url: `${NRS_VIGENTES}/nr-31-atualizada-2024-2.pdf`,
+    },
+  ],
+  funcoes: [
+    'Trabalhadores do campo, da colheita e do manejo',
+    'Equipes de roçada, jardinagem e manutenção de áreas verdes',
+    'Responsáveis pelos primeiros socorros',
+    'Lideranças de fazendas e empresas rurais',
+  ],
+  situacoes: [
+    'Início de safra ou de nova frente de trabalho',
+    'Área com histórico de acidentes com animais',
+    'Admissão de trabalhadores rurais',
+    'Revisão do PGRTR',
+  ],
+  aplicacao: [
+    {
+      titulo: 'Diagnóstico',
+      texto:
+        'Entendemos a região, as atividades e os animais mais comuns na área de trabalho.',
+    },
+    {
+      titulo: 'Planejamento',
+      texto:
+        'Organizamos o conteúdo pelos animais da região e pelas tarefas da turma.',
+    },
+    {
+      titulo: 'Teoria aplicada',
+      texto:
+        'Identificação dos animais, hábitos, prevenção, EPIs e o que não fazer depois da picada.',
+    },
+    {
+      titulo: 'Prática supervisionada',
+      texto:
+        'Simulação do atendimento inicial e do encaminhamento ao serviço de saúde.',
+    },
+    REGISTRO,
+  ],
+};
+
+
 export const NORMAS: readonly Norma[] = [
   {
     slug: 'nr-05',
@@ -663,6 +1056,17 @@ export const NORMAS: readonly Norma[] = [
     pagina: PAGINA_NR06,
   },
   {
+    slug: 'nr-07',
+    codigo: 'NR 07',
+    nome: 'Primeiros Socorros',
+    meta: 'Empresas e escolas',
+    curto: 'Primeiros socorros',
+    rotulo: 'Primeiros socorros',
+    menu: { titulo: 'Primeiros socorros', apoio: 'Empresas e Lei Lucas' },
+    linha: 'Atendimento inicial a emergências, nas empresas e nas escolas (Lei Lucas).',
+    pagina: PAGINA_NR07,
+  },
+  {
     slug: 'nr-10',
     codigo: 'NR 10',
     nome: 'Segurança em Eletricidade',
@@ -685,6 +1089,39 @@ export const NORMAS: readonly Norma[] = [
     pagina: PAGINA_NR11,
   },
   {
+    slug: 'nr-12',
+    codigo: 'NR 12',
+    nome: 'Segurança em Máquinas e Equipamentos',
+    meta: 'Operação e manutenção',
+    curto: 'Máquinas e equipamentos',
+    rotulo: 'Máquinas',
+    menu: { titulo: 'Máquinas e equipamentos', apoio: 'Operação e manutenção' },
+    linha: 'Operação, manutenção e inspeção seguras de máquinas e equipamentos.',
+    pagina: PAGINA_NR12,
+  },
+  {
+    slug: 'nr-18',
+    codigo: 'NR 18',
+    nome: 'Plataforma Elevatória (PEMT)',
+    meta: 'Construção · Operador',
+    curto: 'Plataforma elevatória (PEMT)',
+    rotulo: 'PEMT',
+    menu: { titulo: 'Plataforma elevatória (PEMT)', apoio: 'Construção · operador' },
+    linha: 'Operação segura de plataforma elevatória móvel de trabalho.',
+    pagina: PAGINA_NR18,
+  },
+  {
+    slug: 'nr-20',
+    codigo: 'NR 20',
+    nome: 'Inflamáveis e Combustíveis',
+    meta: 'Capacitação por classe',
+    curto: 'Inflamáveis e combustíveis',
+    rotulo: 'Inflamáveis',
+    menu: { titulo: 'Inflamáveis e combustíveis', apoio: 'Capacitação por classe' },
+    linha: 'Segurança em atividades com inflamáveis e líquidos combustíveis.',
+    pagina: PAGINA_NR20,
+  },
+  {
     slug: 'nr-23',
     codigo: 'NR 23',
     nome: 'Proteção Contra Incêndios',
@@ -695,6 +1132,28 @@ export const NORMAS: readonly Norma[] = [
     linha:
       'Preparo técnico e prático para prevenção e resposta inicial a emergências.',
     pagina: PAGINA_NR23,
+  },
+  {
+    slug: 'nr-26',
+    codigo: 'NR 26',
+    nome: 'Sinalização de Segurança',
+    meta: 'Rotulagem e GHS',
+    curto: 'Sinalização e rotulagem',
+    rotulo: 'Sinalização',
+    menu: { titulo: 'Sinalização e rotulagem', apoio: 'Produtos químicos · GHS' },
+    linha: 'Sinalização por cor e identificação de produtos químicos pelo GHS.',
+    pagina: PAGINA_NR26,
+  },
+  {
+    slug: 'nr-31',
+    codigo: 'NR 31',
+    nome: 'Segurança no Trabalho Rural',
+    meta: 'Animais peçonhentos',
+    curto: 'Trabalho rural',
+    rotulo: 'Rural',
+    menu: { titulo: 'Trabalho rural', apoio: 'Animais peçonhentos' },
+    linha: 'Prevenção de acidentes com animais peçonhentos no trabalho rural.',
+    pagina: PAGINA_NR31,
   },
   {
     slug: 'nr-33',
@@ -725,11 +1184,12 @@ export function normaComPagina(slug: string): NormaComPagina | undefined {
   return norma?.pagina ? { ...norma, pagina: norma.pagina } : undefined;
 }
 
-/** Opções de treinamento do formulário de proposta: as sete normas e "Outro". */
+/** Opções do formulário de proposta: as normas, os laudos e "Outro". */
 export const OPCOES_DE_TREINAMENTO: readonly {
   valor: string;
   rotulo: string;
 }[] = [
   ...NORMAS.map((norma) => ({ valor: norma.slug, rotulo: norma.codigo })),
+  ...LAUDOS.map((laudo) => ({ valor: laudo.slug, rotulo: `Laudo ${laudo.codigo}` })),
   { valor: TREINAMENTO_OUTRO, rotulo: 'Outra NR' },
 ];

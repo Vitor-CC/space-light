@@ -109,7 +109,7 @@ function Abertura({ norma, destinoDoConteudo }: { norma: NormaComPagina; destino
             <Link href={destinoDoConteudo} className={botao({ variante: 'inverso', tamanho: 'lg', className: 'hidden lg:inline-flex' })}>Ver conteúdo</Link>
           </div>
         </div>
-        <FotoLegendada {...pagina.figura} norma={norma.codigo} prioridade legendaNoCelular={false} sizes="(min-width: 1280px) 520px, (min-width: 1024px) 400px, 100vw" className="h-[220px] w-full lg:h-[560px] lg:w-[400px] lg:shrink-0 xl:w-[520px]" />
+        {pagina.figura ? <FotoLegendada {...pagina.figura} norma={norma.codigo} prioridade legendaNoCelular={false} sizes="(min-width: 1280px) 520px, (min-width: 1024px) 400px, 100vw" className="h-[220px] w-full lg:h-[560px] lg:w-[400px] lg:shrink-0 xl:w-[520px]" /> : null}
       </div>
 
       <dl className="grid grid-cols-2 gap-y-3.5 border-t border-ds-borda-inv pt-4 lg:flex lg:pt-7 lg:pb-12">

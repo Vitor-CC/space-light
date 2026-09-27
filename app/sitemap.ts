@@ -21,6 +21,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
             changeFrequency: 'yearly',
             priority: 0.8,
           },
+          {
+            url: `${SITE_URL}${rotas.laudos}`,
+            lastModified: agora,
+            changeFrequency: 'yearly',
+            priority: 0.7,
+          },
           ...NORMAS.filter((norma) => norma.pagina).map((norma) => ({
             url: `${SITE_URL}${rotas.norma(norma.slug)}`,
             lastModified: agora,

@@ -36,13 +36,17 @@ export function SiteFooter() {
               <Link href={rotas.inicio} className={link}>Início</Link>
               <Link href={rotas.treinamentos} className={link}>Treinamentos</Link>
               <Link href={rotas.comoTrabalhamos} className={link}>Como trabalhamos</Link>
+              <Link href={rotas.laudos} className={link}>Laudos técnicos</Link>
               <Link href={rotas.portalCliente} className={link}>Portal do cliente</Link>
               <Link href={rotas.contato} className={link}>Solicitar proposta</Link>
             </nav>
 
             <nav aria-label="Treinamentos" className={lista}>
               <p className={titulo}>Treinamentos</p>
-              {NORMAS.map((norma) => <Link key={norma.slug} href={rotas.norma(norma.slug)} className={link}>{norma.codigo} · {norma.rotulo}</Link>)}
+              {/* Com 13 normas, duas colunas para a lista não passar da altura das outras. */}
+              <div className="grid grid-flow-col grid-rows-7 gap-x-8 gap-y-3.5">
+                {NORMAS.map((norma) => <Link key={norma.slug} href={rotas.norma(norma.slug)} className={link}>{norma.codigo} · {norma.rotulo}</Link>)}
+              </div>
             </nav>
 
             <nav aria-label="Portais" className={lista}>
