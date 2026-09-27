@@ -96,6 +96,7 @@ export function CompanyDashboard({ data, navigate }: { data: CompanyDashboardDat
   }, [data, hoje, agora]);
 
   const doDia = useMemo(() => dias.filter((d) => d.session.session_date === hoje), [dias, hoje]);
+  const siglaDo = useMemo(() => new Map(data.clients.map((c) => [c.id, c.short_code])), [data.clients]);
   const semana = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const iso = somarDias(hoje, i);
     return { iso, itens: dias.filter((d) => d.session.session_date === iso) };
@@ -147,10 +148,12 @@ export function CompanyDashboard({ data, navigate }: { data: CompanyDashboardDat
                 <span className={cn('ds-caps whitespace-nowrap', i === 0 ? 'text-ds-texto' : 'text-ds-texto-2')}>{rotuloDoDia(iso)}</span>
                 {itens.map(({ training, session }) => {
                   const sem = !session.instructor_id;
-                  return <button key={session.id} type="button" onClick={() => navigate('trainings', training.id)} title={`${training.nr} · ${training.internal_label || training.title} · ${training.client_name}`}
+                  return <button key={session.id} type="button" onClick={() => navigate('trainings', training.id)} title={`${training.nr} · ${training.internal_label || training.title} · ${training.client_name} · ${sem ? 'sem instrutor escalado' : `instrutor ${session.instructor_name ?? ''}`}`}
                     className={cn('flex w-full flex-col items-start gap-0.5 overflow-hidden rounded-sm px-2 py-1.5 text-left ds-caption transition-opacity hover:opacity-85 ds-foco', sem ? 'bg-ds-perigo-suave text-ds-perigo' : 'bg-ds-inverso')}>
                     <span className={cn('max-w-full truncate', !sem && 'text-ds-amarelo')}>{training.nr}</span>
-                    <span className={cn('max-w-full truncate', !sem && 'text-ds-texto-inv')}>{sem ? 'Sem instrutor' : (session.instructor_name ?? '').split(/\s+/)[0]}</span>
+                    {/* Norma e empresa (pedido do usuário, 27/09); o vermelho continua marcando o dia sem instrutor. */}
+                    {/* A coluna cabe ~9 caracteres: vai a sigla do cliente; o nome completo fica no title. */}
+                    <span className={cn('max-w-full truncate', !sem && 'text-ds-texto-inv')}>{siglaDo.get(training.client_id) || training.client_name}</span>
                   </button>;
                 })}
               </div>)}
