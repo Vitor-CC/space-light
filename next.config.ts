@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
     return [
       { source: '/v2', destination: '/', permanent: true },
       { source: '/v2/:caminho*', destination: '/:caminho*', permanent: true },
+      // Página do site antigo que o Google ainda mostra; o site novo não tem "Sobre".
+      { source: '/sobre', destination: '/', permanent: true },
     ];
   },
 };
