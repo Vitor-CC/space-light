@@ -196,6 +196,11 @@ export function setTrainingRequestStatus(requestId: string, status: 'open' | 'sc
   return requestJson<{ ok: true }>('/api/company/requests', { method: 'PATCH', body: JSON.stringify({ requestId, status }) });
 }
 
+/** Mesma troca de situação, para o pedido de proposta que veio do site. */
+export function setSiteLeadStatus(leadId: string, status: 'open' | 'scheduled' | 'declined') {
+  return requestJson<{ ok: true }>('/api/company/requests', { method: 'PATCH', body: JSON.stringify({ requestId: leadId, status, origem: 'site' }) });
+}
+
 export function saveEmployeeJobTitle(userId: string, jobTitle: string) {
   return requestJson<{ ok: true }>(`/api/company/employees/${encodeURIComponent(userId)}/job-title`, { method: 'POST', body: JSON.stringify({ jobTitle }) });
 }

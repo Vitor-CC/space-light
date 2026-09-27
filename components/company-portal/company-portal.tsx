@@ -9,7 +9,7 @@ import { CompanyDashboard } from '@/components/company-portal/company-dashboard'
 import { CompanyFiles } from '@/components/company-portal/company-files';
 import { CompanyInstructors } from '@/components/company-portal/company-instructors';
 import { CompanyParticipants } from '@/components/company-portal/company-participants';
-import { CompanyRequests } from '@/components/company-portal/company-requests';
+import { CompanyRequests, solicitacoesAbertas } from '@/components/company-portal/company-requests';
 import { CompanySettings } from '@/components/company-portal/company-settings';
 import { CompanyTrainings } from '@/components/company-portal/company-trainings';
 import { SectionHeading } from '@/components/company-portal/company-ui';
@@ -44,7 +44,7 @@ export function CompanyPortal({ initialData }: { initialData: CompanyDashboardDa
     try { setData(await readMockCompanyDatabase()); } finally { setAtualizando(false); }
   }, []);
 
-  const abertas = data.requests.filter((r) => r.status === 'open').length;
+  const abertas = solicitacoesAbertas(data);
   const aguardando = data.trainings.filter((t) => t.status === 'completed' && !t.certificate_generated_at).length;
   const itens = [
     { id: 'dashboard' as const, rotulo: 'Painel', icone: <LayoutGrid /> },

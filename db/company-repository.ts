@@ -26,9 +26,11 @@ import type {
   CompanyInstructorAvailability,
   CompanyInstructorDocument,
   CompanyParticipant,
+  CompanySiteLead,
   CompanyTraining,
   CompanyTrainingRequest,
 } from '@/lib/company-types';
+import type { Proposta } from '@/lib/site-novo/proposta';
 import type {
   InstructorAvailability,
   InstructorDashboardData,
@@ -180,6 +182,31 @@ const TABELAS_POR_MARCADOR = [
       location TEXT NOT NULL DEFAULT '',
       notes TEXT NOT NULL DEFAULT '',
       based_on_training_id TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  // Pedido de proposta feito no site ("Solicitar proposta"), de quem ainda não
+  // é cliente. Aparece nas Solicitações da equipe com a origem "Site".
+  {
+    marcador: 'tab_site_leads',
+    tabela: 'site_leads',
+    criar: `CREATE TABLE IF NOT EXISTS site_leads (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT NOT NULL DEFAULT '',
+      company TEXT NOT NULL DEFAULT '',
+      document TEXT NOT NULL DEFAULT '',
+      job_title TEXT NOT NULL DEFAULT '',
+      company_size TEXT NOT NULL DEFAULT '',
+      state TEXT NOT NULL DEFAULT '',
+      trainings TEXT NOT NULL DEFAULT '',
+      participants INTEGER NOT NULL DEFAULT 0,
+      modality TEXT NOT NULL DEFAULT '',
+      deadline TEXT NOT NULL DEFAULT '',
+      message TEXT NOT NULL DEFAULT '',
+      origin TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'open',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
@@ -2303,6 +2330,47 @@ export async function setTrainingRequestStatus(input: { requestId: string; statu
   return { ok: true as const };
 }
 
+/** Grava o pedido de proposta do formulário do site. Os dados já chegam validados. */
+export async function registerSiteLead(input: Proposta & { id: string; origem: string }) {
+  await ensurePortalSchema();
+  await getD1()
+    .prepare(`INSERT INTO site_leads (
+      id, name, email, phone, company, document, job_title, company_size, state,
+      trainings, participants, modality, deadline, message, origin
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(
+      input.id,
+      input.nome,
+      input.email,
+      input.celular,
+      input.empresa,
+      input.cnpj,
+      input.cargo,
+      input.tamanho,
+      input.uf,
+      input.treinamentos.join(','),
+      Number(input.participantes) || 0,
+      input.modalidade,
+      input.prazo,
+      input.mensagem,
+      input.origem,
+    )
+    .run();
+  return { id: input.id };
+}
+
+export async function setSiteLeadStatus(input: { leadId: string; status: string; byUserId: string }) {
+  await ensurePortalSchema();
+  if (!STATUS_SOLICITACAO.includes(input.status as StatusSolicitacao)) throw new Error('Situação inválida.');
+  const result = await getD1()
+    .prepare('UPDATE site_leads SET status = ? WHERE id = ?')
+    .bind(input.status, input.leadId)
+    .run();
+  if (!result.meta?.changes) throw new Error('Pedido não encontrado.');
+  await writeAudit(input.byUserId, 'site_lead.status', 'site_lead', input.leadId, { status: input.status });
+  return { ok: true as const };
+}
+
 /** Cargo do funcionário da Space: o dono edita o de qualquer um; cada um, o seu. */
 export async function updateEmployeeJobTitle(input: { userId: string; jobTitle: string; byUserId: string; byOwner: boolean }) {
   await ensurePortalSchema();
@@ -2962,7 +3030,7 @@ export async function getCompanyDashboardData(
 ): Promise<CompanyDashboardData> {
   await ensurePortalSchema();
   const d1 = getD1();
-  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult, requestsResult, perfil] =
+  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult, requestsResult, siteLeadsResult, perfil] =
     await Promise.all([
       d1
         .prepare(
@@ -3045,6 +3113,11 @@ export async function getCompanyDashboardData(
            LEFT JOIN users u ON u.id = r.requested_by
            ORDER BY r.created_at DESC`)
         .all<CompanyTrainingRequest>(),
+      d1
+        .prepare(`SELECT id, name, email, phone, company, document, job_title, company_size,
+           state, trainings, participants, modality, deadline, message, origin, status, created_at
+           FROM site_leads ORDER BY created_at DESC`)
+        .all<CompanySiteLead>(),
       d1.prepare('SELECT name, job_title FROM users WHERE id = ? LIMIT 1').bind(currentUser.id).first<{ name: string; job_title: string }>(),
     ]);
 
@@ -3057,6 +3130,7 @@ export async function getCompanyDashboardData(
     participants: rows(participantsResult),
     attendance: rows(presencasResult),
     requests: rows(requestsResult),
+    siteLeads: rows(siteLeadsResult),
     mailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM),
     currentUser: {
       id: currentUser.id,

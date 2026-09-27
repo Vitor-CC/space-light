@@ -3,6 +3,7 @@
 import { CalendarDays, CalendarPlus, CheckCircle2, ChevronRight, Clock3, GraduationCap, TriangleAlert, UserRound } from 'lucide-react';
 import { useMemo } from 'react';
 
+import { solicitacoesAbertas } from '@/components/company-portal/company-requests';
 import { EmptyState, formatDate, formatWindow, isoFromDate } from '@/components/company-portal/company-ui';
 import type { CompanySection } from '@/components/company-portal/company-ui';
 import { Botao, botaoClasses, Cartao, Indicador } from '@/components/ds/base';
@@ -78,11 +79,11 @@ export function CompanyDashboard({ data, navigate }: { data: CompanyDashboardDat
       atrasadas: abertas.filter((training) => ultimoDia(training) < hoje).length,
       semLista: data.trainings.filter((training) => ultimoDia(training) < hoje && !comLista.has(training.id)).length,
       certificados: data.trainings.filter((training) => training.status === 'completed' && !training.certificate_generated_at).length,
-      solicitacoes: data.requests.filter((pedido) => pedido.status === 'open').length,
+      solicitacoes: solicitacoesAbertas(data),
       clientes: data.clients.filter((client) => client.status === 'pending').length,
       instrutores: data.instructors.filter((item) => item.status === 'pending').length,
     };
-  }, [data.trainings, data.files, data.clients, data.instructors, data.requests, hoje]);
+  }, [data, hoje]);
   const totalPendencias = Object.values(pendencias).reduce((a, b) => a + b, 0);
 
   return <div className="flex flex-col gap-7">

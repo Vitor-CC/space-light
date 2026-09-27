@@ -122,6 +122,29 @@ export type CompanyTrainingRequest = {
   created_at: string;
 };
 
+/** Pedido de proposta feito no formulário do site, por quem ainda não é cliente. */
+export type CompanySiteLead = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  document: string;
+  job_title: string;
+  company_size: string;
+  state: string;
+  /** Normas marcadas, separadas por vírgula ("nr-23,nr-35,outro"). */
+  trainings: string;
+  participants: number;
+  modality: string;
+  deadline: string;
+  message: string;
+  /** Página de onde veio o pedido, com os parâmetros da URL. */
+  origin: string;
+  status: string;
+  created_at: string;
+};
+
 export type CompanyFile = {
   id: string;
   client_id: string;
@@ -226,6 +249,7 @@ export type CompanyDashboardData = {
   /** Um par por presença gravada (check-in do aluno ou marcação da gestão). */
   attendance: { participant_id: string; session_id: string }[];
   requests: CompanyTrainingRequest[];
+  siteLeads: CompanySiteLead[];
   /** Há envio de e-mail configurado (RESEND_API_KEY + MAIL_FROM no servidor)? */
   mailConfigured: boolean;
   currentUser: { id: string; email: string; name: string; jobTitle: string; isOwner: boolean };
