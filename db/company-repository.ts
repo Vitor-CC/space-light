@@ -2542,6 +2542,31 @@ export async function deleteClientDocument(input: { documentId: string; byUserId
   return { objectKey: doc.object_key };
 }
 
+const TABELA_DA_SOLICITACAO = { portal: 'training_requests', site: 'site_leads', documento: 'document_requests' } as const;
+export type OrigemDaSolicitacao = keyof typeof TABELA_DA_SOLICITACAO;
+
+/**
+ * A equipe exclui uma solicitação de qualquer origem. A linha inteira vai para
+ * o registro de atividade antes de sair, para dar para saber o que foi pedido.
+ * Documento já enviado em resposta a um pedido continua com o cliente.
+ */
+export async function deleteRequest(input: { origem: OrigemDaSolicitacao; requestId: string; byUserId: string }) {
+  await ensurePortalSchema();
+  // O nome da tabela entra no SQL: só vale uma das três chaves, nada herdado.
+  if (!Object.hasOwn(TABELA_DA_SOLICITACAO, input.origem)) throw new Error('Tipo de solicitação inválido.');
+  const tabela = TABELA_DA_SOLICITACAO[input.origem];
+  const d1 = getD1();
+  const linha = await d1.prepare(`SELECT * FROM ${tabela} WHERE id = ? LIMIT 1`).bind(input.requestId).first<Record<string, unknown>>();
+  if (!linha) throw new Error('Solicitação não encontrada.');
+  const comandos = [d1.prepare(`DELETE FROM ${tabela} WHERE id = ?`).bind(input.requestId)];
+  if (input.origem === 'documento') {
+    comandos.push(d1.prepare('UPDATE client_documents SET request_id = NULL WHERE request_id = ?').bind(input.requestId));
+  }
+  await d1.batch(comandos);
+  await writeAudit(input.byUserId, `${tabela.replace(/s$/, '')}.deleted`, tabela.replace(/s$/, ''), input.requestId, linha);
+  return { ok: true as const };
+}
+
 /** Grava o pedido de proposta do formulário do site. Os dados já chegam validados. */
 export async function registerSiteLead(input: Proposta & { id: string; origem: string }) {
   await ensurePortalSchema();

@@ -201,6 +201,11 @@ export function setSiteLeadStatus(leadId: string, status: 'open' | 'scheduled' |
   return requestJson<{ ok: true }>('/api/company/requests', { method: 'PATCH', body: JSON.stringify({ requestId: leadId, status, origem: 'site' }) });
 }
 
+/** Exclui a solicitação de vez: pedido de turma (portal), do site ou de documento. */
+export function removeRequest(requestId: string, origem: 'portal' | 'site' | 'documento') {
+  return requestJson<{ ok: true }>('/api/company/requests', { method: 'DELETE', body: JSON.stringify({ requestId, origem }) });
+}
+
 export function saveEmployeeJobTitle(userId: string, jobTitle: string) {
   return requestJson<{ ok: true }>(`/api/company/employees/${encodeURIComponent(userId)}/job-title`, { method: 'POST', body: JSON.stringify({ jobTitle }) });
 }

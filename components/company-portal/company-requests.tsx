@@ -1,13 +1,13 @@
 'use client';
 
-import { Inbox, Loader2, MessageCircle } from 'lucide-react';
+import { Inbox, Loader2, MessageCircle, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { PedidoDeDocumento } from '@/components/company-portal/company-avulsos';
 import { formatDate } from '@/components/company-portal/company-ui';
 import { botaoClasses, Cartao, Pilula, selectClasses, Tag, TopoDePagina, Vazio } from '@/components/ds/base';
 import type { CompanyDashboardData, CompanyDocumentRequest, CompanySiteLead, CompanyTrainingRequest } from '@/lib/company-types';
-import { setSiteLeadStatus, setTrainingRequestStatus } from '@/lib/mock-company-database';
+import { removeRequest, setSiteLeadStatus, setTrainingRequestStatus } from '@/lib/mock-company-database';
 import { OPCOES_DE_TREINAMENTO } from '@/lib/site-novo/normas';
 import { cn } from '@/lib/utils';
 
@@ -53,6 +53,21 @@ export function CompanyRequests({ data, reload, notify, novaTurma }: { data: Com
     finally { setSalvando(''); }
   }
 
+  async function excluir(item: Item) {
+    const aviso = item.origem === 'site'
+      ? `Excluir o pedido de proposta de ${item.pedido.company || item.pedido.name}? Esta ação não pode ser desfeita.`
+      : item.origem === 'documento'
+        ? `Excluir o pedido de "${item.pedido.title}" de ${item.pedido.client_name}? O cliente deixa de ver o pedido no portal${item.pedido.status === 'sent' ? ', mas o documento enviado continua com ele' : ''}. Esta ação não pode ser desfeita.`
+        : `Excluir o pedido de ${item.pedido.nr} de ${item.pedido.client_name}? O cliente deixa de ver o pedido no portal. Esta ação não pode ser desfeita.`;
+    if (!window.confirm(aviso)) return;
+    setSalvando(item.pedido.id);
+    try { await removeRequest(item.pedido.id, item.origem); notify('Solicitação excluída.'); await reload(); }
+    catch (error) { notify(error instanceof Error ? error.message : 'Erro ao excluir a solicitação.'); }
+    finally { setSalvando(''); }
+  }
+
+  const lixeira = (item: Item) => <button type="button" onClick={() => void excluir(item)} disabled={salvando === item.pedido.id} aria-label="Excluir solicitação" title="Excluir solicitação" className="absolute top-3 right-3 rounded p-1.5 text-ds-texto-2 hover:bg-ds-perigo-suave hover:text-ds-perigo disabled:opacity-40"><Trash2 className="size-4" /></button>;
+
   const situacao = (item: Exclude<Item, { origem: 'documento' }>) => <div className="flex items-center gap-2">
     <select aria-label="Situação da solicitação" value={item.pedido.status} disabled={salvando === item.pedido.id} onChange={(e) => void mudar(item, e.target.value as Status)} className={cn(selectClasses, 'min-h-10 w-auto py-2 ds-body-s')}>
       <option value="open">Em aberto</option><option value="scheduled">Agendada</option><option value="declined">Não atendida</option>
@@ -66,15 +81,15 @@ export function CompanyRequests({ data, reload, notify, novaTurma }: { data: Com
       {(['open', 'scheduled', 'declined', 'todas'] as const).map((id) => <Pilula key={id} ativa={filtro === id} onClick={() => setFiltro(id)}>{id === 'todas' ? 'Todas' : id === 'scheduled' ? 'Agendada ou enviada' : STATUS[id].texto} · {id === 'todas' ? itens.length : itens.filter((item) => grupo(item) === id).length}</Pilula>)}
     </div>
     {lista.length ? <div className="grid gap-4 xl:grid-cols-2">{lista.map((item) => {
-      if (item.origem === 'documento') return <Cartao key={`doc-${item.pedido.id}`} className="p-5"><PedidoDeDocumento pedido={item.pedido} notify={notify} reload={reload} mostrarCliente /></Cartao>;
+      if (item.origem === 'documento') return <Cartao key={`doc-${item.pedido.id}`} className="relative p-5"><PedidoDeDocumento pedido={item.pedido} notify={notify} reload={reload} mostrarCliente acao={lixeira(item)} /></Cartao>;
       const st = STATUS[(item.pedido.status as Status)] ?? STATUS.open;
       if (item.origem === 'site') {
         const lead = item.pedido;
         const normas = lead.trainings.split(',').filter(Boolean).map((valor) => OPCOES_DE_TREINAMENTO.find((opcao) => opcao.valor === valor)?.rotulo ?? valor).join(' · ');
         const fone = lead.phone.replace(/\D/g, '');
         const empresa = [lead.company_size ? `${lead.company_size} funcionários` : '', lead.document ? `CNPJ ${lead.document}` : ''].filter(Boolean).join(' · ');
-        return <Cartao key={`site-${lead.id}`} className="flex flex-col gap-3 p-5">
-          <div className="flex flex-wrap items-center gap-2"><Tag tom={st.tom}>{st.texto}</Tag><Tag tom="info">Site</Tag><span className="ds-caption text-ds-texto-2">{formatDate(lead.created_at)}</span></div>
+        return <Cartao key={`site-${lead.id}`} className="relative flex flex-col gap-3 p-5">
+          <div className="flex flex-wrap items-center gap-2 pr-8"><Tag tom={st.tom}>{st.texto}</Tag><Tag tom="info">Site</Tag><span className="ds-caption text-ds-texto-2">{formatDate(lead.created_at)}</span>{lixeira(item)}</div>
           <div><h3 className="ds-h4">{normas || 'Pedido de proposta'}</h3><p className="ds-body-s font-medium text-ds-amarelo-texto">{lead.company}</p></div>
           <dl className="grid gap-x-4 gap-y-1 ds-body-s sm:grid-cols-[120px_1fr]">
             <dt className="text-ds-texto-2">Contato</dt><dd>{lead.name}{lead.job_title ? ` · ${lead.job_title}` : ''}</dd>
@@ -94,8 +109,8 @@ export function CompanyRequests({ data, reload, notify, novaTurma }: { data: Com
       }
       const r = item.pedido;
       const fone = telefone(r.client_id).replace(/\D/g, '');
-      return <Cartao key={`portal-${r.id}`} className="flex flex-col gap-3 p-5">
-        <div className="flex flex-wrap items-center gap-2"><Tag tom={st.tom}>{st.texto}</Tag><Tag tom="neutro">Portal</Tag><span className="ds-caption text-ds-texto-2">{formatDate(r.created_at)}{r.requested_by_name ? ` · por ${r.requested_by_name}` : ''}</span></div>
+      return <Cartao key={`portal-${r.id}`} className="relative flex flex-col gap-3 p-5">
+        <div className="flex flex-wrap items-center gap-2 pr-8"><Tag tom={st.tom}>{st.texto}</Tag><Tag tom="neutro">Portal</Tag><span className="ds-caption text-ds-texto-2">{formatDate(r.created_at)}{r.requested_by_name ? ` · por ${r.requested_by_name}` : ''}</span>{lixeira(item)}</div>
         <div><h3 className="ds-h4">{r.nr}{r.title ? ` · ${r.title}` : ''}</h3><p className="ds-body-s font-medium text-ds-amarelo-texto">{r.client_name}</p></div>
         <dl className="grid gap-x-4 gap-y-1 ds-body-s sm:grid-cols-[120px_1fr]">
           <dt className="text-ds-texto-2">Participantes</dt><dd>{r.participants || '—'}</dd>

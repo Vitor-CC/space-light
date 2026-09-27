@@ -2,7 +2,7 @@
 
 import { Download, Eye, FileText, Loader2, Send, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { SyntheticEvent } from 'react';
+import type { ReactNode, SyntheticEvent } from 'react';
 
 import { formatDate } from '@/components/company-portal/company-ui';
 import { Botao, Campo, campoClasses, LinhaArquivo, Tag, Vazio } from '@/components/ds/base';
@@ -80,7 +80,7 @@ export function ListaDeAvulsos({ docs, notify, reload }: { docs: CompanyClientDo
 }
 
 /** Pedido de documento em aberto: o que o cliente pediu e o envio da resposta. */
-export function PedidoDeDocumento({ pedido, notify, reload, mostrarCliente = false }: { pedido: CompanyDocumentRequest; notify: Notify; reload: Reload; mostrarCliente?: boolean }) {
+export function PedidoDeDocumento({ pedido, notify, reload, mostrarCliente = false, acao }: { pedido: CompanyDocumentRequest; notify: Notify; reload: Reload; mostrarCliente?: boolean; acao?: ReactNode }) {
   const st = SITUACAO_PEDIDO_DOC[pedido.status as keyof typeof SITUACAO_PEDIDO_DOC] ?? SITUACAO_PEDIDO_DOC.open;
   const [salvando, setSalvando] = useState(false);
   async function mudar(status: 'open' | 'declined') {
@@ -90,7 +90,7 @@ export function PedidoDeDocumento({ pedido, notify, reload, mostrarCliente = fal
     finally { setSalvando(false); }
   }
   return <div className="flex flex-col gap-3">
-    <div className="flex flex-wrap items-center gap-2"><Tag tom={st.tom}>{st.texto}</Tag><Tag tom="neutro">Documento</Tag><span className="ds-caption text-ds-texto-2">{formatDate(pedido.created_at)}{pedido.requested_by_name ? ` · por ${pedido.requested_by_name}` : ''}</span></div>
+    <div className={cn('flex flex-wrap items-center gap-2', acao && 'pr-8')}><Tag tom={st.tom}>{st.texto}</Tag><Tag tom="neutro">Documento</Tag><span className="ds-caption text-ds-texto-2">{formatDate(pedido.created_at)}{pedido.requested_by_name ? ` · por ${pedido.requested_by_name}` : ''}</span>{acao}</div>
     <div><h3 className="ds-h4">{pedido.title}</h3>{mostrarCliente ? <p className="ds-body-s font-medium text-ds-amarelo-texto">{pedido.client_name}</p> : null}</div>
     {pedido.notes ? <p className="whitespace-pre-line ds-body-s text-ds-texto-2">{pedido.notes}</p> : null}
     {pedido.status === 'open'

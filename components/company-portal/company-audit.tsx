@@ -44,6 +44,9 @@ const actionLabels: Record<string, string> = {
   'instructor.deleted': 'excluiu um instrutor',
   'training.deleted': 'excluiu um treinamento',
   'employee.deleted': 'excluiu um funcionário',
+  'training_request.deleted': 'excluiu um pedido de turma',
+  'site_lead.deleted': 'excluiu um pedido de proposta do site',
+  'document_request.deleted': 'excluiu um pedido de documento',
 };
 
 function describe(action: string) {
