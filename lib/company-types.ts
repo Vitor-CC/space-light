@@ -12,6 +12,8 @@ export type CompanyClient = {
   city: string;
   state: string;
   postal_code: string;
+  /** Sigla do código das turmas (PETZ-JAC → PETZ-JAC-03). */
+  short_code: string;
   /** Login da empresa no portal; nulo = ainda não consegue entrar. */
   username: string | null;
   status: string;

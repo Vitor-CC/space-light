@@ -3,6 +3,7 @@ import { formatarCpf, formatarRg, problemaCpf, problemaRg } from '@/lib/document
 import { INSTRUCTOR_DOCUMENT_CATEGORIES } from '@/lib/instructor-documents';
 import { clientePedeLogin } from '@/lib/login-do-participante';
 import { nomeCertificadoAluno, PREFIXO_CERTIFICADO_ALUNO } from '@/lib/nome-certificado';
+import { codigoDaTurma, normalizarSigla, SIGLA_REGRA, siglaValida, sugerirSigla } from '@/lib/sigla';
 import { normalizarUsuario, USUARIO_REGRA, usuarioValido } from '@/lib/usuario';
 import type { DatabaseBinding, DatabaseResult } from '@/db/sqlite-adapter';
 import type {
@@ -152,6 +153,13 @@ const COLUNAS_POR_MARCADOR = [
     coluna: 'job_title',
     alter: "ALTER TABLE users ADD COLUMN job_title TEXT NOT NULL DEFAULT ''",
   },
+  // Sigla do cliente (PETZ-JAC): forma o código da turma, PETZ-JAC-03.
+  {
+    marcador: 'col_clients_short_code',
+    tabela: 'clients',
+    coluna: 'short_code',
+    alter: "ALTER TABLE clients ADD COLUMN short_code TEXT NOT NULL DEFAULT ''",
+  },
   // Login interno do participante, pedido só por cliente Amazon no QR.
   {
     marcador: 'col_participants_employee_login',
@@ -287,6 +295,7 @@ export function ensurePortalSchema(): Promise<void> {
         city TEXT NOT NULL DEFAULT '',
         state TEXT NOT NULL DEFAULT '',
         postal_code TEXT NOT NULL DEFAULT '',
+        short_code TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'invited',
         source TEXT NOT NULL DEFAULT 'admin',
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -1056,6 +1065,28 @@ export async function approveClientAccess(
   );
 }
 
+/**
+ * Sigla que o cliente vai usar. Informada: valida e exige que esteja livre.
+ * Vazia: sugere pelo nome e, se já existir, acrescenta 2, 3... até achar livre.
+ */
+async function siglaParaCliente(d1: DatabaseBinding, informada: string, nome: string, excetoId: string | null) {
+  const ocupada = async (sigla: string) => Boolean(await d1
+    .prepare('SELECT id FROM clients WHERE short_code = ? AND id != ? LIMIT 1')
+    .bind(sigla, excetoId ?? '')
+    .first<{ id: string }>());
+  const pedida = normalizarSigla(informada ?? '');
+  if (pedida) {
+    if (!siglaValida(pedida)) throw new Error(`Sigla inválida. ${SIGLA_REGRA}`);
+    if (await ocupada(pedida)) throw new Error(`A sigla ${pedida} já é de outro cliente.`);
+    return pedida;
+  }
+  const base = sugerirSigla(nome) || 'CLI';
+  for (let n = 1; ; n++) {
+    const candidata = normalizarSigla(n === 1 ? base : `${base.slice(0, 10)}${n}`);
+    if (siglaValida(candidata) && !(await ocupada(candidata))) return candidata;
+  }
+}
+
 export async function createClientByAdmin(input: {
   name: string;
   legalName: string;
@@ -1065,6 +1096,8 @@ export async function createClientByAdmin(input: {
   contactEmail: string;
   contactPhone: string;
   username: string;
+  /** Sigla do código das turmas; vazia = sugerida pelo nome. */
+  shortCode?: string;
   createdByUserId: string;
   passwordHash: string;
   passwordSalt: string;
@@ -1075,12 +1108,13 @@ export async function createClientByAdmin(input: {
   const userId = makeId('user');
   const email = normalizeEmail(input.contactEmail);
   const username = await exigirUsuarioLivre(input.username);
+  const sigla = await siglaParaCliente(d1, input.shortCode ?? '', input.name, null);
   await d1.batch([
     d1
       .prepare(`INSERT INTO clients (
         id, name, legal_name, document, unit, contact_name, contact_email,
-        contact_phone, status, source
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'invited', 'admin')`)
+        contact_phone, short_code, status, source
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'invited', 'admin')`)
       .bind(
         id,
         input.name.trim(),
@@ -1090,6 +1124,7 @@ export async function createClientByAdmin(input: {
         input.contactName.trim(),
         email,
         input.contactPhone.trim(),
+        sigla,
       ),
     d1
       .prepare(`INSERT INTO users (
@@ -1837,6 +1872,8 @@ export async function updateClientByAdmin(input: {
   contactName: string;
   contactEmail: string;
   contactPhone: string;
+  /** Ausente = mantém a sigla atual. */
+  shortCode?: string;
 }) {
   await ensurePortalSchema();
   const d1 = getD1();
@@ -1868,12 +1905,18 @@ export async function updateClientByAdmin(input: {
     .bind(campos.contactEmail, input.clientId)
     .first<{ id: string }>();
   if (outraConta) throw new Error('Este e-mail já é usado por outra conta de acesso.');
+  // Trocar a sigla não mexe no código das turmas que já existem: só as novas usam a nova.
+  const atual = await d1.prepare('SELECT short_code FROM clients WHERE id = ?').bind(input.clientId).first<{ short_code: string }>();
+  const siglaAtual = atual?.short_code ?? '';
+  const sigla = input.shortCode === undefined || normalizarSigla(input.shortCode) === siglaAtual
+    ? siglaAtual
+    : await siglaParaCliente(d1, input.shortCode, campos.name, input.clientId);
   await d1.batch([
     d1
       .prepare(`UPDATE clients SET name = ?, legal_name = ?, document = ?, unit = ?, contact_name = ?,
-        contact_email = ?, contact_phone = ?, updated_at = datetime('now') WHERE id = ?`)
+        contact_email = ?, contact_phone = ?, short_code = ?, updated_at = datetime('now') WHERE id = ?`)
       .bind(campos.name, campos.legalName, campos.document, campos.unit, campos.contactName,
-        campos.contactEmail, campos.contactPhone, input.clientId),
+        campos.contactEmail, campos.contactPhone, sigla, input.clientId),
     d1
       .prepare("UPDATE users SET email = ?, name = ? WHERE client_id = ? AND role = 'client'")
       .bind(campos.contactEmail, campos.contactName, input.clientId),
@@ -3036,7 +3079,7 @@ export async function getCompanyDashboardData(
         .prepare(
           `SELECT id, name, legal_name, document, unit, contact_name,
            contact_email, contact_phone, address, district, city, state,
-           postal_code, status, created_at,
+           postal_code, short_code, status, created_at,
            (SELECT u.username FROM users u WHERE u.client_id = clients.id AND u.role = 'client'
             ORDER BY u.created_at ASC LIMIT 1) AS username
            FROM clients ORDER BY name COLLATE NOCASE ASC`,
@@ -3154,6 +3197,26 @@ export type NovoDiaDeTreinamento = {
  * a data costuma ser fechada com o cliente antes de haver escala, e num
  * treinamento de vários dias cada dia pode acabar com um instrutor diferente.
  */
+/**
+ * Código da turma: sigla do cliente + número da turma dele (PETZ-JAC-03).
+ * Cliente sem sigla ganha uma agora. O número parte da quantidade de turmas
+ * do cliente e sobe até achar um código livre (turma apagada deixa buraco,
+ * e sigla trocada recomeça a contagem sem colidir).
+ */
+async function proximoCodigoDeTurma(d1: DatabaseBinding, clientId: string) {
+  const cliente = await d1.prepare('SELECT name, short_code FROM clients WHERE id = ?').bind(clientId).first<{ name: string; short_code: string }>();
+  let sigla = cliente?.short_code ?? '';
+  if (!sigla) {
+    sigla = await siglaParaCliente(d1, '', cliente?.name ?? '', clientId);
+    await d1.prepare('UPDATE clients SET short_code = ? WHERE id = ?').bind(sigla, clientId).run();
+  }
+  const total = await d1.prepare('SELECT count(*) AS n FROM trainings WHERE client_id = ?').bind(clientId).first<{ n: number }>();
+  for (let numero = Number(total?.n ?? 0) + 1; ; numero++) {
+    const code = codigoDaTurma(sigla, numero);
+    if (!(await d1.prepare('SELECT id FROM trainings WHERE code = ? LIMIT 1').bind(code).first<{ id: string }>())) return code;
+  }
+}
+
 export async function createTraining(input: {
   clientId: string;
   nr: string;
@@ -3204,9 +3267,7 @@ export async function createTraining(input: {
 
   const primaryDate = dias[0].date;
   const id = makeId('training');
-  const digits = input.nr.replace(/\D/g, '').padStart(2, '0');
-  const suffix = crypto.randomUUID().slice(0, 6).toUpperCase();
-  const code = `SL-${primaryDate.slice(0, 4)}-${digits}-${suffix}`;
+  const code = await proximoCodigoDeTurma(d1, input.clientId);
   const qrToken = `${code}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
   // Vale o instrutor do último dia: é ele quem assina o certificado.
   const ultimoEscalado = [...dias].reverse().find((dia) => dia.instructorId);

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { updateClientByAdmin } from '@/db/company-repository';
 import { getCurrentUser } from '@/lib/app-auth';
 
-type Corpo = Partial<Record<'name' | 'legalName' | 'document' | 'unit' | 'contactName' | 'contactEmail' | 'contactPhone', string>>;
+type Corpo = Partial<Record<'name' | 'legalName' | 'document' | 'unit' | 'contactName' | 'contactEmail' | 'contactPhone' | 'shortCode', string>>;
 
 /** A gestão edita qualquer dado cadastral da empresa. */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -24,6 +24,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       contactName: corpo.contactName ?? '',
       contactEmail: corpo.contactEmail ?? '',
       contactPhone: corpo.contactPhone ?? '',
+      shortCode: corpo.shortCode,
     }));
   } catch (error) {
     return NextResponse.json(

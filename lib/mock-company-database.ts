@@ -23,7 +23,7 @@ export function readMockCompanyDatabase() {
   return requestJson<CompanyDashboardData>('/api/company/dashboard', { cache: 'no-store' });
 }
 
-export function createMockClient(input: { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string; username: string }) {
+export function createMockClient(input: { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string; username: string; shortCode: string }) {
   return requestJson<{ id: string; email: string; username: string; temporaryPassword: string }>('/api/company/clients', { method: 'POST', body: JSON.stringify(input) });
 }
 
@@ -214,7 +214,7 @@ export function saveClientAddress(input: { clientId: string; address: string; di
 /** A função saiu dos formulários em 26/09/2026; o login só existe para cliente Amazon. */
 export type DadosParticipante = { fullName: string; documentId: string; rg: string; birthDate: string; email: string; phone: string; employeeLogin?: string };
 
-export function updateClient(clientId: string, input: { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string }) {
+export function updateClient(clientId: string, input: { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string; shortCode: string }) {
   return requestJson<{ ok: true }>(`/api/company/clients/${encodeURIComponent(clientId)}`, { method: 'PATCH', body: JSON.stringify(input) });
 }
 

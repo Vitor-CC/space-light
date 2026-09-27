@@ -9,12 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { CompanyClient, CompanyDashboardData } from '@/lib/company-types';
 import { approveClient, createMockClient, deleteClient, resetUserPassword, saveClientAddress, setClientUsername, updateClient } from '@/lib/mock-company-database';
+import { limparDigitacaoSigla, SIGLA_REGRA, sugerirSigla } from '@/lib/sigla';
 import { limparDigitacaoUsuario, USUARIO_REGRA } from '@/lib/usuario';
 
 type Aba = 'lista' | 'criar';
 
-type Draft = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string; username: string };
-const emptyDraft: Draft = { name: '', legalName: '', document: '', unit: '', contactName: '', contactEmail: '', contactPhone: '', username: '' };
+type Draft = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string; username: string; shortCode: string };
+const emptyDraft: Draft = { name: '', legalName: '', document: '', unit: '', contactName: '', contactEmail: '', contactPhone: '', username: '', shortCode: '' };
 
 type EnderecoDraft = { address: string; district: string; city: string; state: string; postalCode: string };
 
@@ -83,11 +84,20 @@ function ClientAddress({ client, notify, reload }: { client: CompanyClient; noti
   </div>;
 }
 
-type DadosCliente = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string };
+type DadosCliente = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string; shortCode: string };
+
+/** Sigla do código das turmas: PETZ-JAC vira PETZ-JAC-01, -02... */
+function CampoSigla({ id, valor, onChange, sugestao, ajuda }: { id: string; valor: string; onChange: (valor: string) => void; sugestao?: string; ajuda: string }) {
+  return <label htmlFor={id}>
+    <span className={labelClass}>Sigla (código das turmas)</span>
+    <Input id={id} value={valor} onChange={(e) => onChange(limparDigitacaoSigla(e.target.value))} placeholder={sugestao || 'ex.: PETZ-JAC'} autoCapitalize="characters" spellCheck={false} maxLength={12} className={`${fieldClass} font-mono`} />
+    <span className="mt-1.5 block text-[11px] leading-relaxed text-ds-texto-2">{ajuda} Turmas saem como <span className="whitespace-nowrap font-mono">{(valor || sugestao || 'PETZ-JAC').replace(/-$/, '')}-01</span>, -02... {SIGLA_REGRA}</span>
+  </label>;
+}
 
 /** A gestão edita qualquer dado cadastral da empresa. */
 function ClientEdit({ client, notify, reload }: { client: CompanyClient; notify: (message: string) => void; reload: () => Promise<void> }) {
-  const inicial = (): DadosCliente => ({ name: client.name, legalName: client.legal_name, document: client.document, unit: client.unit, contactName: client.contact_name, contactEmail: client.contact_email, contactPhone: client.contact_phone ?? '' });
+  const inicial = (): DadosCliente => ({ name: client.name, legalName: client.legal_name, document: client.document, unit: client.unit, contactName: client.contact_name, contactEmail: client.contact_email, contactPhone: client.contact_phone ?? '', shortCode: client.short_code ?? '' });
   const [aberto, setAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [draft, setDraft] = useState<DadosCliente>(inicial);
@@ -128,6 +138,7 @@ function ClientEdit({ client, notify, reload }: { client: CompanyClient; notify:
       {campo('contactName', 'Responsável na empresa')}
       {campo('contactEmail', 'E-mail do responsável (contato)', { type: 'email' })}
       {campo('contactPhone', 'Telefone', { required: false })}
+      <CampoSigla id={`cliente-${client.id}-sigla`} valor={draft.shortCode} onChange={(shortCode) => setDraft({ ...draft, shortCode })} ajuda="Trocar a sigla só vale para as turmas novas; as que já existem mantêm o código." />
       <Button type="submit" disabled={salvando} className="mt-1 h-11 bg-ds-amarelo ds-botao text-ds-texto hover:bg-[#eab900] sm:col-span-2">
         {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar dados
       </Button>
@@ -348,6 +359,7 @@ export function CompanyClients({ data, reload, notify }: { data: CompanyDashboar
         <label htmlFor="cliente-email"><span className={labelClass}>E-mail do responsável (contato)</span><Input id="cliente-email" required type="email" value={draft.contactEmail} onChange={(e) => setDraft({ ...draft, contactEmail: e.target.value })} className={fieldClass} /></label>
         <label htmlFor="cliente-usuario"><span className={labelClass}>Nome de usuário (login)</span><Input id="cliente-usuario" required minLength={3} maxLength={40} value={draft.username} onChange={(e) => setDraft({ ...draft, username: limparDigitacaoUsuario(e.target.value) })} placeholder="ex.: empresaexemplo1" autoCapitalize="none" spellCheck={false} className={`${fieldClass} font-mono`} /><span className="mt-1.5 block text-[11px] leading-relaxed text-ds-texto-2">{USUARIO_REGRA}</span></label>
         <label htmlFor="cliente-telefone"><span className={labelClass}>Telefone</span><Input id="cliente-telefone" value={draft.contactPhone} onChange={(e) => setDraft({ ...draft, contactPhone: e.target.value })} className={fieldClass} /></label>
+        <CampoSigla id="cliente-sigla" valor={draft.shortCode} sugestao={sugerirSigla(draft.name)} onChange={(shortCode) => setDraft({ ...draft, shortCode })} ajuda="Em branco, fica a sugestão tirada do nome." />
       </div>
       <Button type="submit" className="mt-6 h-12 bg-ds-amarelo px-8 ds-botao text-ds-texto hover:bg-[#eab900]"><Plus className="size-4" />Salvar e gerar acesso</Button>
     </form> : null}
