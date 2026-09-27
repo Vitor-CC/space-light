@@ -141,7 +141,7 @@ export function FormularioProposta({ treinamentos, preSelecionados = [], origem,
   const texto = (campo: CampoDeTexto) => ({ name: campo, value: valores[campo], 'data-campo': campo, onBlur: () => conferir(campo) });
 
   return <div className="bg-ds-muted text-ds-texto">
-    <div className="mx-auto w-full max-w-[1440px] lg:flex lg:items-start lg:gap-12 lg:px-10 lg:pt-14 lg:pb-[104px] xl:px-[120px]">
+    <div className="mx-auto w-full max-w-[1440px] lg:flex lg:items-start lg:gap-10 lg:px-10 xl:gap-12 lg:pt-14 lg:pb-[104px] xl:px-[120px]">
       {apoio}
       <form ref={formulario} action={acao} onSubmit={aoEnviar} noValidate aria-label="Solicitar proposta" className="bg-ds-superficie lg:min-w-0 lg:flex-1 lg:overflow-hidden lg:rounded-lg">
         <input type="hidden" name="origem" value={origem} />

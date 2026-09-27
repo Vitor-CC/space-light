@@ -19,7 +19,7 @@ const linhaDeLista = 'border-b border-doc-rule-strong';
 const linkDeLista =
   'doc-focus flex min-h-12 items-center py-3 text-base font-semibold';
 
-/** Menu abaixo de 1024: painel de tela cheia com o índice do site. */
+/** Menu abaixo de 1280: painel de tela cheia com o índice do site. */
 export function MobileMenu() {
   const [aberto, setAberto] = useState(false);
   const fechar = () => setAberto(false);
@@ -28,7 +28,7 @@ export function MobileMenu() {
     <Sheet open={aberto} onOpenChange={setAberto}>
       <SheetTrigger
         aria-label="Abrir menu"
-        className="doc-focus flex size-10 items-center justify-center rounded-md border border-ds-borda-inv text-ds-texto-inv lg:hidden"
+        className="doc-focus flex size-10 items-center justify-center rounded-md border border-ds-borda-inv text-ds-texto-inv xl:hidden"
       >
         <Menu className="size-5" aria-hidden="true" />
       </SheetTrigger>

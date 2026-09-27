@@ -71,7 +71,7 @@ export default async function PaginaDeContato({
  * formulário.
  */
 function Apoio() {
-  return <div className="flex flex-col gap-2.5 px-5 pt-8 pb-5 md:px-10 lg:w-[400px] lg:shrink-0 lg:gap-7 lg:p-0">
+  return <div className="flex flex-col gap-2.5 px-5 pt-8 pb-5 md:px-10 lg:w-[320px] lg:shrink-0 lg:gap-7 lg:p-0 xl:w-[400px]">
     <Rotulo>Solicitar proposta</Rotulo>
     <h1 className="font-ds-display text-[26px] leading-8 font-bold tracking-[-0.01em] lg:text-[40px] lg:leading-[46px] lg:tracking-[-0.02em]">Conte o treinamento que a sua empresa precisa.</h1>
     <p className="hidden ds-body-m text-ds-texto-2 lg:block">Preencha o essencial. A Space Light retorna com a proposta e o caminho recomendado para a sua operação.</p>

@@ -12,7 +12,8 @@ const itemNav =
   'doc-focus inline-flex h-10 items-center gap-1 font-ds-sans text-sm leading-5 font-medium text-ds-texto-inv decoration-ds-amarelo decoration-2 underline-offset-[10px] hover:underline';
 
 /**
- * Navegação a partir de 1024. "Treinamentos" abre o índice das normas, que
+ * Navegação a partir de 1280 (entre 1024 e 1280 os quatro itens, o Entrar e
+ * o botão não cabem numa linha, e fica o menu do celular). "Treinamentos" abre o índice das normas, que
  * pende do fio inferior do cabeçalho como uma folha: fio de 1px, sem sombra.
  * Montado direto nas partes do Base UI porque o `navigation-menu` do kit fixa
  * sombra no popup.
@@ -21,7 +22,7 @@ export function DesktopNav() {
   return (
     <NavigationMenu.Root
       aria-label="Navegação principal"
-      className="hidden lg:block"
+      className="hidden xl:block"
     >
       <NavigationMenu.List className="flex items-center gap-9">
         <NavigationMenu.Item>

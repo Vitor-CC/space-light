@@ -42,16 +42,16 @@ export function Abertura() {
       <div className="flex flex-col gap-7 lg:flex-row lg:items-center lg:gap-16">
         <div className="flex flex-col gap-6 lg:flex-1 lg:gap-8">
           <p className="flex items-center gap-2.5 ds-caps text-ds-texto-inv-2"><span aria-hidden="true" className="size-2 shrink-0 bg-ds-amarelo" />Engenharia de segurança do trabalho</p>
-          <h1 id="abertura" className="font-ds-display text-[40px] leading-[44px] font-extrabold tracking-[-0.035em] lg:text-[80px] lg:leading-[84px]">Segurança que sai do <span className="text-ds-amarelo">papel.</span></h1>
+          <h1 id="abertura" className="font-ds-display text-[40px] leading-[44px] font-extrabold tracking-[-0.035em] lg:text-[64px] lg:leading-[68px] xl:text-[80px] xl:leading-[84px]">Segurança que sai do <span className="text-ds-amarelo">papel.</span></h1>
           <p className="ds-body-m text-ds-texto-inv-2 lg:font-ds-sans lg:text-xl lg:leading-[30px]"><Resp {...TEXTOS.abertura} /></p>
-          <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
             <Link href={rotas.contato} className={botao({ tamanho: 'lg' })}>Solicitar proposta<ArrowRight className="size-5" aria-hidden="true" /></Link>
             <Link href={rotas.treinamentos} className={botao({ variante: 'inverso', tamanho: 'lg', className: 'hidden lg:inline-flex' })}>Ver treinamentos</Link>
             <a href={WHATSAPP.link} target="_blank" rel="noreferrer" className={botao({ variante: 'inverso', tamanho: 'lg', className: 'lg:hidden' })}>Falar no WhatsApp<MessageCircle className="size-5" aria-hidden="true" /></a>
           </div>
           <p className="flex flex-wrap items-center gap-3 ds-caption font-medium lg:ds-body-s lg:font-medium"><Estrelas className="text-[14px]" /><span>{PROVA_SOCIAL.nota} no Google · <Resp curto={PROVA_SOCIAL.treinadosCurto} longo={PROVA_SOCIAL.treinados} /></span></p>
         </div>
-        <FotoLegendada {...FOTO_DA_ABERTURA} prioridade sizes="(min-width: 1024px) 560px, 100vw" className="h-60 w-full lg:h-[620px] lg:w-[560px] lg:shrink-0" />
+        <FotoLegendada {...FOTO_DA_ABERTURA} prioridade sizes="(min-width: 1280px) 560px, (min-width: 1024px) 420px, 100vw" className="h-60 w-full lg:h-[620px] lg:w-[420px] lg:shrink-0 xl:w-[560px]" />
       </div>
       <ul className="hidden border-t border-ds-borda-inv pt-8 pb-14 lg:grid lg:grid-cols-4">
         {FAIXA_DE_PROVAS.map((item, i) => <li key={item.titulo} className="flex flex-col gap-2 pr-8">
@@ -102,7 +102,7 @@ export function Treinamentos() {
       </ul>
       <p className="ds-caption text-ds-texto-2 lg:hidden">Atendemos outras NRs — <Link href={rotas.contato} className="underline underline-offset-4">fale com a gente</Link>.</p>
 
-      <ul data-surgir className="hidden gap-6 lg:grid lg:grid-cols-4">
+      <ul data-surgir className="hidden gap-6 lg:grid lg:grid-cols-3 xl:grid-cols-4">
         {NORMAS.map((norma) => <li key={norma.slug} className="flex"><CardNorma norma={norma} destaque={norma.slug === NORMA_MAIS_APLICADA} className="w-full" /></li>)}
         <li className="flex">
           <div className="flex min-h-[323px] w-full flex-col justify-between rounded-md border border-dashed border-ds-amarelo bg-ds-amarelo-suave p-7">
@@ -196,7 +196,7 @@ function TurmaNoPortal() {
     { nome: 'Carla Mendes', funcao: 'Líder de área', ok: true },
     { nome: 'Diego Rocha', funcao: 'Brigadista', ok: false },
   ];
-  return <div aria-hidden="true" className="hidden w-[600px] shrink-0 overflow-hidden rounded-[10px] bg-ds-superficie shadow-[0_24px_48px_-8px_rgba(17,19,21,0.12)] lg:block">
+  return <div aria-hidden="true" className="hidden w-[520px] shrink-0 overflow-hidden rounded-[10px] xl:w-[600px] bg-ds-superficie shadow-[0_24px_48px_-8px_rgba(17,19,21,0.12)] lg:block">
     <div className="flex flex-col gap-3 px-6 pt-6">
       <div className="flex items-center justify-between"><span className="ds-caps text-ds-texto-2">Turma 2026-041 · NR 23</span><Tag tom="sucesso">Concluída</Tag></div>
       <p className="font-ds-display text-[26px] leading-8 font-bold tracking-[-0.01em]">Formação de brigada de incêndio</p>
@@ -223,7 +223,7 @@ function TurmaNoPortal() {
 
 export function Portal() {
   return <section id="portal" aria-labelledby="portal-titulo" className="scroll-mt-header bg-ds-muted text-ds-texto">
-    <div className={cn(miolo, 'flex items-center gap-20 pt-12 pb-12 lg:py-[120px]')}>
+    <div className={cn(miolo, 'flex items-center gap-12 pt-12 pb-12 lg:py-[120px] xl:gap-20')}>
       <div className="flex flex-1 flex-col gap-4 lg:gap-7">
         <Rotulo>05 — Portal do cliente</Rotulo>
         <h2 id="portal-titulo" className={tituloDeSecao}>Tudo documentado. Pronto para a auditoria.</h2>

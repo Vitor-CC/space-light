@@ -23,7 +23,7 @@ export function CardNorma({ norma, destaque = false, className }: { norma: Norma
       )}
     >
       <div className="flex items-start justify-between gap-4">
-        <span className={cn('font-ds-codigo text-5xl leading-none font-extrabold tracking-[-0.03em] transition-colors', destaque ? 'text-ds-amarelo' : 'group-hover:text-ds-amarelo')}>{norma.codigo}</span>
+        <span className={cn('font-ds-codigo text-5xl leading-none font-extrabold tracking-[-0.03em] whitespace-nowrap transition-colors', destaque ? 'text-ds-amarelo' : 'group-hover:text-ds-amarelo')}>{norma.codigo}</span>
         <ArrowUpRight className={cn('size-6 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5', destaque ? 'text-ds-amarelo' : 'group-hover:text-ds-amarelo')} aria-hidden="true" />
       </div>
       <h3 className="mt-10 ds-h4">{norma.nome}</h3>

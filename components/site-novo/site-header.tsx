@@ -23,7 +23,7 @@ export function SiteHeader() {
         <DesktopNav />
 
         <div className="flex items-center gap-3 lg:gap-6">
-          <Link href={rotas.portal} className="doc-focus hidden items-center gap-2 font-ds-sans text-sm leading-5 font-medium text-ds-texto-inv hover:text-ds-amarelo lg:inline-flex">
+          <Link href={rotas.portal} className="doc-focus hidden items-center gap-2 font-ds-sans text-sm leading-5 font-medium text-ds-texto-inv hover:text-ds-amarelo xl:inline-flex">
             <Lock className="size-4" aria-hidden="true" />Entrar
           </Link>
           {/* No celular o Figma deixa só logo e menu; a proposta fica no menu aberto. */}

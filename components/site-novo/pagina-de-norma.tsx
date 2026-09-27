@@ -104,12 +104,12 @@ function Abertura({ norma, destinoDoConteudo }: { norma: NormaComPagina; destino
             <span className="text-[40px] leading-[44px] tracking-[-0.025em] lg:text-[56px] lg:leading-[60px] lg:tracking-[-0.03em]">{norma.nome}</span>
           </h1>
           <p className="ds-body-m text-ds-texto-inv-2 lg:font-ds-sans lg:text-xl lg:leading-[30px]"><Resp {...texto} /></p>
-          <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
             <Link href={rotas.proposta(norma.slug)} className={botao({ tamanho: 'lg' })}><Resp curto="Solicitar proposta" longo={`Solicitar proposta para ${norma.codigo}`} /><ArrowRight className="size-5" aria-hidden="true" /></Link>
             <Link href={destinoDoConteudo} className={botao({ variante: 'inverso', tamanho: 'lg', className: 'hidden lg:inline-flex' })}>Ver conteúdo</Link>
           </div>
         </div>
-        <FotoLegendada {...pagina.figura} norma={norma.codigo} prioridade legendaNoCelular={false} sizes="(min-width: 1024px) 520px, 100vw" className="h-[220px] w-full lg:h-[560px] lg:w-[520px] lg:shrink-0" />
+        <FotoLegendada {...pagina.figura} norma={norma.codigo} prioridade legendaNoCelular={false} sizes="(min-width: 1280px) 520px, (min-width: 1024px) 400px, 100vw" className="h-[220px] w-full lg:h-[560px] lg:w-[400px] lg:shrink-0 xl:w-[520px]" />
       </div>
 
       <dl className="grid grid-cols-2 gap-y-3.5 border-t border-ds-borda-inv pt-4 lg:flex lg:pt-7 lg:pb-12">
