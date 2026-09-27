@@ -512,22 +512,35 @@ function diaVazio(instructorId: string | null = null): NovoDia {
   return { date: '', startTime: '08:00', endTime: '18:00', instructorId };
 }
 
+/**
+ * Cliente da turma: só a busca. Os resultados aparecem enquanto digita; sem
+ * lista aberta nem cliente pré-marcado, para a turma não cair no cliente errado.
+ */
 function ClientPicker({ clients, value, onChange }: { clients: CompanyDashboardData['clients']; value: string; onChange: (id: string) => void }) {
   const [busca, setBusca] = useState('');
   const alvo = busca.trim().toLowerCase();
   const alvoDigitos = digitos(busca);
   const filtrados = useMemo(() => {
-    if (!alvo) return clients;
-    return clients.filter((client) => `${client.name} ${client.legal_name}`.toLowerCase().includes(alvo) || (alvoDigitos.length > 0 && digitos(client.document).includes(alvoDigitos)));
+    if (!alvo) return [];
+    return clients
+      .filter((client) => `${client.name} ${client.legal_name} ${client.short_code ?? ''}`.toLowerCase().includes(alvo) || (alvoDigitos.length > 0 && digitos(client.document).includes(alvoDigitos)))
+      .slice(0, 8);
   }, [clients, alvo, alvoDigitos]);
   const escolhido = clients.find((client) => client.id === value);
+  const escolher = (id: string) => { onChange(id); setBusca(''); };
   return <div className="flex flex-col gap-2">
     <span className="font-ds-sans text-sm leading-5 font-medium">Cliente</span>
-    <label className="relative"><Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ds-texto-2" /><input aria-label="Buscar cliente por nome ou CNPJ" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou CNPJ" className={cn(campoClasses, 'pl-10')} /></label>
-    <select aria-label="Cliente do treinamento" required value={value} onChange={(e) => onChange(e.target.value)} size={Math.min(6, Math.max(3, filtrados.length))} className="w-full rounded-md border border-ds-borda bg-ds-superficie p-1 ds-body-s outline-none focus:border-ds-borda-forte">
-      {filtrados.map((client) => <option key={client.id} value={client.id} className="rounded px-2 py-2">{client.name} · {client.document}</option>)}
-    </select>
-    <p className="ds-caption text-ds-texto-2">{filtrados.length === 0 ? 'Nenhum cliente com esse nome ou CNPJ.' : escolhido ? `Selecionado: ${escolhido.legal_name}` : 'Escolha um cliente na lista.'}</p>
+    <div className="relative">
+      <label className="relative block"><Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ds-texto-2" /><input aria-label="Buscar cliente por nome, sigla ou CNPJ" value={busca} onChange={(e) => setBusca(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && filtrados[0]) { e.preventDefault(); escolher(filtrados[0].id); } if (e.key === 'Escape') setBusca(''); }} placeholder={escolhido ? 'Buscar outro cliente' : 'Buscar por nome, sigla ou CNPJ'} className={cn(campoClasses, 'pl-10')} /></label>
+      {alvo ? <div className="absolute right-0 left-0 z-30 mt-1 overflow-hidden rounded-md border border-ds-borda bg-ds-superficie shadow-lg">
+        {filtrados.length
+          ? filtrados.map((client) => <button key={client.id} type="button" onClick={() => escolher(client.id)} className="flex w-full flex-col items-start border-b border-ds-borda px-3.5 py-2.5 text-left last:border-b-0 hover:bg-ds-muted"><span className="ds-body-s font-medium">{client.name}</span><span className="ds-caption text-ds-texto-2">{[client.short_code, client.document].filter(Boolean).join(' · ')}</span></button>)
+          : <p className="px-3.5 py-3 ds-body-s text-ds-texto-2">Nenhum cliente com esse nome, sigla ou CNPJ.</p>}
+      </div> : null}
+    </div>
+    {escolhido
+      ? <p className="flex flex-wrap items-center gap-x-2 rounded-md bg-ds-amarelo-suave px-3.5 py-2.5 ds-body-s"><strong className="font-semibold">{escolhido.name}</strong><span className="ds-caption text-ds-texto-2">{[escolhido.short_code, escolhido.document, escolhido.legal_name].filter(Boolean).join(' · ')}</span></p>
+      : <p className="ds-caption text-ds-texto-2">Digite para buscar e escolha o cliente.</p>}
   </div>;
 }
 
@@ -536,7 +549,7 @@ function Criar({ data, reload, notify, aoCriar, preset = null }: { data: Company
   const [salvando, setSalvando] = useState(false);
   // Vindo da ficha do cliente ("Nova turma" ou "Agendar" uma reciclagem), já chega com cliente e norma.
   const nrInicial = preset?.nr && nrInfo(preset.nr) ? preset.nr : 'NR 23';
-  const [draft, setDraft] = useState<Draft>({ clientId: preset?.clienteId || data.clients[0]?.id || '', nr: nrInicial, title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: conteudoPadrao(data, nrInicial), duration: cargaHorariaPadrao(nrInicial), location: '' });
+  const [draft, setDraft] = useState<Draft>({ clientId: preset?.clienteId || '', nr: nrInicial, title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: conteudoPadrao(data, nrInicial), duration: cargaHorariaPadrao(nrInicial), location: '' });
 
   function changeNr(nr: string) {
     setDraft((current) => {
@@ -562,6 +575,7 @@ function Criar({ data, reload, notify, aoCriar, preset = null }: { data: Company
   }
   async function save(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!draft.clientId) { notify('Escolha o cliente da turma.'); return; }
     setSalvando(true);
     try {
       const result = await createMockTraining(draft);
