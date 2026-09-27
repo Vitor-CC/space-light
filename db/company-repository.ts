@@ -30,6 +30,7 @@ import type {
   CompanySiteLead,
   CompanyClientDocument,
   CompanyDocumentRequest,
+  CompanyProgramTemplate,
   CompanyTraining,
   CompanyTrainingRequest,
 } from '@/lib/company-types';
@@ -194,6 +195,17 @@ const TABELAS_POR_MARCADOR = [
       based_on_training_id TEXT,
       status TEXT NOT NULL DEFAULT 'open',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  // Conteúdo programático padrão por norma, salvo pela equipe na criação de turma.
+  {
+    marcador: 'tab_program_templates',
+    tabela: 'program_templates',
+    criar: `CREATE TABLE IF NOT EXISTS program_templates (
+      nr TEXT PRIMARY KEY,
+      content TEXT NOT NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
   },
   // Documento avulso do cliente (laudo etc.), enviado pela equipe fora de turma.
@@ -2408,6 +2420,29 @@ export async function setTrainingRequestStatus(input: { requestId: string; statu
   return { ok: true as const };
 }
 
+/**
+ * Conteúdo programático padrão de uma norma: vale para as próximas turmas dela.
+ * Texto vazio apaga o padrão da equipe, e a norma volta ao do catálogo.
+ */
+export async function saveProgramTemplate(input: { nr: string; content: string; byUserId: string }) {
+  await ensurePortalSchema();
+  const nr = (input.nr ?? '').trim().slice(0, 60);
+  if (!nr) throw new Error('Norma não informada.');
+  const content = (input.content ?? '').trim().slice(0, 8000);
+  const d1 = getD1();
+  if (!content) {
+    await d1.prepare('DELETE FROM program_templates WHERE nr = ?').bind(nr).run();
+  } else {
+    await d1
+      .prepare(`INSERT INTO program_templates (nr, content, updated_by, updated_at) VALUES (?, ?, ?, datetime('now'))
+        ON CONFLICT(nr) DO UPDATE SET content = excluded.content, updated_by = excluded.updated_by, updated_at = excluded.updated_at`)
+      .bind(nr, content, input.byUserId)
+      .run();
+  }
+  await writeAudit(input.byUserId, 'program_template.saved', 'program_template', nr, { tamanho: content.length });
+  return { ok: true as const };
+}
+
 /* ─── Documentos avulsos (laudo etc.) e pedidos de documento ─────────────── */
 
 const STATUS_PEDIDO_DOCUMENTO = ['open', 'sent', 'declined'] as const;
@@ -3207,7 +3242,7 @@ export async function getCompanyDashboardData(
 ): Promise<CompanyDashboardData> {
   await ensurePortalSchema();
   const d1 = getD1();
-  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult, requestsResult, siteLeadsResult, perfil, avulsosResult, pedidosDocResult] =
+  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult, requestsResult, siteLeadsResult, perfil, avulsosResult, pedidosDocResult, programasResult] =
     await Promise.all([
       d1
         .prepare(
@@ -3305,6 +3340,10 @@ export async function getCompanyDashboardData(
            FROM document_requests r JOIN clients c ON c.id = r.client_id LEFT JOIN users u ON u.id = r.requested_by
            ORDER BY r.created_at DESC`)
         .all<CompanyDocumentRequest>(),
+      d1
+        .prepare(`SELECT p.nr, p.content, p.updated_at, u.name AS updated_by_name
+           FROM program_templates p LEFT JOIN users u ON u.id = p.updated_by`)
+        .all<CompanyProgramTemplate>(),
     ]);
 
   return {
@@ -3319,6 +3358,7 @@ export async function getCompanyDashboardData(
     siteLeads: rows(siteLeadsResult),
     clientDocuments: rows(avulsosResult),
     documentRequests: rows(pedidosDocResult),
+    programTemplates: rows(programasResult),
     mailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM),
     currentUser: {
       id: currentUser.id,

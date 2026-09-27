@@ -10,7 +10,7 @@ import { areaClasses, Botao, botaoClasses, BotaoIcone, Campo, campoClasses, Cart
 import { Interruptor, PainelLateral } from '@/components/ds/interativo';
 import { Calendar } from '@/components/ui/calendar';
 import type { CompanyDashboardData, CompanyInstructor, CompanyTraining, TrainingSession } from '@/lib/company-types';
-import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTraining, generateCertificates, readInstructorDocuments, removeTrainingDay, renameTraining, updateTrainingDay, updateTrainingDetails, uploadCompanyFiles } from '@/lib/mock-company-database';
+import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTraining, generateCertificates, readInstructorDocuments, removeTrainingDay, renameTraining, saveProgramTemplate, updateTrainingDay, updateTrainingDetails, uploadCompanyFiles } from '@/lib/mock-company-database';
 import type { NovoDia } from '@/lib/mock-company-database';
 import { dataDoDia as dataDaTurma, proximoDiaDaTurma as proximoDia } from '@/lib/dias-da-turma';
 import { nrInfo } from '@/lib/nr-catalog';
@@ -157,8 +157,43 @@ function AddDay({ training, instructors, reload, notify }: { training: CompanyTr
 
 type DadosTreinamento = { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string; validityMonths: number };
 
+/**
+ * Conteúdo programático que a norma sugere: o salvo pela equipe, se houver;
+ * senão o do catálogo (`nr-catalog.ts`).
+ */
+function conteudoPadrao(data: CompanyDashboardData, nr: string) {
+  return data.programTemplates.find((p) => p.nr === nr)?.content ?? nrInfo(nr)?.content ?? '';
+}
+
+/** Campo do conteúdo programático com "Salvar como padrão" da norma, para as próximas turmas. */
+function CampoConteudo({ data, nr, valor, onChange, reload, notify }: { data: CompanyDashboardData; nr: string; valor: string; onChange: (v: string) => void; reload: Reload; notify: Notify }) {
+  const [salvando, setSalvando] = useState(false);
+  const salvo = data.programTemplates.find((p) => p.nr === nr);
+  const padrao = conteudoPadrao(data, nr);
+  const diferente = valor.trim() !== padrao.trim();
+  async function salvarPadrao() {
+    if (salvo && !window.confirm(`Substituir o conteúdo padrão da ${nr}? As turmas já criadas não mudam; só as próximas usam o novo.`)) return;
+    setSalvando(true);
+    try { await saveProgramTemplate(nr, valor); notify(`Conteúdo salvo como padrão da ${nr}. As próximas turmas dessa norma já vêm com ele.`); await reload(); }
+    catch (error) { notify(error instanceof Error ? error.message : 'Erro ao salvar o conteúdo padrão.'); }
+    finally { setSalvando(false); }
+  }
+  const origem = salvo
+    ? `Padrão da ${nr} salvo pela equipe${salvo.updated_by_name ? ` (${salvo.updated_by_name})` : ''} em ${formatDate(salvo.updated_at)}.`
+    : padrao ? `Padrão do sistema para a ${nr}.` : `A ${nr} ainda não tem conteúdo padrão.`;
+  return <div className="flex flex-col gap-2">
+    <Campo rotulo="Conteúdo programático (aparece na lista)"><textarea rows={5} value={valor} onChange={(e) => onChange(e.target.value)} placeholder="Tópicos do treinamento." className={areaClasses} /></Campo>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span className="min-w-0 flex-1 ds-caption text-ds-texto-2">{diferente ? 'Editado nesta turma. ' : ''}{origem}</span>
+      {diferente && padrao ? <button type="button" onClick={() => onChange(padrao)} className={botaoClasses('link', 'P', 'min-h-0 py-1')}>Voltar ao padrão</button> : null}
+      <Botao tamanho="P" tipo="secundario" disabled={salvando || !diferente || !valor.trim()} onClick={() => void salvarPadrao()}>{salvando ? <Loader2 className="animate-spin" /> : <Check />}Salvar como padrão da {nr}</Botao>
+    </div>
+  </div>;
+}
+
 /** O que sai no certificado e na lista: cliente, norma, título, carga horária, endereço e conteúdo. */
-function TrainingDetails({ training, clients, reload, notify }: { training: CompanyTraining; clients: CompanyDashboardData['clients']; reload: Reload; notify: Notify }) {
+function TrainingDetails({ training, data, reload, notify }: { training: CompanyTraining; data: CompanyDashboardData; reload: Reload; notify: Notify }) {
+  const clients = data.clients;
   const inicial = (): DadosTreinamento => ({ clientId: training.client_id, nr: training.nr, title: training.title, duration: training.duration, location: training.location, contentProgram: training.content_program ?? '', theme: training.theme ?? '', validityMonths: training.validity_months ?? 0 });
   const [aberto, setAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -200,7 +235,7 @@ function TrainingDetails({ training, clients, reload, notify }: { training: Comp
     </div>
     <Campo rotulo="Endereço do treinamento"><input required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} className={campoClasses} /></Campo>
     <Campo rotulo="Tema da turma" ajuda="Vai na mensagem de escala do instrutor. Não aparece em nenhum documento."><input value={draft.theme} onChange={(e) => setDraft({ ...draft, theme: e.target.value })} placeholder="Ex.: Reciclagem para a equipe de manutenção" className={campoClasses} /></Campo>
-    <Campo rotulo="Conteúdo programático (aparece na lista)"><textarea rows={4} value={draft.contentProgram} onChange={(e) => setDraft({ ...draft, contentProgram: e.target.value })} className={areaClasses} /></Campo>
+    <CampoConteudo data={data} nr={draft.nr} valor={draft.contentProgram} onChange={(contentProgram) => setDraft({ ...draft, contentProgram })} reload={reload} notify={notify} />
     <div className="flex flex-wrap gap-2"><Botao type="submit" disabled={salvando}>{salvando ? <Loader2 className="animate-spin" /> : <Check />}Salvar dados</Botao><Botao tipo="fantasma" onClick={() => setAberto(false)}>Cancelar</Botao></div>
   </form>;
 }
@@ -344,7 +379,7 @@ function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoE
       <AddDay training={training} instructors={instructors} reload={reload} notify={notify} />
     </Secao>
 
-    <Secao titulo="Dados do treinamento"><TrainingDetails training={training} clients={data.clients} reload={reload} notify={notify} /></Secao>
+    <Secao titulo="Dados do treinamento"><TrainingDetails training={training} data={data} reload={reload} notify={notify} /></Secao>
 
     <Secao titulo="Identificação da turma">
       <Campo rotulo="Nome interno" ajuda="Separa duas turmas do mesmo treinamento. Não aparece em documento."><input value={identificacao} onChange={(e) => setIdentificacao(e.target.value)} onBlur={() => void renomear()} placeholder="Ex.: Turma A - manhã" className={campoClasses} /></Campo>
@@ -501,15 +536,15 @@ function Criar({ data, reload, notify, aoCriar, preset = null }: { data: Company
   const [salvando, setSalvando] = useState(false);
   // Vindo da ficha do cliente ("Nova turma" ou "Agendar" uma reciclagem), já chega com cliente e norma.
   const nrInicial = preset?.nr && nrInfo(preset.nr) ? preset.nr : 'NR 23';
-  const [draft, setDraft] = useState<Draft>({ clientId: preset?.clienteId || data.clients[0]?.id || '', nr: nrInicial, title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: nrInfo(nrInicial)?.content ?? '', duration: cargaHorariaPadrao(nrInicial), location: '' });
+  const [draft, setDraft] = useState<Draft>({ clientId: preset?.clienteId || data.clients[0]?.id || '', nr: nrInicial, title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: conteudoPadrao(data, nrInicial), duration: cargaHorariaPadrao(nrInicial), location: '' });
 
   function changeNr(nr: string) {
     setDraft((current) => {
-      const previous = nrInfo(current.nr)?.content ?? '';
+      const previous = conteudoPadrao(data, current.nr);
       const custom = current.contentProgram.trim() !== '' && current.contentProgram !== previous;
       // A carga horária sugerida acompanha a norma, mas nunca sobrescreve o que foi digitado.
       const cargaIntocada = current.duration === cargaHorariaPadrao(current.nr);
-      return { ...current, nr, contentProgram: custom ? current.contentProgram : (nrInfo(nr)?.content ?? ''), duration: cargaIntocada ? cargaHorariaPadrao(nr) : current.duration };
+      return { ...current, nr, contentProgram: custom ? current.contentProgram : conteudoPadrao(data, nr), duration: cargaIntocada ? cargaHorariaPadrao(nr) : current.duration };
     });
   }
   function setDia(index: number, campos: Partial<NovoDia>) {
@@ -531,7 +566,7 @@ function Criar({ data, reload, notify, aoCriar, preset = null }: { data: Company
     try {
       const result = await createMockTraining(draft);
       aoCriar(result.id);
-      setDraft({ ...draft, title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: nrInfo(draft.nr)?.content ?? '', location: '' });
+      setDraft({ ...draft, title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: conteudoPadrao(data, draft.nr), location: '' });
       notify('Treinamento criado com QR Code próprio.');
       await reload();
     } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao criar treinamento.'); }
@@ -572,7 +607,7 @@ function Criar({ data, reload, notify, aoCriar, preset = null }: { data: Company
       <Campo rotulo="Carga horária"><input required value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: e.target.value })} className={campoClasses} /></Campo>
       <Campo rotulo="Endereço do treinamento"><input required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} placeholder="Rua, número, bairro e cidade" className={campoClasses} /></Campo>
     </div>
-    <Campo rotulo="Conteúdo programático (aparece na lista)"><textarea rows={4} value={draft.contentProgram} onChange={(e) => setDraft({ ...draft, contentProgram: e.target.value })} placeholder="Tópicos do treinamento." className={areaClasses} /></Campo>
+    <CampoConteudo data={data} nr={draft.nr} valor={draft.contentProgram} onChange={(contentProgram) => setDraft({ ...draft, contentProgram })} reload={reload} notify={notify} />
     <div><Botao type="submit" disabled={data.clients.length === 0 || salvando}>{salvando ? <Loader2 className="animate-spin" /> : <CalendarPlus />}Criar turma e QR</Botao></div>
     {data.clients.length === 0 ? <Faixa tom="sinal">Cadastre um cliente antes de criar a turma.</Faixa> : null}
   </form></Cartao>;

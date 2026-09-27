@@ -251,6 +251,11 @@ export function setParticipantAttendance(participantId: string, sessionId: strin
   return requestJson<{ ok: true }>('/api/company/participants/attendance', { method: 'POST', body: JSON.stringify({ participantId, sessionId, present }) });
 }
 
+/** Salva o conteúdo programático como padrão da norma (vazio volta ao do catálogo). */
+export function saveProgramTemplate(nr: string, content: string) {
+  return requestJson<{ ok: true }>('/api/company/program-templates', { method: 'PUT', body: JSON.stringify({ nr, content }) });
+}
+
 // --- Documentos avulsos (laudo etc.) ---
 
 /** Envia um documento avulso ao cliente; com `requestId`, responde ao pedido dele. */

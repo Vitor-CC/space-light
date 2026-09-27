@@ -268,6 +268,14 @@ export type CompanyDocumentRequest = {
   created_at: string;
 };
 
+/** Conteúdo programático salvo pela equipe como padrão de uma norma. */
+export type CompanyProgramTemplate = {
+  nr: string;
+  content: string;
+  updated_at: string;
+  updated_by_name: string | null;
+};
+
 export type CompanyDashboardData = {
   clients: CompanyClient[];
   instructors: CompanyInstructor[];
@@ -281,6 +289,7 @@ export type CompanyDashboardData = {
   siteLeads: CompanySiteLead[];
   clientDocuments: CompanyClientDocument[];
   documentRequests: CompanyDocumentRequest[];
+  programTemplates: CompanyProgramTemplate[];
   /** Há envio de e-mail configurado (RESEND_API_KEY + MAIL_FROM no servidor)? */
   mailConfigured: boolean;
   currentUser: { id: string; email: string; name: string; jobTitle: string; isOwner: boolean };
