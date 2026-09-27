@@ -43,6 +43,12 @@ export type Norma = {
   codigo: string;
   nome: string;
   linha: string;
+  /** Linha curta no pé do card de NR (Figma "Card / Treinamento NR"). */
+  meta: string;
+  /** Nome na lista de normas da home no celular. */
+  curto: string;
+  /** Nome mínimo, no rodapé e no menu do celular ("NR 06 · EPI"). */
+  rotulo: string;
   pagina?: PaginaDaNorma;
 };
 
@@ -623,6 +629,9 @@ export const NORMAS: readonly Norma[] = [
     slug: 'nr-05',
     codigo: 'NR 05',
     nome: 'CIPA',
+    meta: 'Comissão · Formação',
+    curto: 'CIPA',
+    rotulo: 'CIPA',
     linha:
       'Formação para prevenção de acidentes e atuação responsável no ambiente de trabalho.',
     pagina: PAGINA_NR05,
@@ -631,6 +640,9 @@ export const NORMAS: readonly Norma[] = [
     slug: 'nr-06',
     codigo: 'NR 06',
     nome: 'Equipamentos de Proteção Individual',
+    meta: 'Uso e conservação',
+    curto: 'EPI',
+    rotulo: 'EPI',
     linha: 'Seleção, uso, guarda e conservação correta dos EPIs.',
     pagina: PAGINA_NR06,
   },
@@ -638,6 +650,9 @@ export const NORMAS: readonly Norma[] = [
     slug: 'nr-10',
     codigo: 'NR 10',
     nome: 'Segurança em Eletricidade',
+    meta: 'Instalações e serviços',
+    curto: 'Segurança em eletricidade',
+    rotulo: 'Eletricidade',
     linha: 'Prevenção de riscos em instalações e serviços com eletricidade.',
     pagina: PAGINA_NR10,
   },
@@ -645,6 +660,9 @@ export const NORMAS: readonly Norma[] = [
     slug: 'nr-11',
     codigo: 'NR 11',
     nome: 'Movimentação de Materiais',
+    meta: 'Operação e armazenagem',
+    curto: 'Movimentação de materiais',
+    rotulo: 'Movimentação',
     linha: 'Transporte, movimentação, armazenagem e manuseio de materiais.',
     pagina: PAGINA_NR11,
   },
@@ -652,6 +670,9 @@ export const NORMAS: readonly Norma[] = [
     slug: 'nr-23',
     codigo: 'NR 23',
     nome: 'Proteção Contra Incêndios',
+    meta: 'Brigada de incêndio',
+    curto: 'Proteção contra incêndios',
+    rotulo: 'Incêndio',
     linha:
       'Preparo técnico e prático para prevenção e resposta inicial a emergências.',
     pagina: PAGINA_NR23,
@@ -660,6 +681,9 @@ export const NORMAS: readonly Norma[] = [
     slug: 'nr-33',
     codigo: 'NR 33',
     nome: 'Espaços Confinados',
+    meta: 'Riscos e resgate',
+    curto: 'Espaços confinados',
+    rotulo: 'Espaço confinado',
     linha: 'Reconhecer, avaliar e controlar riscos em espaços confinados.',
     pagina: PAGINA_NR33,
   },
@@ -667,6 +691,9 @@ export const NORMAS: readonly Norma[] = [
     slug: 'nr-35',
     codigo: 'NR 35',
     nome: 'Trabalho em Altura',
+    meta: 'Planejamento e execução',
+    curto: 'Trabalho em altura',
+    rotulo: 'Altura',
     linha: 'Planejamento, organização e execução segura de trabalho em altura.',
     pagina: PAGINA_NR35,
   },

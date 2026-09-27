@@ -10,6 +10,11 @@ const variantes = cva(
         primario: 'bg-ds-amarelo text-ds-texto hover:bg-[#eab900]',
         contorno:
           'border-[1.5px] border-doc-ink text-doc-ink hover:bg-doc-ink hover:text-doc-paper',
+        // Preto: a ação principal sobre o degradê amarelo e nos blocos claros.
+        escuro: 'bg-ds-inverso text-ds-texto-inv hover:bg-ds-inverso-2',
+        // Contorno branco, só sobre fundo preto.
+        inverso:
+          'border-[1.5px] border-ds-texto-inv text-ds-texto-inv hover:bg-ds-texto-inv hover:text-ds-texto',
       },
       tamanho: {
         md: 'min-h-11 px-5 py-3 ds-botao',

@@ -26,10 +26,10 @@ export function SiteHeader() {
           <Link href={rotas.portal} className="doc-focus hidden items-center gap-2 font-ds-sans text-sm leading-5 font-medium text-ds-texto-inv hover:text-ds-amarelo lg:inline-flex">
             <Lock className="size-4" aria-hidden="true" />Entrar
           </Link>
-          <Link href={rotas.contato} className={botao()}>
-            <span className="sm:hidden">Proposta</span>
-            <span className="max-sm:hidden">Solicitar proposta</span>
-            <ArrowRight className="size-[18px] max-sm:hidden" aria-hidden="true" />
+          {/* No celular o Figma deixa só logo e menu; a proposta fica no menu aberto. */}
+          <Link href={rotas.contato} className={botao({ className: 'max-sm:hidden' })}>
+            Solicitar proposta
+            <ArrowRight className="size-[18px]" aria-hidden="true" />
           </Link>
           <MobileMenu />
         </div>

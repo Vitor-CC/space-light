@@ -20,7 +20,17 @@ export function SiteFooter() {
             <p className="ds-body-s text-ds-texto-inv-2">Treinamentos corporativos em Normas Regulamentadoras. Base em São Paulo, atendimento em âmbito nacional.</p>
           </div>
 
-          <div className="grid gap-x-16 gap-y-10 sm:grid-cols-2 xl:flex xl:gap-16">
+          {/* Celular: o Figma deixa só os portais e o contato; as páginas e as normas ficam no menu. */}
+          <div className="flex flex-col gap-5 lg:hidden">
+            <nav aria-label="Portais" className="flex flex-wrap gap-x-4 gap-y-2">
+              <Link href={rotas.portalCliente} className={link}>Área do cliente</Link>
+              <Link href={rotas.portalInstrutor} className={link}>Área do instrutor</Link>
+              <Link href={rotas.portalEmpresa} className={link}>Área da empresa</Link>
+            </nav>
+            <p className="ds-caption text-ds-texto-inv-2"><a href={WHATSAPP.link} target="_blank" rel="noreferrer" className="doc-focus hover:underline">WhatsApp {WHATSAPP.numero}</a> · <a href={REDES.instagram} target="_blank" rel="noreferrer" className="doc-focus hover:underline">@spacelight_eng</a></p>
+          </div>
+
+          <div className="hidden gap-12 whitespace-nowrap lg:flex xl:gap-16">
             <nav aria-label="Páginas" className={lista}>
               <p className={titulo}>Páginas</p>
               <Link href={rotas.inicio} className={link}>Início</Link>
@@ -32,7 +42,7 @@ export function SiteFooter() {
 
             <nav aria-label="Treinamentos" className={lista}>
               <p className={titulo}>Treinamentos</p>
-              {NORMAS.map((norma) => <Link key={norma.slug} href={rotas.norma(norma.slug)} className={link}>{norma.codigo} · {norma.nome}</Link>)}
+              {NORMAS.map((norma) => <Link key={norma.slug} href={rotas.norma(norma.slug)} className={link}>{norma.codigo} · {norma.rotulo}</Link>)}
             </nav>
 
             <nav aria-label="Portais" className={lista}>
@@ -45,7 +55,7 @@ export function SiteFooter() {
             <div className={lista}>
               <p className={titulo}>Contato</p>
               <a href={WHATSAPP.link} target="_blank" rel="noreferrer" className={link}>WhatsApp {WHATSAPP.numero}</a>
-              <a href={REDES.instagram} target="_blank" rel="noreferrer" className={link}>Instagram</a>
+              <a href={REDES.instagram} target="_blank" rel="noreferrer" className={link}>Instagram @spacelight_eng</a>
               <a href={REDES.facebook} target="_blank" rel="noreferrer" className={link}>Facebook</a>
             </div>
           </div>
