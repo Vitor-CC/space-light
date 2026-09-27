@@ -16,7 +16,7 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-[90rem] flex-col gap-16 px-5 pt-16 pb-10 md:px-10 lg:gap-[72px] lg:pt-24 xl:px-[120px]">
         <div className="flex flex-col gap-12 lg:flex-row lg:justify-between">
           <div className="flex max-w-[340px] flex-col gap-5">
-            <Logo cor="claro" />
+            <Logo cor="claro" className="self-start" />
             <p className="ds-body-s text-ds-texto-inv-2">Treinamentos corporativos em Normas Regulamentadoras. Base em São Paulo, atendimento em âmbito nacional.</p>
           </div>
 
