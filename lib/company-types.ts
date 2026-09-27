@@ -241,6 +241,33 @@ export type AuditEntry = {
   actor_email: string | null;
 };
 
+/** Documento avulso do cliente (laudo etc.), fora de turma. */
+export type CompanyClientDocument = {
+  id: string;
+  client_id: string;
+  client_name: string;
+  request_id: string | null;
+  title: string;
+  name: string;
+  content_type: string;
+  size: number;
+  created_at: string;
+};
+
+/** Pedido de documento avulso feito pelo cliente no portal. */
+export type CompanyDocumentRequest = {
+  id: string;
+  client_id: string;
+  client_name: string;
+  requested_by_name: string | null;
+  title: string;
+  notes: string;
+  /** open = aguardando; sent = documento enviado; declined = não atendido. */
+  status: string;
+  document_id: string | null;
+  created_at: string;
+};
+
 export type CompanyDashboardData = {
   clients: CompanyClient[];
   instructors: CompanyInstructor[];
@@ -252,6 +279,8 @@ export type CompanyDashboardData = {
   attendance: { participant_id: string; session_id: string }[];
   requests: CompanyTrainingRequest[];
   siteLeads: CompanySiteLead[];
+  clientDocuments: CompanyClientDocument[];
+  documentRequests: CompanyDocumentRequest[];
   /** Há envio de e-mail configurado (RESEND_API_KEY + MAIL_FROM no servidor)? */
   mailConfigured: boolean;
   currentUser: { id: string; email: string; name: string; jobTitle: string; isOwner: boolean };

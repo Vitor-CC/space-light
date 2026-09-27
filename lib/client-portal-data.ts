@@ -98,6 +98,24 @@ export type ClientOrganization = {
   phone: string;
 };
 
+/** Documento avulso enviado pela Space (laudo etc.), fora de turma. */
+export type ClientAvulso = {
+  id: string;
+  title: string;
+  format: string;
+  size: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ClientDocumentRequest = {
+  id: string;
+  title: string;
+  notes: string;
+  status: string;
+  createdAt: string;
+};
+
 export type ClientPortalData = {
   organization: ClientOrganization;
   trainings: ClientTraining[];
@@ -106,4 +124,6 @@ export type ClientPortalData = {
   certificates: ClientCertificate[];
   participants: ClientParticipant[];
   requests: ClientTrainingRequest[];
+  avulsos: ClientAvulso[];
+  documentRequests: ClientDocumentRequest[];
 };

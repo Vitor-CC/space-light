@@ -3,9 +3,10 @@
 import { Inbox, Loader2, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 
+import { PedidoDeDocumento } from '@/components/company-portal/company-avulsos';
 import { formatDate } from '@/components/company-portal/company-ui';
 import { botaoClasses, Cartao, Pilula, selectClasses, Tag, TopoDePagina, Vazio } from '@/components/ds/base';
-import type { CompanyDashboardData, CompanySiteLead, CompanyTrainingRequest } from '@/lib/company-types';
+import type { CompanyDashboardData, CompanyDocumentRequest, CompanySiteLead, CompanyTrainingRequest } from '@/lib/company-types';
 import { setSiteLeadStatus, setTrainingRequestStatus } from '@/lib/mock-company-database';
 import { OPCOES_DE_TREINAMENTO } from '@/lib/site-novo/normas';
 import { cn } from '@/lib/utils';
@@ -13,12 +14,15 @@ import { cn } from '@/lib/utils';
 const STATUS = { open: { tom: 'sinal', texto: 'Em aberto' }, scheduled: { tom: 'sucesso', texto: 'Agendada' }, declined: { tom: 'neutro', texto: 'Não atendida' } } as const;
 type Status = keyof typeof STATUS;
 
-/** Pedido do cliente no portal ou pedido de proposta do formulário do site. */
-type Item = { origem: 'portal'; pedido: CompanyTrainingRequest } | { origem: 'site'; pedido: CompanySiteLead };
+/** Pedido de turma ou de documento no portal, ou pedido de proposta do formulário do site. */
+type Item = { origem: 'portal'; pedido: CompanyTrainingRequest } | { origem: 'site'; pedido: CompanySiteLead } | { origem: 'documento'; pedido: CompanyDocumentRequest };
+
+/** Documento enviado conta como atendido, junto com a turma agendada. */
+const grupo = (item: Item) => (item.origem === 'documento' && item.pedido.status === 'sent' ? 'scheduled' : item.pedido.status);
 
 /** Solicitações em aberto, do portal e do site: o número do menu e do painel. */
 export function solicitacoesAbertas(data: CompanyDashboardData) {
-  return data.requests.filter((r) => r.status === 'open').length + data.siteLeads.filter((l) => l.status === 'open').length;
+  return data.requests.filter((r) => r.status === 'open').length + data.siteLeads.filter((l) => l.status === 'open').length + data.documentRequests.filter((r) => r.status === 'open').length;
 }
 
 /** Pedidos de nova turma que os clientes fazem pelo portal e pedidos de proposta do site. */
@@ -28,11 +32,12 @@ export function CompanyRequests({ data, reload, notify, novaTurma }: { data: Com
   const itens: Item[] = [
     ...data.requests.map((pedido) => ({ origem: 'portal' as const, pedido })),
     ...data.siteLeads.map((pedido) => ({ origem: 'site' as const, pedido })),
+    ...data.documentRequests.map((pedido) => ({ origem: 'documento' as const, pedido })),
   ].sort((a, b) => b.pedido.created_at.localeCompare(a.pedido.created_at));
-  const lista = itens.filter((item) => filtro === 'todas' || item.pedido.status === filtro);
+  const lista = itens.filter((item) => filtro === 'todas' || grupo(item) === filtro);
   const telefone = (clientId: string) => data.clients.find((c) => c.id === clientId)?.contact_phone ?? '';
 
-  async function mudar(item: Item, status: Status) {
+  async function mudar(item: Exclude<Item, { origem: 'documento' }>, status: Status) {
     setSalvando(item.pedido.id);
     try {
       if (item.origem === 'site') {
@@ -48,7 +53,7 @@ export function CompanyRequests({ data, reload, notify, novaTurma }: { data: Com
     finally { setSalvando(''); }
   }
 
-  const situacao = (item: Item) => <div className="flex items-center gap-2">
+  const situacao = (item: Exclude<Item, { origem: 'documento' }>) => <div className="flex items-center gap-2">
     <select aria-label="Situação da solicitação" value={item.pedido.status} disabled={salvando === item.pedido.id} onChange={(e) => void mudar(item, e.target.value as Status)} className={cn(selectClasses, 'min-h-10 w-auto py-2 ds-body-s')}>
       <option value="open">Em aberto</option><option value="scheduled">Agendada</option><option value="declined">Não atendida</option>
     </select>
@@ -56,11 +61,12 @@ export function CompanyRequests({ data, reload, notify, novaTurma }: { data: Com
   </div>;
 
   return <div className="flex flex-col gap-6">
-    <TopoDePagina titulo="Solicitações" subtitulo="Pedidos de turma feitos pelos clientes no portal e pedidos de proposta que chegam pelo site. Marque como agendada quando criar a turma." acoes={<button type="button" onClick={novaTurma} className={botaoClasses('primario', 'M')}>Nova turma</button>} />
+    <TopoDePagina titulo="Solicitações" subtitulo="Pedidos de turma e de documento feitos pelos clientes no portal, e pedidos de proposta que chegam pelo site. Marque a turma como agendada quando criá-la; o pedido de documento fecha sozinho quando você envia o arquivo." acoes={<button type="button" onClick={novaTurma} className={botaoClasses('primario', 'M')}>Nova turma</button>} />
     <div className="flex gap-2 overflow-x-auto pb-1">
-      {(['open', 'scheduled', 'declined', 'todas'] as const).map((id) => <Pilula key={id} ativa={filtro === id} onClick={() => setFiltro(id)}>{id === 'todas' ? 'Todas' : STATUS[id].texto} · {id === 'todas' ? itens.length : itens.filter((item) => item.pedido.status === id).length}</Pilula>)}
+      {(['open', 'scheduled', 'declined', 'todas'] as const).map((id) => <Pilula key={id} ativa={filtro === id} onClick={() => setFiltro(id)}>{id === 'todas' ? 'Todas' : id === 'scheduled' ? 'Agendada ou enviada' : STATUS[id].texto} · {id === 'todas' ? itens.length : itens.filter((item) => grupo(item) === id).length}</Pilula>)}
     </div>
     {lista.length ? <div className="grid gap-4 xl:grid-cols-2">{lista.map((item) => {
+      if (item.origem === 'documento') return <Cartao key={`doc-${item.pedido.id}`} className="p-5"><PedidoDeDocumento pedido={item.pedido} notify={notify} reload={reload} mostrarCliente /></Cartao>;
       const st = STATUS[(item.pedido.status as Status)] ?? STATUS.open;
       if (item.origem === 'site') {
         const lead = item.pedido;
@@ -102,6 +108,6 @@ export function CompanyRequests({ data, reload, notify, novaTurma }: { data: Com
           {fone ? <a href={`https://wa.me/55${fone}`} target="_blank" rel="noreferrer" className={botaoClasses('fantasma', 'P', 'ml-auto')}><MessageCircle />WhatsApp do cliente</a> : null}
         </div>
       </Cartao>;
-    })}</div> : <Vazio icone={<Inbox />} titulo="Nenhuma solicitação aqui" texto="Quando um cliente pedir uma turma pelo portal, ou alguém pedir proposta pelo site, o pedido aparece nesta lista." />}
+    })}</div> : <Vazio icone={<Inbox />} titulo="Nenhuma solicitação aqui" texto="Quando um cliente pedir uma turma ou um documento pelo portal, ou alguém pedir proposta pelo site, o pedido aparece nesta lista." />}
   </div>;
 }

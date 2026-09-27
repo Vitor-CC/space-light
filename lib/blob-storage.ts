@@ -83,6 +83,18 @@ export async function uploadTrainingFile(input: {
   return gravar(pathname, input.body);
 }
 
+/** Documento avulso do cliente (laudo etc.): fora das turmas, na pasta do cliente. */
+export async function uploadClientDocument(input: {
+  clientId: string;
+  documentId: string;
+  name: string;
+  contentType: string;
+  body: ArrayBuffer;
+}) {
+  const pathname = `clientes/${input.clientId}/documentos/${input.documentId}${extensionFor(input.name, input.contentType)}`;
+  return gravar(pathname, input.body);
+}
+
 /** Documento pessoal do instrutor: caminho próprio, fora da pasta dos treinamentos. */
 export async function uploadInstructorFile(input: {
   instructorId: string;

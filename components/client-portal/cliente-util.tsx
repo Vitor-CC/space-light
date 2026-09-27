@@ -10,7 +10,8 @@ import { downloadFilesAsZip, type ZipEntry } from '@/lib/download-zip';
 export type Secao = 'dashboard' | 'trainings' | 'certificates' | 'documents' | 'request' | 'profile';
 
 /** Normas oferecidas no pedido de nova turma (as mesmas do site). */
-export const NORMAS_PEDIDO = ['NR 05', 'NR 06', 'NR 10', 'NR 10 SEP', 'NR 11', 'NR 23', 'NR 33', 'NR 35', 'Outra'];
+/** Normas de treinamento da Space (lista do usuário, 27/09/2026). NR 13, 15 e 16 são laudo: pedem-se em Documentos. */
+export const NORMAS_PEDIDO = ['NR 05', 'NR 06', 'NR 07', 'NR 07 LEI LUCAS', 'NR 10', 'NR 10 SEP', 'NR 11', 'NR 12', 'NR 18', 'NR 20', 'NR 23', 'NR 26', 'NR 31', 'NR 33', 'NR 35', 'Outra'];
 
 export function tomDoStatus(status: ClientTraining['status']): Tom {
   return status === 'Concluído' ? 'sucesso' : status === 'Em andamento' ? 'sinal' : 'info';

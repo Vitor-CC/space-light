@@ -68,6 +68,65 @@ export function Certificados({ data, abrirTurma }: { data: ClientPortalData; abr
 
 /* ─── Documentos e fotos (todas as turmas) ─────────────────────────────── */
 
+/** O que o cliente pode pedir fora de turma. "Outro" abre o campo de texto. */
+const DOCUMENTOS_PEDIDO = ['Laudo NR 13 (caldeiras e vasos de pressão)', 'Laudo NR 15 (insalubridade)', 'Laudo NR 16 (periculosidade)', 'Outro documento'];
+const statusPedidoDoc: Record<string, { tom: 'sinal' | 'sucesso' | 'neutro'; texto: string }> = {
+  open: { tom: 'sinal', texto: 'Aguardando' },
+  sent: { tom: 'sucesso', texto: 'Enviado' },
+  declined: { tom: 'neutro', texto: 'Não atendido' },
+};
+
+/** Laudos e outros documentos fora de turma: o que a Space enviou e o pedido de um novo. */
+function LaudosEAvulsos({ data }: { data: ClientPortalData }) {
+  const router = useRouter();
+  const [aberto, setAberto] = useState(false);
+  const [tipo, setTipo] = useState('');
+  const [outro, setOutro] = useState('');
+  const [notas, setNotas] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [aviso, setAviso] = useState<{ tom: 'sucesso' | 'perigo'; texto: string } | null>(null);
+  const titulo = tipo === 'Outro documento' ? outro.trim() : tipo;
+
+  async function pedir(e: SyntheticEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setEnviando(true);
+    setAviso(null);
+    try {
+      const r = await fetch('/api/client/document-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: titulo, notes: notas }) });
+      const payload = (await r.json().catch(() => ({}))) as { error?: string };
+      if (!r.ok) throw new Error(payload.error || 'Não foi possível enviar o pedido.');
+      setAviso({ tom: 'sucesso', texto: 'Pedido enviado. O documento aparece aqui quando a Space Light enviar.' });
+      setTipo(''); setOutro(''); setNotas(''); setAberto(false);
+      router.refresh();
+    } catch (error) {
+      setAviso({ tom: 'perigo', texto: error instanceof Error ? error.message : 'Não foi possível enviar o pedido.' });
+    } finally { setEnviando(false); }
+  }
+
+  const pedidosAbertos = data.documentRequests.filter((r) => r.status !== 'sent');
+  return <Cartao>
+    <CartaoCabecalho titulo="Laudos e outros documentos" acao={<button type="button" onClick={() => setAberto((v) => !v)} className={botaoClasses(aberto ? 'fantasma' : 'secundario', 'P')}>{aberto ? 'Fechar' : 'Solicitar documento'}</button>} />
+    <div className="flex flex-col gap-4 px-5 pb-5 sm:px-6">
+      {aviso ? <Faixa tom={aviso.tom}>{aviso.texto}</Faixa> : null}
+      {aberto ? <form onSubmit={pedir} className="grid gap-4 rounded-lg bg-ds-muted p-4 sm:grid-cols-2">
+        <Campo rotulo="Documento *"><select required value={tipo} onChange={(e) => setTipo(e.target.value)} className={selectClasses}><option value="" disabled>Selecione</option>{DOCUMENTOS_PEDIDO.map((d) => <option key={d} value={d}>{d}</option>)}</select></Campo>
+        {tipo === 'Outro documento' ? <Campo rotulo="Qual documento? *"><input required maxLength={200} value={outro} onChange={(e) => setOutro(e.target.value)} placeholder="Ex.: declaração de treinamento" className={campoClasses} /></Campo> : <span className="hidden sm:block" />}
+        <Campo rotulo="Detalhes" className="sm:col-span-2"><textarea value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Unidade, setor, prazo ou o que mais ajudar" className={areaClasses} /></Campo>
+        <div className="sm:col-span-2"><button type="submit" disabled={enviando || !titulo} className={botaoClasses('primario', 'M')}>{enviando ? 'Enviando…' : 'Enviar pedido'}{enviando ? <Loader2 className="animate-spin" /> : <Send />}</button></div>
+      </form> : null}
+      {data.avulsos.length ? <div>{data.avulsos.map((d) => <LinhaArquivo key={d.id} className="first:border-t-0" icone={<FileText />} titulo={d.title} detalhe={`${d.format} · ${d.size} · ${d.updatedAt}`} acoes={<><a href={`/api/client-documents/${d.id}`} target="_blank" rel="noreferrer" aria-label={`Abrir ${d.title}`} className="rounded p-1.5 hover:bg-ds-muted"><Eye className="size-4" /></a><a href={`/api/client-documents/${d.id}?download=1`} aria-label={`Baixar ${d.title}`} className="rounded p-1.5 hover:bg-ds-muted"><Download className="size-4" /></a></>} />)}</div>
+        : <p className="ds-body-s text-ds-texto-2">Nenhum laudo ou documento avulso ainda. Precisa de um? Use Solicitar documento.</p>}
+      {pedidosAbertos.length ? <div className="flex flex-col">
+        <p className="ds-caps text-ds-texto-2">Seus pedidos</p>
+        {pedidosAbertos.map((r) => { const st = statusPedidoDoc[r.status] ?? statusPedidoDoc.open; return <div key={r.id} className="flex items-center gap-3 border-t border-ds-borda py-3 first:border-t-0">
+          <div className="min-w-0 flex-1"><p className="truncate ds-body-s font-medium">{r.title}</p><p className="ds-caption text-ds-texto-2">{dataCurta(r.createdAt)}</p></div>
+          <Tag tom={st.tom}>{st.texto}</Tag>
+        </div>; })}
+      </div> : null}
+    </div>
+  </Cartao>;
+}
+
 export function Documentos({ data }: { data: ClientPortalData }) {
   const [tipo, setTipo] = useState<'docs' | 'fotos'>('docs');
   const [turmaId, setTurmaId] = useState('todas');
@@ -77,7 +136,8 @@ export function Documentos({ data }: { data: ClientPortalData }) {
   const nomeZip = turmaId === 'todas' ? `${tipo === 'docs' ? 'documentos' : 'fotos'}-space-light` : slug(`${turmas.get(turmaId)?.nr}-${turmas.get(turmaId)?.title}`);
 
   return <div className="flex flex-col gap-6">
-    <TopoDePagina titulo="Documentos" subtitulo="Listas de presença, relatórios e fotos publicados pela Space Light, por turma." acoes={<BotaoZip entries={tipo === 'docs' ? docs.map((d) => ({ id: d.id, name: d.title })) : fotos.map((f) => ({ id: f.id, name: f.alt }))} zipName={nomeZip} rotulo={turmaId === 'todas' ? 'Baixar tudo (.zip)' : 'Baixar esta turma (.zip)'} />} />
+    <LaudosEAvulsos data={data} />
+    <TopoDePagina titulo="Documentos das turmas" subtitulo="Listas de presença, relatórios e fotos publicados pela Space Light, por turma." acoes={<BotaoZip entries={tipo === 'docs' ? docs.map((d) => ({ id: d.id, name: d.title })) : fotos.map((f) => ({ id: f.id, name: f.alt }))} zipName={nomeZip} rotulo={turmaId === 'todas' ? 'Baixar tudo (.zip)' : 'Baixar esta turma (.zip)'} />} />
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <Segmentado rotulo="Tipo de arquivo" ativa={tipo} onChange={setTipo} className="sm:w-72" opcoes={[{ id: 'docs', rotulo: `Documentos · ${data.documents.filter((d) => !d.isCertificate).length}`, icone: <FileText /> }, { id: 'fotos', rotulo: `Fotos · ${data.photos.length}`, icone: <ImageIcon /> }]} />
       <select value={turmaId} onChange={(e) => setTurmaId(e.target.value)} aria-label="Filtrar por turma" className={cn(selectClasses, 'sm:max-w-sm')}>
@@ -267,6 +327,8 @@ function notificacoes(data: ClientPortalData): Notificacao[] {
     const dias = diasAte(t.expiresAt);
     if (dias <= 90) itens.push({ id: `venc-${t.id}`, quando: new Date().toISOString(), titulo: dias < 0 ? 'Certificados vencidos' : `Reciclagem em ${dias} dias`, texto: `${t.nr} · ${t.title}`, destino: { secao: 'request', turma: t.id } });
   }
+  for (const d of data.avulsos) if (recente(d.createdAt)) itens.push({ id: `avulso-${d.id}`, quando: d.createdAt, titulo: 'Documento disponível', texto: d.title, destino: { secao: 'documents' } });
+  for (const r of data.documentRequests) if (r.status === 'declined' && recente(r.createdAt)) itens.push({ id: `pdoc-${r.id}`, quando: r.createdAt, titulo: 'Pedido de documento respondido', texto: r.title, destino: { secao: 'documents' } });
   for (const r of data.requests) if (r.status !== 'open' && recente(r.createdAt)) itens.push({ id: `ped-${r.id}-${r.status}`, quando: r.createdAt, titulo: r.status === 'scheduled' ? 'Solicitação agendada' : 'Solicitação respondida', texto: `${r.nr}${r.title ? ` · ${r.title}` : ''}`, destino: { secao: 'request' } });
   return itens.sort((a, b) => b.quando.localeCompare(a.quando));
 }

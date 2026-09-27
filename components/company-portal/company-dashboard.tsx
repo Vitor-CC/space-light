@@ -84,7 +84,7 @@ export function CompanyDashboard({ data, navigate }: { data: CompanyDashboardDat
     const agendadas = doMes.length - concluidas - andamento;
 
     const aEmitir = data.trainings.filter((t) => t.status === 'completed' && !t.certificate_generated_at);
-    const pedidos = [...data.requests.filter((r) => r.status === 'open'), ...data.siteLeads.filter((l) => l.status === 'open')];
+    const pedidos = [...data.requests.filter((r) => r.status === 'open'), ...data.siteLeads.filter((l) => l.status === 'open'), ...data.documentRequests.filter((r) => r.status === 'open')];
     const paradas = paradosHaMaisDe2Dias(pedidos, agora);
 
     return {

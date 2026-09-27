@@ -4,6 +4,7 @@ import { ArrowLeft, Building2, Check, ChevronDown, Download, KeyRound, Loader2, 
 import { useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 
+import { EnviarDocumento, ListaDeAvulsos, PedidoDeDocumento } from '@/components/company-portal/company-avulsos';
 import { pendenciasDaEquipe, SinoEquipe, ultimoDia } from '@/components/company-portal/company-topo';
 import type { NavegarEquipe } from '@/components/company-portal/company-topo';
 import { AccessCredentials, formatDayMonth, isoFromDate } from '@/components/company-portal/company-ui';
@@ -158,7 +159,7 @@ function EditarCliente({ client, aberto, onFechar, notify, reload, aoExcluir }: 
 
 /* ─── Ficha do cliente (Figma "Equipe · Ficha do cliente", 80:1545) ─────── */
 
-type AbaFicha = 'resumo' | 'turmas' | 'participantes' | 'acesso';
+type AbaFicha = 'resumo' | 'turmas' | 'participantes' | 'documentos' | 'acesso';
 
 function FichaDoCliente({ client, data, hoje, agora, reload, notify, navegar, voltar }: { client: CompanyClient; data: CompanyDashboardData; hoje: string; agora: number; reload: Reload; notify: Notify; navegar: NavegarEquipe; voltar: () => void }) {
   const [aba, setAba] = useState<AbaFicha>('resumo');
@@ -170,6 +171,8 @@ function FichaDoCliente({ client, data, hoje, agora, reload, notify, navegar, vo
   const turmas = useMemo(() => data.trainings.filter((t) => t.client_id === client.id).sort((a, b) => ultimoDia(b).localeCompare(ultimoDia(a))), [data.trainings, client.id]);
   const participantes = useMemo(() => { const ids = new Set(turmas.map((t) => t.id)); return data.participants.filter((p) => ids.has(p.training_id)); }, [data.participants, turmas]);
   const reciclagens = useMemo(() => reciclagensDoCliente(turmas, hoje), [turmas, hoje]);
+  const avulsos = useMemo(() => data.clientDocuments.filter((d) => d.client_id === client.id), [data.clientDocuments, client.id]);
+  const pedidosAbertos = useMemo(() => data.documentRequests.filter((r) => r.client_id === client.id && r.status === 'open'), [data.documentRequests, client.id]);
   const ano = hoje.slice(0, 4);
 
   const numeros = useMemo(() => {
@@ -223,6 +226,7 @@ function FichaDoCliente({ client, data, hoje, agora, reload, notify, navegar, vo
       { id: 'resumo', rotulo: 'Resumo' },
       { id: 'turmas', rotulo: 'Turmas', contador: turmas.length },
       { id: 'participantes', rotulo: 'Participantes', contador: participantes.length },
+      { id: 'documentos', rotulo: 'Documentos', contador: pedidosAbertos.length ? `${avulsos.length} · ${pedidosAbertos.length} pedido${pedidosAbertos.length === 1 ? '' : 's'}` : avulsos.length },
       { id: 'acesso', rotulo: 'Pessoas com acesso', contador: client.username ? 1 : 0 },
     ]} />
 
@@ -282,6 +286,15 @@ function FichaDoCliente({ client, data, hoje, agora, reload, notify, navegar, vo
         <td className={cn(tb.td, 'whitespace-nowrap')}>{t ? `${t.code} · ${t.nr}` : '—'}</td>
       </tr>; })}</tbody>
     </table></div></div> : <Vazio icone={<Building2 />} titulo="Nenhum participante ainda" texto="Os participantes entram pelo QR de cada turma." /> : null}
+
+    {aba === 'documentos' ? <div className="flex flex-col gap-5">
+      {pedidosAbertos.map((pedido) => <section key={pedido.id} className="rounded-lg border-l-4 border-ds-amarelo bg-ds-superficie p-5"><PedidoDeDocumento pedido={pedido} notify={notify} reload={reload} /></section>)}
+      <section className="flex flex-col gap-4 rounded-lg bg-ds-superficie p-5">
+        <div><h2 className="ds-h4">Enviar documento avulso</h2><p className="ds-body-s text-ds-texto-2">Laudo ou outro documento fora de turma. O cliente vê e baixa em Documentos, no portal dele.</p></div>
+        <EnviarDocumento clientId={client.id} notify={notify} reload={reload} />
+      </section>
+      <ListaDeAvulsos docs={avulsos} notify={notify} reload={reload} />
+    </div> : null}
 
     {aba === 'acesso' ? <div className="flex flex-col gap-4">
       {senhaNova ? <AccessCredentials eyebrow={`Nova senha de ${client.name}`} note={senhaNova.active ? 'Anote agora: a senha aparece somente desta vez. A senha antiga já não funciona e, no próximo acesso, o cliente terá de criar uma nova.' : 'Anote agora: a senha aparece somente desta vez. Atenção: este acesso ainda está inativo — aprove o cliente para ele conseguir entrar.'} loginLabel="Nome de usuário" email={senhaNova.username ?? 'Não definido — defina antes de enviar'} password={senhaNova.temporaryPassword} onDismiss={() => setSenhaNova(null)} /> : null}

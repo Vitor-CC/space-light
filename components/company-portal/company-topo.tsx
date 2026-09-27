@@ -71,7 +71,7 @@ export function pendenciasDaEquipe(data: CompanyDashboardData, hoje: string, ago
   const documentos = comDocumento.reduce((soma, i) => soma + i.pending_document_count, 0);
   if (documentos) lista.push({ id: 'documentos', titulo: 'Documentos para avaliar', detalhe: `${plural(documentos, 'documento', 'documentos')} de ${plural(comDocumento.length, 'instrutor', 'instrutores')}`, tom: 'atencao', icone: <FileCheck />, ir: ['instructors'] });
 
-  const pedidos = [...data.requests.filter((r) => r.status === 'open'), ...data.siteLeads.filter((l) => l.status === 'open')];
+  const pedidos = [...data.requests.filter((r) => r.status === 'open'), ...data.siteLeads.filter((l) => l.status === 'open'), ...data.documentRequests.filter((r) => r.status === 'open')];
   if (pedidos.length) {
     const paradas = paradosHaMaisDe2Dias(pedidos, agora);
     lista.push({ id: 'solicitacoes', titulo: 'Solicitações sem resposta', detalhe: paradas ? `${paradas} há mais de 2 dias` : plural(pedidos.length, 'em aberto', 'em aberto'), tom: 'atencao', icone: <Inbox />, ir: ['requests'] });

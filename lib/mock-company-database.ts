@@ -250,3 +250,26 @@ export function removeParticipantByCompany(participantId: string) {
 export function setParticipantAttendance(participantId: string, sessionId: string, present: boolean) {
   return requestJson<{ ok: true }>('/api/company/participants/attendance', { method: 'POST', body: JSON.stringify({ participantId, sessionId, present }) });
 }
+
+// --- Documentos avulsos (laudo etc.) ---
+
+/** Envia um documento avulso ao cliente; com `requestId`, responde ao pedido dele. */
+export async function sendClientDocument(input: { clientId: string; title: string; file: File; requestId?: string | null }) {
+  const form = new FormData();
+  form.set('clientId', input.clientId);
+  form.set('title', input.title);
+  if (input.requestId) form.set('requestId', input.requestId);
+  form.set('file', input.file);
+  const response = await fetch('/api/company/client-documents', { method: 'POST', body: form });
+  const payload = (await response.json().catch(() => ({}))) as { error?: string; id?: string };
+  if (!response.ok) throw new RequestError(payload.error || 'Não foi possível enviar o documento.', response.status);
+  return payload;
+}
+
+export function removeClientDocument(documentId: string) {
+  return requestJson<{ ok: true }>('/api/company/client-documents', { method: 'DELETE', body: JSON.stringify({ documentId }) });
+}
+
+export function setDocumentRequestStatus(requestId: string, status: 'open' | 'sent' | 'declined') {
+  return requestJson<{ ok: true }>(`/api/company/document-requests/${encodeURIComponent(requestId)}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+}

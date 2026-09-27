@@ -28,6 +28,8 @@ import type {
   CompanyInstructorDocument,
   CompanyParticipant,
   CompanySiteLead,
+  CompanyClientDocument,
+  CompanyDocumentRequest,
   CompanyTraining,
   CompanyTrainingRequest,
 } from '@/lib/company-types';
@@ -192,6 +194,39 @@ const TABELAS_POR_MARCADOR = [
       based_on_training_id TEXT,
       status TEXT NOT NULL DEFAULT 'open',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  // Documento avulso do cliente (laudo etc.), enviado pela equipe fora de turma.
+  {
+    marcador: 'tab_client_documents',
+    tabela: 'client_documents',
+    criar: `CREATE TABLE IF NOT EXISTS client_documents (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      request_id TEXT,
+      title TEXT NOT NULL,
+      name TEXT NOT NULL,
+      object_key TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      size INTEGER NOT NULL DEFAULT 0,
+      uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  // Pedido de documento avulso feito pelo cliente no portal ("Solicitar documento").
+  {
+    marcador: 'tab_document_requests',
+    tabela: 'document_requests',
+    criar: `CREATE TABLE IF NOT EXISTS document_requests (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      requested_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      title TEXT NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'open',
+      document_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      answered_at TEXT
     )`,
   },
   // Pedido de proposta feito no site ("Solicitar proposta"), de quem ainda não
@@ -2373,6 +2408,105 @@ export async function setTrainingRequestStatus(input: { requestId: string; statu
   return { ok: true as const };
 }
 
+/* ─── Documentos avulsos (laudo etc.) e pedidos de documento ─────────────── */
+
+const STATUS_PEDIDO_DOCUMENTO = ['open', 'sent', 'declined'] as const;
+
+/** O cliente pede um documento que não é de turma (ex.: laudo de insalubridade). */
+export async function createDocumentRequest(input: { clientId: string; userId: string; title: string; notes: string }) {
+  await ensurePortalSchema();
+  const title = (input.title ?? '').trim().slice(0, 200);
+  if (!title) throw new Error('Diga qual documento você precisa.');
+  const id = makeId('docreq');
+  await getD1()
+    .prepare(`INSERT INTO document_requests (id, client_id, requested_by, title, notes, status)
+      VALUES (?, ?, ?, ?, ?, 'open')`)
+    .bind(id, input.clientId, input.userId, title, (input.notes ?? '').trim().slice(0, 2000))
+    .run();
+  await writeAudit(input.userId, 'document_request.created', 'document_request', id, { title });
+  return { id };
+}
+
+export async function setDocumentRequestStatus(input: { requestId: string; status: string; byUserId: string }) {
+  await ensurePortalSchema();
+  if (!STATUS_PEDIDO_DOCUMENTO.includes(input.status as (typeof STATUS_PEDIDO_DOCUMENTO)[number])) throw new Error('Situação inválida.');
+  const result = await getD1()
+    .prepare(`UPDATE document_requests SET status = ?, answered_at = CASE WHEN ? = 'open' THEN NULL ELSE datetime('now') END WHERE id = ?`)
+    .bind(input.status, input.status, input.requestId)
+    .run();
+  if (!result.meta?.changes) throw new Error('Pedido não encontrado.');
+  await writeAudit(input.byUserId, 'document_request.status', 'document_request', input.requestId, { status: input.status });
+  return { ok: true as const };
+}
+
+/**
+ * Registra o documento já gravado no disco. Se responde a um pedido do mesmo
+ * cliente, o pedido fecha como "enviado" e aponta para o documento.
+ */
+export async function registerClientDocument(input: {
+  id: string;
+  clientId: string;
+  requestId: string | null;
+  title: string;
+  name: string;
+  objectKey: string;
+  contentType: string;
+  size: number;
+  byUserId: string;
+}) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  let pedido: string | null = null;
+  if (input.requestId) {
+    const achado = await d1.prepare('SELECT id FROM document_requests WHERE id = ? AND client_id = ? LIMIT 1').bind(input.requestId, input.clientId).first<{ id: string }>();
+    if (!achado) throw new Error('O pedido escolhido não é deste cliente.');
+    pedido = achado.id;
+  }
+  const comandos = [
+    d1
+      .prepare(`INSERT INTO client_documents (id, client_id, request_id, title, name, object_key, content_type, size, uploaded_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(input.id, input.clientId, pedido, input.title.trim().slice(0, 200), input.name, input.objectKey, input.contentType, input.size, input.byUserId),
+  ];
+  if (pedido) {
+    comandos.push(d1
+      .prepare(`UPDATE document_requests SET status = 'sent', document_id = ?, answered_at = datetime('now') WHERE id = ?`)
+      .bind(input.id, pedido));
+  }
+  await d1.batch(comandos);
+  await writeAudit(input.byUserId, 'client_document.uploaded', 'client', input.clientId, { documento: input.id, titulo: input.title, pedido });
+  return { id: input.id };
+}
+
+type LinhaDocumentoAvulso = { id: string; client_id: string; request_id: string | null; title: string; name: string; object_key: string; content_type: string; size: number; created_at: string };
+
+/** Só a equipe e o próprio cliente abrem o documento avulso. */
+export async function findClientDocumentForUser(input: { documentId: string; user: StoredUser }) {
+  await ensurePortalSchema();
+  const doc = await getD1()
+    .prepare('SELECT id, client_id, request_id, title, name, object_key, content_type, size, created_at FROM client_documents WHERE id = ? LIMIT 1')
+    .bind(input.documentId)
+    .first<LinhaDocumentoAvulso>();
+  if (!doc) return null;
+  if (input.user.role === 'admin') return doc;
+  if (input.user.role === 'client' && input.user.client_id === doc.client_id) return doc;
+  return null;
+}
+
+/** Apaga a linha e devolve a chave, para a rota apagar o arquivo. Pedido respondido por ele volta a ficar em aberto. */
+export async function deleteClientDocument(input: { documentId: string; byUserId: string }) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const doc = await d1.prepare('SELECT id, client_id, object_key, request_id FROM client_documents WHERE id = ? LIMIT 1').bind(input.documentId).first<{ id: string; client_id: string; object_key: string; request_id: string | null }>();
+  if (!doc) throw new Error('Documento não encontrado.');
+  await d1.batch([
+    d1.prepare('DELETE FROM client_documents WHERE id = ?').bind(doc.id),
+    d1.prepare(`UPDATE document_requests SET status = 'open', document_id = NULL, answered_at = NULL WHERE document_id = ?`).bind(doc.id),
+  ]);
+  await writeAudit(input.byUserId, 'client_document.deleted', 'client', doc.client_id, { documento: doc.id });
+  return { objectKey: doc.object_key };
+}
+
 /** Grava o pedido de proposta do formulário do site. Os dados já chegam validados. */
 export async function registerSiteLead(input: Proposta & { id: string; origem: string }) {
   await ensurePortalSchema();
@@ -3073,7 +3207,7 @@ export async function getCompanyDashboardData(
 ): Promise<CompanyDashboardData> {
   await ensurePortalSchema();
   const d1 = getD1();
-  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult, requestsResult, siteLeadsResult, perfil] =
+  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult, requestsResult, siteLeadsResult, perfil, avulsosResult, pedidosDocResult] =
     await Promise.all([
       d1
         .prepare(
@@ -3162,6 +3296,15 @@ export async function getCompanyDashboardData(
            FROM site_leads ORDER BY created_at DESC`)
         .all<CompanySiteLead>(),
       d1.prepare('SELECT name, job_title FROM users WHERE id = ? LIMIT 1').bind(currentUser.id).first<{ name: string; job_title: string }>(),
+      d1
+        .prepare(`SELECT d.id, d.client_id, c.name AS client_name, d.request_id, d.title, d.name, d.content_type, d.size, d.created_at
+           FROM client_documents d JOIN clients c ON c.id = d.client_id ORDER BY d.created_at DESC`)
+        .all<CompanyClientDocument>(),
+      d1
+        .prepare(`SELECT r.id, r.client_id, c.name AS client_name, u.name AS requested_by_name, r.title, r.notes, r.status, r.document_id, r.created_at
+           FROM document_requests r JOIN clients c ON c.id = r.client_id LEFT JOIN users u ON u.id = r.requested_by
+           ORDER BY r.created_at DESC`)
+        .all<CompanyDocumentRequest>(),
     ]);
 
   return {
@@ -3174,6 +3317,8 @@ export async function getCompanyDashboardData(
     attendance: rows(presencasResult),
     requests: rows(requestsResult),
     siteLeads: rows(siteLeadsResult),
+    clientDocuments: rows(avulsosResult),
+    documentRequests: rows(pedidosDocResult),
     mailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM),
     currentUser: {
       id: currentUser.id,
@@ -3734,7 +3879,7 @@ export async function getClientPortalData(
     }>();
   if (!organization) return null;
 
-  const [trainingResult, fileResult, certificateResult, participantResult, requestResult] = await Promise.all([
+  const [trainingResult, fileResult, certificateResult, participantResult, requestResult, avulsoResult, pedidoDocResult] = await Promise.all([
     d1
       .prepare(
         `SELECT t.id, t.client_id, t.code, t.nr, t.title, t.internal_label, t.training_date,
@@ -3842,6 +3987,14 @@ export async function getClientPortalData(
         status: string;
         created_at: string;
       }>(),
+    d1
+      .prepare('SELECT id, title, name, content_type, size, created_at FROM client_documents WHERE client_id = ? ORDER BY created_at DESC')
+      .bind(clientId)
+      .all<{ id: string; title: string; name: string; content_type: string; size: number; created_at: string }>(),
+    d1
+      .prepare('SELECT id, title, notes, status, created_at FROM document_requests WHERE client_id = ? ORDER BY created_at DESC')
+      .bind(clientId)
+      .all<{ id: string; title: string; notes: string; status: string; created_at: string }>(),
   ]);
 
   const trainings: ClientTraining[] = rows(trainingResult).map((item) => {
@@ -3947,6 +4100,16 @@ export async function getClientPortalData(
     createdAt: item.created_at,
   }));
 
+  const avulsos = rows(avulsoResult).map((item) => ({
+    id: item.id,
+    title: item.title,
+    format: fileFormat(item.content_type, item.name),
+    size: formatSize(item.size),
+    createdAt: item.created_at,
+    updatedAt: formatDate(item.created_at),
+  }));
+  const documentRequests = rows(pedidoDocResult).map((item) => ({ id: item.id, title: item.title, notes: item.notes, status: item.status, createdAt: item.created_at }));
+
   return {
     organization: {
       id: organization.id,
@@ -3965,6 +4128,8 @@ export async function getClientPortalData(
     certificates,
     participants,
     requests,
+    avulsos,
+    documentRequests,
   };
 }
 
