@@ -579,8 +579,8 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
 // Tela de turmas (Figma 18:170)
 // ---------------------------------------------------------------------------
 
-export function CompanyTrainings({ data, reload, notify, turmaAlvo = null }: { data: CompanyDashboardData; reload: Reload; notify: Notify; turmaAlvo?: string | null }) {
-  const [vista, setVista] = useState<Vista>('tabela');
+export function CompanyTrainings({ data, reload, notify, turmaAlvo = null, vistaInicial = null }: { data: CompanyDashboardData; reload: Reload; notify: Notify; turmaAlvo?: string | null; vistaInicial?: 'agenda' | 'criar' | null }) {
+  const [vista, setVista] = useState<Vista>(vistaInicial ?? 'tabela');
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<Filtro>('todas');
   const [aberta, setAberta] = useState<string | null>(turmaAlvo);

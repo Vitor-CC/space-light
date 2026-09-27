@@ -213,6 +213,24 @@ export function TopoDePagina({ titulo, subtitulo, acoes, trilha, className }: { 
   </div>;
 }
 
+/**
+ * "Portal / Barra superior" do Figma: título e subtítulo à esquerda; ações da
+ * página, busca e notificações à direita. Busca e sino chegam prontos (têm
+ * estado e dependem dos dados de cada portal).
+ */
+export function BarraSuperior({ titulo, subtitulo, acoes, busca, notificacoes, className }: { titulo: ReactNode; subtitulo?: ReactNode; acoes?: ReactNode; busca?: ReactNode; notificacoes?: ReactNode; className?: string }) {
+  return <div className={cn('flex flex-col gap-3 lg:flex-row lg:items-center', className)}>
+    <div className="min-w-0 flex-1">
+      <h1 className="ds-h3 text-ds-texto">{titulo}</h1>
+      {subtitulo ? <p className="mt-1 ds-body-s text-ds-texto-2">{subtitulo}</p> : null}
+    </div>
+    <div className="flex flex-wrap items-center gap-3">
+      {acoes}
+      {busca || notificacoes ? <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-none">{busca}{notificacoes}</div> : null}
+    </div>
+  </div>;
+}
+
 /** Linha de metadados com ícone (data, local, instrutor, carga horária). */
 export function Meta({ itens, className }: { itens: Array<{ icone: ReactNode; texto: ReactNode } | null | false>; className?: string }) {
   return <div className={cn('flex flex-wrap gap-x-5 gap-y-1.5', className)}>

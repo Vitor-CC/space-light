@@ -20,21 +20,23 @@ import type { CompanyDashboardData } from '@/lib/company-types';
 import { readMockCompanyDatabase } from '@/lib/mock-company-database';
 
 /** Seções que desenham o próprio cabeçalho (as demais usam o SectionHeading). */
-const COM_CABECALHO_PROPRIO: CompanySection[] = ['trainings', 'certificates', 'requests', 'settings'];
+const COM_CABECALHO_PROPRIO: CompanySection[] = ['dashboard', 'trainings', 'certificates', 'requests', 'settings'];
 
 export function CompanyPortal({ initialData }: { initialData: CompanyDashboardData }) {
   const [section, setSection] = useState<CompanySection>('dashboard');
   const [turmaAlvo, setTurmaAlvo] = useState<string | null>(null);
+  const [vistaTurmas, setVistaTurmas] = useState<'agenda' | 'criar' | null>(null);
   const [data, setData] = useState<CompanyDashboardData>(initialData);
   const [aviso, setAviso] = useAviso(6000);
   const [atualizando, setAtualizando] = useState(false);
 
   // Ir para uma seção, opcionalmente já abrindo uma turma. Entrar pelo menu
   // limpa o alvo, senão a turma reabriria na próxima visita à seção.
-  const irPara = useCallback((destino: CompanySection, trainingId?: string) => {
+  const irPara = useCallback((destino: CompanySection, trainingId?: string, vista?: 'agenda' | 'criar') => {
     // Funcionários e Atividade moram em Configurações.
     const alvo = destino === 'team' || destino === 'audit' ? 'settings' : destino;
     setTurmaAlvo(trainingId ?? null);
+    setVistaTurmas(vista ?? null);
     setSection(alvo);
     window.scrollTo({ top: 0 });
   }, []);
@@ -62,7 +64,7 @@ export function CompanyPortal({ initialData }: { initialData: CompanyDashboardDa
   if (section === 'dashboard') conteudo = <CompanyDashboard data={data} navigate={irPara} />;
   else if (section === 'clients') conteudo = <CompanyClients data={data} reload={reload} notify={setAviso} />;
   else if (section === 'instructors') conteudo = <CompanyInstructors data={data} reload={reload} notify={setAviso} />;
-  else if (section === 'trainings') conteudo = <CompanyTrainings data={data} reload={reload} notify={setAviso} turmaAlvo={turmaAlvo} />;
+  else if (section === 'trainings') conteudo = <CompanyTrainings data={data} reload={reload} notify={setAviso} turmaAlvo={turmaAlvo} vistaInicial={vistaTurmas} />;
   else if (section === 'certificates') conteudo = <CompanyCertificates data={data} reload={reload} notify={setAviso} abrirDocumentos={() => irPara('files')} />;
   else if (section === 'files') conteudo = <CompanyFiles data={data} reload={reload} notify={setAviso} />;
   else if (section === 'participants') conteudo = <CompanyParticipants data={data} reload={reload} notify={setAviso} />;
@@ -70,7 +72,7 @@ export function CompanyPortal({ initialData }: { initialData: CompanyDashboardDa
   else if (section === 'settings') conteudo = <CompanySettings data={data} reload={reload} notify={setAviso} />;
 
   return <PortalShell area="Equipe Space Light" itens={itens} ativo={section} onNavegar={(id) => irPara(id)} usuario={{ nome: data.currentUser.name, detalhe: data.currentUser.jobTitle || data.currentUser.email }} onUsuario={() => irPara('settings')}>
-    <div key={`${section}-${turmaAlvo ?? ''}`} className="flex flex-col gap-7">
+    <div key={`${section}-${turmaAlvo ?? ''}-${vistaTurmas ?? ''}`} className="flex flex-col gap-7">
       {COM_CABECALHO_PROPRIO.includes(section) ? null : <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><SectionHeading section={section} /></div><BotaoIcone rotulo="Atualizar dados" onClick={() => void reload()} disabled={atualizando}><RefreshCw className={atualizando ? 'animate-spin' : undefined} /></BotaoIcone></div>}
       {conteudo}
     </div>
