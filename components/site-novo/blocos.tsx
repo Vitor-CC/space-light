@@ -21,11 +21,11 @@ export function Resp({ curto, longo }: { curto: string; longo: string }) {
   return <><span className="lg:hidden">{curto}</span><span className="hidden lg:inline">{longo}</span></>;
 }
 
-/** Cinco estrelas da nota do Google; o número vem sempre em texto ao lado. */
-export function Estrelas({ className }: { className?: string }) {
+/** Estrelas da nota do Google (cheias até `quantidade`, vazadas depois). */
+export function Estrelas({ quantidade = 5, className }: { quantidade?: number; className?: string }) {
   return <span className={cn('relative inline-flex items-center gap-0.5 text-ds-amarelo', className)}>
-    <span className="sr-only">5 de 5 estrelas</span>
-    {[0, 1, 2, 3, 4].map((i) => <Star key={i} className="size-[1em] fill-current" aria-hidden="true" />)}
+    <span className="sr-only">{quantidade} de 5 estrelas</span>
+    {[0, 1, 2, 3, 4].map((i) => <Star key={i} className={cn('size-[1em]', i < quantidade && 'fill-current')} aria-hidden="true" />)}
   </span>;
 }
 

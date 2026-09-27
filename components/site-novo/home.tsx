@@ -1,8 +1,9 @@
-import { ArrowRight, ArrowUpRight, Calendar, Check, ChevronRight, Download, MapPin, MessageCircle, Plus, User, Users, X } from 'lucide-react';
+import { ArrowRight, Calendar, Check, ChevronRight, Download, MapPin, MessageCircle, Plus, Users, X } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
 import { Cabecalho, Estrelas, FotoLegendada, Onda, Resp, Rotulo, miolo, tituloDeSecao } from '@/components/site-novo/blocos';
+import { AvaliacoesDoGoogleNaHome } from '@/components/site-novo/avaliacoes-do-google';
 import { botao } from '@/components/site-novo/botao';
 import { CardNorma } from '@/components/site-novo/card-norma';
 import { Tag } from '@/components/ds/base';
@@ -305,38 +306,8 @@ export function PorQue() {
 
 export function Avaliacoes() {
   return <section id="avaliacoes" aria-labelledby="avaliacoes-titulo" className="scroll-mt-header bg-ds-muted text-ds-texto lg:bg-ds-superficie">
-    <div className={cn(miolo, 'flex flex-col gap-4 pt-12 pb-10 lg:gap-12 lg:pt-32 lg:pb-16')}>
-      <Cabecalho id="avaliacoes-titulo" rotulo="08 — Quem passou pelo treinamento" titulo="Nota máxima de quem esteve na prática." apoio="Avaliações públicas do perfil da Space Light no Google, deixadas por participantes das turmas." largura="lg:w-[720px]" apoioNoCelular={false} />
-      {/* Celular: a nota em linha, antes do carrossel. */}
-      <div className="flex items-center gap-3 lg:hidden">
-        <span className="font-ds-display text-[40px] leading-[46px] font-bold tracking-[-0.02em]">{PROVA_SOCIAL.nota}</span>
-        <div className="flex flex-col gap-1"><Estrelas className="text-base" /><a href={LINK_DAS_AVALIACOES} target="_blank" rel="noreferrer" className="ds-caption text-ds-texto-2 underline underline-offset-4">média de {PROVA_SOCIAL.avaliacoes} avaliações</a></div>
-      </div>
-      <div className="lg:grid lg:grid-cols-4 lg:gap-6">
-        <div className="hidden flex-col justify-between gap-6 rounded-md bg-ds-inverso p-8 text-ds-texto-inv lg:flex">
-          <div className="flex flex-col gap-3">
-            <span className="ds-caps text-ds-texto-inv-2">Google</span>
-            <span className="font-ds-display text-[72px] leading-[72px] font-extrabold tracking-[-0.03em]">{PROVA_SOCIAL.nota}</span>
-            <Estrelas className="text-xl" />
-            <span className="ds-body-s text-ds-texto-inv-2">média de {PROVA_SOCIAL.avaliacoes} avaliações</span>
-          </div>
-          <a href={LINK_DAS_AVALIACOES} target="_blank" rel="noreferrer" className="doc-focus inline-flex items-center gap-2 ds-body-s font-medium text-ds-amarelo">Ver todas no Google<ArrowUpRight className="size-4" aria-hidden="true" /></a>
-        </div>
-        <ul className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-2 md:-mx-10 md:scroll-px-10 md:px-10 lg:col-span-3 lg:scroll-px-0 lg:mx-0 lg:grid lg:grid-cols-3 lg:gap-6 lg:overflow-visible lg:px-0 lg:pb-0">
-          {AVALIACOES.map((texto) => <li key={texto} className="w-[290px] shrink-0 snap-start lg:w-auto">
-            <figure className="flex h-full flex-col justify-between gap-3 rounded-lg bg-ds-superficie p-5 lg:gap-8 lg:rounded-md lg:border lg:border-ds-borda lg:p-8">
-              <div className="flex flex-col gap-3 lg:gap-4">
-                <Estrelas className="text-xs lg:text-base" />
-                <blockquote className="ds-body-m font-semibold lg:font-ds-display lg:text-[19px] lg:leading-[26px]">“{texto}”</blockquote>
-              </div>
-              <figcaption className="flex items-center gap-3 lg:border-t lg:border-ds-borda lg:pt-5">
-                <span aria-hidden="true" className="hidden size-9 items-center justify-center rounded-full bg-ds-muted lg:flex"><User className="size-[18px]" /></span>
-                <span className="ds-caption text-ds-texto-2 lg:ds-body-s">Participante · via Google</span>
-              </figcaption>
-            </figure>
-          </li>)}
-        </ul>
-      </div>
+    <div className={cn(miolo, 'pt-12 pb-10 lg:pt-32 lg:pb-16')}>
+      <AvaliacoesDoGoogleNaHome fixas={{ nota: PROVA_SOCIAL.nota, total: PROVA_SOCIAL.avaliacoes, link: LINK_DAS_AVALIACOES, textos: AVALIACOES }} />
     </div>
   </section>;
 }
