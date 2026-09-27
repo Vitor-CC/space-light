@@ -1,15 +1,24 @@
 /**
  * Envio de e-mail via Resend (API HTTP, sem dependência extra).
  *
- * Variáveis necessárias na Vercel:
+ * Variáveis em /etc/space-light.env (depois, `systemctl restart space-light`):
  *   RESEND_API_KEY  — chave da conta Resend
  *   MAIL_FROM       — remetente verificado, ex.: "Space Light <nao-responda@mail.spacelightengenharia.com.br>"
+ *   LEADS_EMAIL_TO  — quem recebe o aviso de nova solicitação do site; aceita
+ *                     vários endereços separados por vírgula
  */
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 
 export function isMailerConfigured() {
   return Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
+}
+
+function destinatariosDasSolicitacoes() {
+  return (process.env.LEADS_EMAIL_TO ?? '')
+    .split(',')
+    .map((endereco) => endereco.trim())
+    .filter(Boolean);
 }
 
 function escapeHtml(value: string) {
@@ -20,7 +29,13 @@ function escapeHtml(value: string) {
     .replace(/"/g, '&quot;');
 }
 
-async function sendEmail(input: { to: string; subject: string; html: string; text: string }) {
+async function sendEmail(input: {
+  to: string | string[];
+  subject: string;
+  html: string;
+  text: string;
+  replyTo?: string;
+}) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.MAIL_FROM;
   if (!apiKey || !from) {
@@ -34,10 +49,11 @@ async function sendEmail(input: { to: string; subject: string; html: string; tex
     },
     body: JSON.stringify({
       from,
-      to: [input.to],
+      to: Array.isArray(input.to) ? input.to : [input.to],
       subject: input.subject,
       html: input.html,
       text: input.text,
+      ...(input.replyTo ? { reply_to: input.replyTo } : {}),
     }),
   });
   if (!response.ok) {
@@ -130,4 +146,70 @@ export async function sendCertificatesAvailableEmail(input: {
   </table>
 </body></html>`;
   await sendEmail({ to: input.to, subject: `Certificados disponíveis · ${input.trainingLabel}`, html, text });
+}
+
+/** O aviso de nova solicitação só sai com o e-mail ligado e um destinatário definido. */
+export function isLeadNotificationConfigured() {
+  return isMailerConfigured() && destinatariosDasSolicitacoes().length > 0;
+}
+
+/**
+ * Aviso à equipe de que chegou um pedido pelo "Solicitar proposta" do site.
+ * O "Responder" do e-mail vai direto para quem pediu.
+ */
+export async function sendNewLeadEmail(input: {
+  nome: string;
+  empresa: string;
+  email: string;
+  /** Rótulo e valor, na ordem em que aparecem no e-mail. Valor vazio é omitido. */
+  campos: [string, string][];
+  mensagem: string;
+  portalLink: string;
+}) {
+  const destinatarios = destinatariosDasSolicitacoes();
+  if (destinatarios.length === 0) {
+    throw new Error('Nenhum destinatário em LEADS_EMAIL_TO.');
+  }
+  const campos = input.campos.filter(([, valor]) => valor.trim());
+  const text = [
+    `Nova solicitação de proposta pelo site: ${input.empresa}.`,
+    '',
+    ...campos.map(([rotulo, valor]) => `${rotulo}: ${valor}`),
+    ...(input.mensagem.trim() ? ['', 'Mensagem:', input.mensagem.trim()] : []),
+    '',
+    `Responda este e-mail para falar com ${input.nome}, ou abra o portal: ${input.portalLink}`,
+  ].join('\n');
+  const linhas = campos
+    .map(
+      ([rotulo, valor]) =>
+        `<tr><td style="padding:8px 12px 8px 0;border-top:1px solid #ececE6;font-size:12px;color:#777;vertical-align:top;white-space:nowrap">${escapeHtml(rotulo)}</td><td style="padding:8px 0;border-top:1px solid #ececE6;font-size:14px;color:#000">${escapeHtml(valor)}</td></tr>`,
+    )
+    .join('');
+  const mensagem = input.mensagem.trim()
+    ? `<p style="margin:22px 0 0;font-size:12px;color:#777">Mensagem</p><p style="margin:6px 0 0;font-size:14px;line-height:1.6;color:#000;white-space:pre-wrap">${escapeHtml(input.mensagem.trim())}</p>`
+    : '';
+  const html = `<!doctype html>
+<html lang="pt-BR"><body style="margin:0;background:#f4f3ef;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#000">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e4e2dc;border-radius:8px">
+    <tr><td style="background:#000;padding:22px 28px;border-radius:8px 8px 0 0">
+      <span style="color:#fac600;font-size:11px;font-weight:bold;letter-spacing:.14em;text-transform:uppercase">Space Light Engenharia</span>
+    </td></tr>
+    <tr><td style="padding:32px 28px">
+      <h1 style="margin:0;font-size:22px;line-height:1.3">Nova solicitação de proposta</h1>
+      <p style="margin:12px 0 20px;font-size:14px;line-height:1.6;color:#595959">Chegou pelo site. Responda este e-mail para falar direto com ${escapeHtml(input.nome)}.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${linhas}</table>
+      ${mensagem}
+      <p style="margin:26px 0 0">
+        <a href="${escapeHtml(input.portalLink)}" style="display:inline-block;background:#fac600;color:#000;padding:14px 24px;font-size:14px;font-weight:bold;text-decoration:none;border-radius:6px">Abrir as solicitações</a>
+      </p>
+    </td></tr>
+  </table>
+</body></html>`;
+  await sendEmail({
+    to: destinatarios,
+    subject: `Nova solicitação pelo site · ${input.empresa}`,
+    html,
+    text,
+    replyTo: input.email,
+  });
 }
