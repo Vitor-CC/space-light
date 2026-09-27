@@ -23,7 +23,7 @@ export function Resp({ curto, longo }: { curto: string; longo: string }) {
 
 /** Cinco estrelas da nota do Google; o número vem sempre em texto ao lado. */
 export function Estrelas({ className }: { className?: string }) {
-  return <span className={cn('inline-flex items-center gap-0.5 text-ds-amarelo', className)}>
+  return <span className={cn('relative inline-flex items-center gap-0.5 text-ds-amarelo', className)}>
     <span className="sr-only">5 de 5 estrelas</span>
     {[0, 1, 2, 3, 4].map((i) => <Star key={i} className="size-[1em] fill-current" aria-hidden="true" />)}
   </span>;

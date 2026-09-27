@@ -51,6 +51,8 @@ export type Norma = {
   curto: string;
   /** Nome mínimo, no rodapé e no menu do celular ("NR 06 · EPI"). */
   rotulo: string;
+  /** Nome e linha de apoio no menu "Treinamentos" do desktop (Figma "Menu suspenso"). */
+  menu: { titulo: string; apoio: string };
   pagina?: PaginaDaNorma;
 };
 
@@ -644,6 +646,7 @@ export const NORMAS: readonly Norma[] = [
     meta: 'Comissão · Formação',
     curto: 'CIPA',
     rotulo: 'CIPA',
+    menu: { titulo: 'CIPA', apoio: 'Prevenção de acidentes' },
     linha:
       'Formação para prevenção de acidentes e atuação responsável no ambiente de trabalho.',
     pagina: PAGINA_NR05,
@@ -655,6 +658,7 @@ export const NORMAS: readonly Norma[] = [
     meta: 'Uso e conservação',
     curto: 'EPI',
     rotulo: 'EPI',
+    menu: { titulo: 'EPI', apoio: 'Uso, guarda e conservação' },
     linha: 'Seleção, uso, guarda e conservação correta dos EPIs.',
     pagina: PAGINA_NR06,
   },
@@ -665,6 +669,7 @@ export const NORMAS: readonly Norma[] = [
     meta: 'Instalações e serviços',
     curto: 'Segurança em eletricidade',
     rotulo: 'Eletricidade',
+    menu: { titulo: 'Eletricidade', apoio: 'Instalações e serviços' },
     linha: 'Prevenção de riscos em instalações e serviços com eletricidade.',
     pagina: PAGINA_NR10,
   },
@@ -675,6 +680,7 @@ export const NORMAS: readonly Norma[] = [
     meta: 'Operação e armazenagem',
     curto: 'Movimentação de materiais',
     rotulo: 'Movimentação',
+    menu: { titulo: 'Movimentação de materiais', apoio: 'Operação e armazenagem' },
     linha: 'Transporte, movimentação, armazenagem e manuseio de materiais.',
     pagina: PAGINA_NR11,
   },
@@ -685,6 +691,7 @@ export const NORMAS: readonly Norma[] = [
     meta: 'Brigada de incêndio',
     curto: 'Proteção contra incêndios',
     rotulo: 'Incêndio',
+    menu: { titulo: 'Proteção contra incêndios', apoio: 'Brigada · mais aplicado' },
     linha:
       'Preparo técnico e prático para prevenção e resposta inicial a emergências.',
     pagina: PAGINA_NR23,
@@ -696,6 +703,7 @@ export const NORMAS: readonly Norma[] = [
     meta: 'Riscos e resgate',
     curto: 'Espaços confinados',
     rotulo: 'Espaço confinado',
+    menu: { titulo: 'Espaços confinados', apoio: 'Riscos e resgate' },
     linha: 'Reconhecer, avaliar e controlar riscos em espaços confinados.',
     pagina: PAGINA_NR33,
   },
@@ -706,6 +714,7 @@ export const NORMAS: readonly Norma[] = [
     meta: 'Planejamento e execução',
     curto: 'Trabalho em altura',
     rotulo: 'Altura',
+    menu: { titulo: 'Trabalho em altura', apoio: 'Planejamento e execução' },
     linha: 'Planejamento, organização e execução segura de trabalho em altura.',
     pagina: PAGINA_NR35,
   },
