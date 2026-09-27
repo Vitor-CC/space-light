@@ -51,7 +51,7 @@ export function situacaoDaTurma(training: CompanyTraining, hojeIso: string): { t
 // Ações de um dia e de uma turma
 // ---------------------------------------------------------------------------
 
-function DayRow({ training, session, instructors, reload, notify, onEncerrar, ocupado = false }: { training: CompanyTraining; session: TrainingSession; instructors: CompanyInstructor[]; reload: Reload; notify: Notify; onEncerrar?: () => void; ocupado?: boolean }) {
+function DayRow({ training, session, instructors, reload, notify }: { training: CompanyTraining; session: TrainingSession; instructors: CompanyInstructor[]; reload: Reload; notify: Notify }) {
   const [salvando, setSalvando] = useState(false);
   const total = training.sessions.length;
   const encerrado = session.status === 'completed';
@@ -94,14 +94,12 @@ function DayRow({ training, session, instructors, reload, notify, onEncerrar, oc
     : null;
 
   return <div className={cn('flex flex-col gap-3 border-t border-ds-borda py-4', encerrado && 'opacity-80')}>
-    <div className="flex items-center gap-2">
-      <span className="ds-caps text-ds-texto-2">Dia {session.day_number} de {total}</span>
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="whitespace-nowrap ds-caps text-ds-texto-2">Dia {session.day_number} de {total}</span>
       {encerrado ? <Tag tom="sucesso">Encerrado</Tag> : session.status === 'in_progress' ? <Tag tom="atencao">Em andamento</Tag> : null}
       {salvando ? <Loader2 className="size-4 animate-spin text-ds-amarelo-texto" /> : null}
       <div className="ml-auto flex items-center gap-2">
         {!encerrado && aviso ? <a href={aviso} target="_blank" rel="noreferrer" className={botaoClasses('fantasma', 'P')}><MessageCircle />Avisar</a> : null}
-        {/* Um dia só, quando o instrutor não fechou o dele. Turma de um dia fecha pelo "Encerrar turma". */}
-        {!encerrado && total > 1 && onEncerrar ? <Botao tipo="fantasma" tamanho="P" onClick={onEncerrar} disabled={salvando || ocupado}><Check />Encerrar este dia</Botao> : null}
         {total > 1 ? <BotaoIcone rotulo={`Remover o dia ${session.day_number}`} tom="perigo" className="size-9" onClick={() => void removerDia()} disabled={salvando}><X /></BotaoIcone> : null}
       </div>
     </div>
@@ -285,27 +283,63 @@ function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoE
     catch (error) { notify(error instanceof Error ? error.message : 'Erro ao excluir o treinamento.'); }
   }
 
-  return <div className="flex flex-col gap-5">
-    {confirmarSemLista ? <Faixa tom="perigo" titulo="Encerrar sem a lista assinada?" acao={<div className="flex gap-2"><Botao tipo="fantasma" tamanho="P" onClick={() => setConfirmarSemLista(null)}>Cancelar</Botao><Botao tipo="perigo" tamanho="P" onClick={() => void encerrar(true, confirmarSemLista.sessionId)} disabled={ocupado === 'encerrando'}>{ocupado === 'encerrando' ? <Loader2 className="animate-spin" /> : <Check />}Encerrar assim mesmo</Botao></div>}>{confirmarSemLista.mensagem} Os certificados saem mesmo assim e a ressalva fica registrada na Atividade com o seu nome.</Faixa> : null}
+  const listas = data.files.filter((file) => file.kind === 'attendance' && file.training_id === training.id);
+  const totalDias = training.sessions.length;
+  const nomeDoInstrutor = (id: string | null) => instructors.find((item) => item.id === id)?.name ?? 'Sem instrutor';
+  const encerrando = ocupado === 'encerrando';
 
-    <Secao titulo="Ações">
-      <div className="flex flex-wrap gap-2">
-        {concluido ? <Botao onClick={emitir}><Award />{training.certificate_generated_at ? 'Certificados' : 'Emitir certificados'}</Botao> : <>
-          <Botao onClick={() => void encerrar(false)} disabled={Boolean(ocupado)}>{ocupado === 'encerrando' ? <Loader2 className="animate-spin" /> : <Check />}Encerrar turma</Botao>
-          {cobraveisPorWhats.map((item) => <a key={item.nome} href={item.url as string} target="_blank" rel="noreferrer" className={botaoClasses('fantasma', 'M')}><MessageCircle />{cobraveisPorWhats.length > 1 ? `Cobrar ${item.nome.split(' ')[0]}` : 'Cobrar no WhatsApp'}</a>)}
-        </>}
-        <a href={`/lista-presenca/${training.id}`} target="_blank" rel="noopener" className={botaoClasses('fantasma', 'M')}><FileText />Lista (PDF)</a>
-        <label className={botaoClasses('fantasma', 'M', ocupado ? 'pointer-events-none opacity-60' : 'cursor-pointer')}>
-          {ocupado === 'lista' ? <Loader2 className="animate-spin" /> : <Upload />}Enviar lista assinada
+  return <div className="flex flex-col gap-6">
+    {/* Em destaque no topo: a lista assinada e o encerramento, que é o que a
+        equipe mais procura na ficha. Turma encerrada sem lista continua
+        mostrando o envio, porque a lista ainda pode chegar depois. */}
+    {!concluido || faltaLista ? <section aria-labelledby={`encerramento-${training.id}`} className="flex flex-col gap-4 rounded-[10px] border border-ds-borda bg-ds-muted p-4 sm:p-5">
+      <h3 id={`encerramento-${training.id}`} className="ds-h4">{concluido ? 'Lista assinada' : 'Encerramento da turma'}</h3>
+
+      {confirmarSemLista ? <Faixa tom="perigo" titulo="Encerrar sem a lista assinada?" acao={<div className="flex gap-2"><Botao tipo="fantasma" tamanho="P" onClick={() => setConfirmarSemLista(null)}>Cancelar</Botao><Botao tipo="perigo" tamanho="P" onClick={() => void encerrar(true, confirmarSemLista.sessionId)} disabled={encerrando}>{encerrando ? <Loader2 className="animate-spin" /> : <Check />}Encerrar assim mesmo</Botao></div>}>{confirmarSemLista.mensagem} Os certificados saem mesmo assim e a ressalva fica registrada na Atividade com o seu nome.</Faixa> : null}
+
+      <div className={cn('flex flex-col gap-4 rounded-lg border-2 bg-ds-superficie p-4 sm:flex-row sm:items-center', faltaLista ? 'border-ds-perigo' : 'border-ds-sucesso')}>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2"><FileText className="size-5 shrink-0" /><strong className="ds-body-m font-semibold">Lista de presença assinada</strong><Tag tom={faltaLista ? 'perigo' : 'sucesso'}>{faltaLista ? 'Não enviada' : 'Enviada'}</Tag></div>
+          <p className="mt-1.5 ds-body-s text-ds-texto-2">{faltaLista
+            ? 'Obrigatória para encerrar o último dia. Se o instrutor não enviou, envie aqui a foto ou o PDF escaneado.'
+            : `${listas.length} ${listas.length === 1 ? 'arquivo enviado' : 'arquivos enviados'}. Se faltou alguma página, envie as que faltam.`}</p>
+        </div>
+        <label className={botaoClasses(faltaLista ? 'primario' : 'secundario', 'L', cn('shrink-0', ocupado ? 'pointer-events-none opacity-60' : 'cursor-pointer'))}>
+          {ocupado === 'lista' ? <Loader2 className="animate-spin" /> : <Upload />}{faltaLista ? 'Enviar lista assinada' : 'Enviar mais páginas'}
           <input type="file" accept="image/*,application/pdf" multiple className="sr-only" onChange={(e) => { const arquivos = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; void enviarLista(arquivos); }} />
         </label>
       </div>
-      <p className={cn('ds-caption', faltaLista ? 'text-ds-perigo' : 'text-ds-texto-2')}>{faltaLista ? 'Lista assinada ainda não enviada. A equipe pode enviar no lugar do instrutor.' : 'Lista assinada enviada.'}</p>
+
+      {!concluido && totalDias > 1 ? <div className="flex flex-col gap-2">
+        <span className="ds-caps text-ds-texto-2">Encerrar um dia de cada vez</span>
+        {training.sessions.map((dia) => <div key={dia.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-ds-borda bg-ds-superficie px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <strong className="block ds-body-s font-semibold">Dia {dia.day_number} de {totalDias} · {formatDate(dia.session_date)}</strong>
+            <span className="block truncate ds-caption text-ds-texto-2">{nomeDoInstrutor(dia.instructor_id)}</span>
+          </div>
+          {dia.status === 'completed'
+            ? <Tag tom="sucesso">Encerrado</Tag>
+            : <Botao tipo="escuro" onClick={() => void encerrar(false, dia.id)} disabled={Boolean(ocupado)}>{encerrando ? <Loader2 className="animate-spin" /> : <Check />}Encerrar dia {dia.day_number}</Botao>}
+        </div>)}
+      </div> : null}
+
+      {!concluido ? <div className="flex flex-col gap-3 border-t border-ds-borda pt-4 sm:flex-row sm:items-center">
+        <Botao tamanho="L" className="shrink-0" onClick={() => void encerrar(false)} disabled={Boolean(ocupado)}>{encerrando ? <Loader2 className="animate-spin" /> : <Check />}{totalDias > 1 ? 'Encerrar a turma inteira' : 'Encerrar turma'}</Botao>
+        <p className="ds-caption text-ds-texto-2">{totalDias > 1 ? 'Fecha todos os dias abertos de uma vez e emite os certificados.' : 'Fecha a turma e emite os certificados.'}</p>
+      </div> : null}
+    </section> : null}
+
+    <Secao titulo="Ações">
+      <div className="flex flex-wrap gap-2">
+        {concluido ? <Botao onClick={emitir}><Award />{training.certificate_generated_at ? 'Certificados' : 'Emitir certificados'}</Botao> : null}
+        {!concluido ? cobraveisPorWhats.map((item) => <a key={item.nome} href={item.url as string} target="_blank" rel="noreferrer" className={botaoClasses('fantasma', 'M')}><MessageCircle />{cobraveisPorWhats.length > 1 ? `Cobrar ${item.nome.split(' ')[0]}` : 'Cobrar no WhatsApp'}</a>) : null}
+        <a href={`/lista-presenca/${training.id}`} target="_blank" rel="noopener" className={botaoClasses('fantasma', 'M')}><FileText />Lista para imprimir (PDF)</a>
+      </div>
       {devedores.length > 0 && devedores.every((item) => !item.url) && !concluido ? <p className="ds-caption text-ds-texto-2">Sem telefone no cadastro do instrutor não dá para cobrar por WhatsApp: inclua o número em Instrutores.</p> : null}
     </Secao>
 
-    <Secao titulo={`Dias · ${training.sessions.length}`}>
-      <div>{training.sessions.map((dia) => <DayRow key={dia.id} training={training} session={dia} instructors={instructors} reload={reload} notify={notify} onEncerrar={() => void encerrar(false, dia.id)} ocupado={Boolean(ocupado)} />)}</div>
+    <Secao titulo={`Datas, horários e instrutores · ${totalDias} ${totalDias === 1 ? 'dia' : 'dias'}`}>
+      <div>{training.sessions.map((dia) => <DayRow key={dia.id} training={training} session={dia} instructors={instructors} reload={reload} notify={notify} />)}</div>
       <AddDay training={training} instructors={instructors} reload={reload} notify={notify} />
     </Secao>
 
@@ -622,7 +656,7 @@ export function CompanyTrainings({ data, reload, notify, turmaAlvo = null }: { d
       </table></div></div> : <Vazio icone={<CalendarPlus />} titulo="Nenhuma turma neste filtro" texto={data.trainings.length === 0 ? 'Crie a primeira turma em "Nova turma".' : 'Ajuste a busca ou o filtro.'} />}
     </> : null}
 
-    {turmaAberta ? <PainelLateral aberto onFechar={() => setAberta(null)} largura={560} sobretitulo={`Turma ${turmaAberta.code}`} titulo={`${turmaAberta.nr} · ${turmaAberta.internal_label || turmaAberta.title}`} subtitulo={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="inline-flex items-center gap-1.5"><UserRound className="size-3.5" />{turmaAberta.client_name}</span><span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" />{turmaAberta.duration}</span><span className="inline-flex items-center gap-1.5"><ImageIcon className="size-3.5" />{turmaAberta.file_count} arquivos</span><Tag tom={situacaoDaTurma(turmaAberta, hojeIso).tom}>{situacaoDaTurma(turmaAberta, hojeIso).texto}</Tag></span>}>
+    {turmaAberta ? <PainelLateral aberto onFechar={() => setAberta(null)} largura={760} sobretitulo={`Turma ${turmaAberta.code}`} titulo={`${turmaAberta.nr} · ${turmaAberta.internal_label || turmaAberta.title}`} subtitulo={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="inline-flex items-center gap-1.5"><UserRound className="size-3.5" />{turmaAberta.client_name}</span><span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" />{turmaAberta.duration}</span><span className="inline-flex items-center gap-1.5"><ImageIcon className="size-3.5" />{turmaAberta.file_count} arquivos</span><Tag tom={situacaoDaTurma(turmaAberta, hojeIso).tom}>{situacaoDaTurma(turmaAberta, hojeIso).texto}</Tag></span>}>
       <FichaDaTurma key={turmaAberta.id} training={turmaAberta} data={data} instructors={instrutores} reload={reload} notify={notify} emitir={() => { setEmissao(turmaAberta.id); setAberta(null); }} aoExcluir={() => setAberta(null)} />
     </PainelLateral> : null}
 
