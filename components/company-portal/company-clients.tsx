@@ -1,367 +1,413 @@
 'use client';
 
-import { Building2, Check, ChevronDown, KeyRound, Loader2, MapPin, Pencil, Plus, Search, Trash2, TriangleAlert, UserRound } from 'lucide-react';
+import { ArrowLeft, Building2, Check, ChevronDown, Download, KeyRound, Loader2, MessageCircle, Plus, Search, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 
-import { AccessCredentials, EmptyState, fieldClass, labelClass, selectClass, SubTabs } from '@/components/company-portal/company-ui';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import type { CompanyClient, CompanyDashboardData } from '@/lib/company-types';
+import { pendenciasDaEquipe, SinoEquipe, ultimoDia } from '@/components/company-portal/company-topo';
+import type { NavegarEquipe } from '@/components/company-portal/company-topo';
+import { AccessCredentials, formatDayMonth, isoFromDate } from '@/components/company-portal/company-ui';
+import { Avatar, BarraSuperior, Botao, botaoClasses, Campo, campoClasses, Faixa, Indicador, tabelaClasses as tb, Tag, Vazio } from '@/components/ds/base';
+import type { Tom } from '@/components/ds/base';
+import { Abas, PainelLateral } from '@/components/ds/interativo';
+import type { CompanyClient, CompanyDashboardData, CompanyTraining } from '@/lib/company-types';
 import { approveClient, createMockClient, deleteClient, resetUserPassword, saveClientAddress, setClientUsername, updateClient } from '@/lib/mock-company-database';
 import { limparDigitacaoSigla, SIGLA_REGRA, sugerirSigla } from '@/lib/sigla';
 import { limparDigitacaoUsuario, USUARIO_REGRA } from '@/lib/usuario';
+import { cn } from '@/lib/utils';
+import { whatsappLink } from '@/lib/whatsapp';
 
-type Aba = 'lista' | 'criar';
-
-type Draft = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string; username: string; shortCode: string };
-const emptyDraft: Draft = { name: '', legalName: '', document: '', unit: '', contactName: '', contactEmail: '', contactPhone: '', username: '', shortCode: '' };
-
-type EnderecoDraft = { address: string; district: string; city: string; state: string; postalCode: string };
+type Notify = (message: string) => void;
+type Reload = () => Promise<void>;
 
 /** Só dígitos: o CNPJ é digitado com e sem pontuação, e as duas têm de achar. */
-function digitos(value: string) {
-  return (value ?? '').replace(/\D/g, '');
+const digitos = (value: string) => (value ?? '').replace(/\D/g, '');
+const enderecoCompleto = (c: CompanyClient) => Boolean(c.address && c.city && c.state);
+const dataLocal = (iso: string) => new Date(`${iso}T12:00:00`);
+const diasAte = (iso: string, hoje: string) => Math.round((dataLocal(iso).getTime() - dataLocal(hoje).getTime()) / 86_400_000);
+const dataBr = (iso: string) => iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '—';
+
+function somarMeses(iso: string, meses: number) {
+  const d = dataLocal(iso);
+  d.setMonth(d.getMonth() + meses);
+  return isoFromDate(d);
 }
 
-function enderecoCompleto(client: CompanyClient) {
-  return Boolean(client.address && client.city && client.state);
+/* ─── Reciclagens e situação ────────────────────────────────────────────── */
+
+type Reciclagem = { training: CompanyTraining; vence: string; dias: number };
+
+/**
+ * Reciclagem prevista: a turma concluída mais recente de cada norma + título,
+ * vencendo no último dia + validade. Sem validade informada não há o que prever.
+ */
+function reciclagensDoCliente(trainings: CompanyTraining[], hoje: string): Reciclagem[] {
+  const ultimaPorCurso = new Map<string, CompanyTraining>();
+  for (const t of trainings) {
+    if (t.status !== 'completed') continue;
+    const chave = `${t.nr}|${t.title}`;
+    const atual = ultimaPorCurso.get(chave);
+    if (!atual || ultimoDia(t) > ultimoDia(atual)) ultimaPorCurso.set(chave, t);
+  }
+  return [...ultimaPorCurso.values()]
+    .filter((t) => (t.validity_months ?? 0) > 0)
+    .map((t) => { const vence = somarMeses(ultimoDia(t), t.validity_months ?? 0); return { training: t, vence, dias: diasAte(vence, hoje) }; })
+    .sort((a, b) => a.vence.localeCompare(b.vence));
 }
 
-function ClientAddress({ client, notify, reload }: { client: CompanyClient; notify: (message: string) => void; reload: () => Promise<void> }) {
-  const [aberto, setAberto] = useState(false);
+function prazo(dias: number): { texto: string; tom: Tom } {
+  if (dias < 0) return { texto: 'Vencida', tom: 'perigo' };
+  const texto = dias === 0 ? 'Hoje' : `Em ${dias} ${dias === 1 ? 'dia' : 'dias'}`;
+  return { texto, tom: dias <= 30 ? 'perigo' : dias <= 60 ? 'atencao' : 'neutro' };
+}
+
+function situacao(client: CompanyClient, reciclagens: Reciclagem[]): { texto: string; tom: Tom } {
+  if (reciclagens.some((r) => r.dias < 0)) return { texto: 'Vencida', tom: 'perigo' };
+  if (client.status === 'pending') return { texto: 'Aguardando', tom: 'atencao' };
+  if (!client.username) return { texto: 'Sem acesso', tom: 'atencao' };
+  return { texto: 'Ativo', tom: 'sucesso' };
+}
+
+/* ─── Formulários (painéis laterais) ────────────────────────────────────── */
+
+type Dados = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string; shortCode: string };
+type Endereco = { address: string; district: string; city: string; state: string; postalCode: string };
+
+/** Sigla do código das turmas: PETZ-JAC vira PETZ-JAC-01, -02... */
+function CampoSigla({ valor, onChange, sugestao, ajuda }: { valor: string; onChange: (valor: string) => void; sugestao?: string; ajuda: string }) {
+  return <Campo rotulo="Sigla (código das turmas)" ajuda={<>{ajuda} Turmas saem como <span className="whitespace-nowrap font-mono">{(valor || sugestao || 'PETZ-JAC').replace(/-$/, '')}-01</span>, -02... {SIGLA_REGRA}</>}>
+    <input value={valor} onChange={(e) => onChange(limparDigitacaoSigla(e.target.value))} placeholder={sugestao || 'ex.: PETZ-JAC'} autoCapitalize="characters" spellCheck={false} maxLength={12} className={cn(campoClasses, 'font-mono')} />
+  </Campo>;
+}
+
+function CamposDoCliente({ draft, setDraft }: { draft: Dados; setDraft: (d: Dados) => void }) {
+  const campo = (chave: keyof Dados, rotulo: string, extra: { type?: string; required?: boolean } = {}) =>
+    <Campo rotulo={rotulo}><input type={extra.type ?? 'text'} required={extra.required ?? true} value={draft[chave]} onChange={(e) => setDraft({ ...draft, [chave]: e.target.value })} className={campoClasses} /></Campo>;
+  return <>
+    {campo('name', 'Nome de exibição')}
+    {campo('legalName', 'Razão social')}
+    {campo('document', 'CNPJ')}
+    {campo('unit', 'Unidade / cidade')}
+    {campo('contactName', 'Responsável na empresa')}
+    {campo('contactEmail', 'E-mail do responsável', { type: 'email' })}
+    {campo('contactPhone', 'Telefone', { required: false })}
+  </>;
+}
+
+function NovoCliente({ aberto, onFechar, notify, reload, aoCriar }: { aberto: boolean; onFechar: () => void; notify: Notify; reload: Reload; aoCriar: (acesso: { username: string; temporaryPassword: string }) => void }) {
+  const vazio: Dados & { username: string } = { name: '', legalName: '', document: '', unit: '', contactName: '', contactEmail: '', contactPhone: '', shortCode: '', username: '' };
+  const [draft, setDraft] = useState(vazio);
   const [salvando, setSalvando] = useState(false);
-  const [draft, setDraft] = useState<EnderecoDraft>({
-    address: client.address ?? '',
-    district: client.district ?? '',
-    city: client.city ?? '',
-    state: client.state ?? '',
-    postalCode: client.postal_code ?? '',
-  });
-
-  const completo = enderecoCompleto(client);
-  const resumo = completo
-    ? `${client.address}${client.district ? ` - ${client.district}` : ''} · ${client.city}/${client.state}`
-    : 'Endereço não preenchido';
-
   async function salvar(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     setSalvando(true);
     try {
-      await saveClientAddress({ clientId: client.id, ...draft });
-      notify('Endereço salvo.');
-      setAberto(false);
+      aoCriar(await createMockClient(draft));
+      setDraft(vazio);
+      onFechar();
+      notify('Cliente cadastrado e acesso temporário gerado.');
       await reload();
-    } catch (error) {
-      notify(error instanceof Error ? error.message : 'Erro ao salvar o endereço.');
-    } finally {
-      setSalvando(false);
-    }
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao cadastrar cliente.'); }
+    finally { setSalvando(false); }
   }
-
-  return <div>
-    <div className="flex flex-wrap items-start justify-between gap-2">
-      <div className="min-w-0">
-        <span className="ds-caps text-ds-amarelo-texto">Endereço da edificação</span>
-        <p className={`mt-1 text-xs ${completo ? 'text-ds-texto-2' : 'font-bold text-ds-perigo'}`}>{resumo}</p>
-        {!completo ? <p className="mt-1 text-[11px] leading-relaxed text-ds-texto-2">Necessário para emitir o atestado de treinamento.</p> : null}
-      </div>
-      <button type="button" onClick={() => setAberto((v) => !v)} className="rounded-md inline-flex h-10 shrink-0 items-center gap-2 border border-ds-borda bg-ds-superficie px-3 ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv">
-        <MapPin className="size-3.5" />{aberto ? 'Fechar' : completo ? 'Editar' : 'Preencher'}
-      </button>
-    </div>
-
-    {aberto ? <form onSubmit={salvar} className="rounded-lg mt-4 grid gap-3 border border-ds-borda bg-ds-superficie p-4 sm:grid-cols-2">
-      <label className="sm:col-span-2" htmlFor={`endereco-${client.id}-logradouro`}><span className="mb-1.5 block ds-caps">Logradouro e número</span><Input id={`endereco-${client.id}-logradouro`} value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} placeholder="Ex.: Rua das Palmeiras, 120" className={fieldClass} /></label>
-      <label htmlFor={`endereco-${client.id}-bairro`}><span className="mb-1.5 block ds-caps">Bairro</span><Input id={`endereco-${client.id}-bairro`} value={draft.district} onChange={(e) => setDraft({ ...draft, district: e.target.value })} placeholder="Ex.: Centro" className={fieldClass} /></label>
-      <label htmlFor={`endereco-${client.id}-cep`}><span className="mb-1.5 block ds-caps">CEP</span><Input id={`endereco-${client.id}-cep`} value={draft.postalCode} onChange={(e) => setDraft({ ...draft, postalCode: e.target.value })} placeholder="Ex.: 01000-000" className={fieldClass} /></label>
-      <label htmlFor={`endereco-${client.id}-municipio`}><span className="mb-1.5 block ds-caps">Município</span><Input id={`endereco-${client.id}-municipio`} value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} placeholder="Ex.: São Paulo" className={fieldClass} /></label>
-      <label htmlFor={`endereco-${client.id}-uf`}><span className="mb-1.5 block ds-caps">UF</span><Input id={`endereco-${client.id}-uf`} value={draft.state} onChange={(e) => setDraft({ ...draft, state: e.target.value.toUpperCase().slice(0, 2) })} placeholder="Ex.: SP" maxLength={2} className={fieldClass} /></label>
-      <Button type="submit" disabled={salvando} className="mt-1 h-11 bg-ds-amarelo ds-botao text-ds-texto hover:bg-[#eab900] sm:col-span-2">
-        {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar endereço
-      </Button>
-    </form> : null}
-  </div>;
+  return <PainelLateral aberto={aberto} onFechar={onFechar} titulo="Novo cliente" subtitulo="O endereço da edificação, que sai no atestado, é preenchido depois na ficha do cliente." largura={520}>
+    <form id="form-novo-cliente" onSubmit={salvar} className="flex flex-col gap-4">
+      <CamposDoCliente draft={draft} setDraft={(d) => setDraft({ ...draft, ...d })} />
+      <Campo rotulo="Nome de usuário (login)" ajuda={USUARIO_REGRA}><input required minLength={3} maxLength={40} value={draft.username} onChange={(e) => setDraft({ ...draft, username: limparDigitacaoUsuario(e.target.value) })} placeholder="ex.: empresaexemplo1" autoCapitalize="none" spellCheck={false} className={cn(campoClasses, 'font-mono')} /></Campo>
+      <CampoSigla valor={draft.shortCode} sugestao={sugerirSigla(draft.name)} onChange={(shortCode) => setDraft({ ...draft, shortCode })} ajuda="Em branco, fica a sugestão tirada do nome." />
+      <Botao type="submit" disabled={salvando} className="w-full">{salvando ? <Loader2 className="animate-spin" /> : <Plus />}Salvar e gerar acesso</Botao>
+    </form>
+  </PainelLateral>;
 }
 
-type DadosCliente = { name: string; legalName: string; document: string; unit: string; contactName: string; contactEmail: string; contactPhone: string; shortCode: string };
-
-/** Sigla do código das turmas: PETZ-JAC vira PETZ-JAC-01, -02... */
-function CampoSigla({ id, valor, onChange, sugestao, ajuda }: { id: string; valor: string; onChange: (valor: string) => void; sugestao?: string; ajuda: string }) {
-  return <label htmlFor={id}>
-    <span className={labelClass}>Sigla (código das turmas)</span>
-    <Input id={id} value={valor} onChange={(e) => onChange(limparDigitacaoSigla(e.target.value))} placeholder={sugestao || 'ex.: PETZ-JAC'} autoCapitalize="characters" spellCheck={false} maxLength={12} className={`${fieldClass} font-mono`} />
-    <span className="mt-1.5 block text-[11px] leading-relaxed text-ds-texto-2">{ajuda} Turmas saem como <span className="whitespace-nowrap font-mono">{(valor || sugestao || 'PETZ-JAC').replace(/-$/, '')}-01</span>, -02... {SIGLA_REGRA}</span>
-  </label>;
-}
-
-/** A gestão edita qualquer dado cadastral da empresa. */
-function ClientEdit({ client, notify, reload }: { client: CompanyClient; notify: (message: string) => void; reload: () => Promise<void> }) {
-  const inicial = (): DadosCliente => ({ name: client.name, legalName: client.legal_name, document: client.document, unit: client.unit, contactName: client.contact_name, contactEmail: client.contact_email, contactPhone: client.contact_phone ?? '', shortCode: client.short_code ?? '' });
-  const [aberto, setAberto] = useState(false);
+function EditarCliente({ client, aberto, onFechar, notify, reload, aoExcluir }: { client: CompanyClient; aberto: boolean; onFechar: () => void; notify: Notify; reload: Reload; aoExcluir: () => void }) {
+  const [draft, setDraft] = useState<Dados>({ name: client.name, legalName: client.legal_name, document: client.document, unit: client.unit, contactName: client.contact_name, contactEmail: client.contact_email, contactPhone: client.contact_phone ?? '', shortCode: client.short_code ?? '' });
+  const [endereco, setEndereco] = useState<Endereco>({ address: client.address ?? '', district: client.district ?? '', city: client.city ?? '', state: client.state ?? '', postalCode: client.postal_code ?? '' });
   const [salvando, setSalvando] = useState(false);
-  const [draft, setDraft] = useState<DadosCliente>(inicial);
-
   async function salvar(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     setSalvando(true);
     try {
       await updateClient(client.id, draft);
+      await saveClientAddress({ clientId: client.id, ...endereco });
       notify('Dados do cliente salvos.');
-      setAberto(false);
+      onFechar();
       await reload();
-    } catch (error) {
-      notify(error instanceof Error ? error.message : 'Erro ao salvar os dados do cliente.');
-    } finally {
-      setSalvando(false);
-    }
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao salvar os dados do cliente.'); }
+    finally { setSalvando(false); }
   }
-
-  const campo = (chave: keyof DadosCliente, rotulo: string, extra: { type?: string; required?: boolean } = {}) => <label key={chave} htmlFor={`cliente-${client.id}-${chave}`}><span className="mb-1.5 block ds-caps">{rotulo}</span><Input id={`cliente-${client.id}-${chave}`} type={extra.type ?? 'text'} required={extra.required ?? true} value={draft[chave]} onChange={(e) => setDraft({ ...draft, [chave]: e.target.value })} className={fieldClass} /></label>;
-
-  return <div>
-    <div className="flex flex-wrap items-start justify-between gap-2">
-      <div className="min-w-0">
-        <span className="ds-caps text-ds-amarelo-texto">Dados cadastrais</span>
-        <p className="mt-1 text-[11px] leading-relaxed text-ds-texto-2">Razão social e CNPJ saem impressos nos documentos.</p>
-      </div>
-      <button type="button" onClick={() => { setDraft(inicial()); setAberto((v) => !v); }} className="rounded-md inline-flex h-10 shrink-0 items-center gap-2 border border-ds-borda bg-ds-superficie px-3 ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv">
-        <Pencil className="size-3.5" />{aberto ? 'Fechar' : 'Editar dados'}
-      </button>
-    </div>
-
-    {aberto ? <form onSubmit={salvar} className="rounded-lg mt-4 grid gap-3 border border-ds-borda bg-ds-superficie p-4 sm:grid-cols-2">
-      {campo('name', 'Nome de exibição')}
-      {campo('legalName', 'Razão social')}
-      {campo('document', 'CNPJ')}
-      {campo('unit', 'Unidade / cidade')}
-      {campo('contactName', 'Responsável na empresa')}
-      {campo('contactEmail', 'E-mail do responsável (contato)', { type: 'email' })}
-      {campo('contactPhone', 'Telefone', { required: false })}
-      <CampoSigla id={`cliente-${client.id}-sigla`} valor={draft.shortCode} onChange={(shortCode) => setDraft({ ...draft, shortCode })} ajuda="Trocar a sigla só vale para as turmas novas; as que já existem mantêm o código." />
-      <Button type="submit" disabled={salvando} className="mt-1 h-11 bg-ds-amarelo ds-botao text-ds-texto hover:bg-[#eab900] sm:col-span-2">
-        {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar dados
-      </Button>
-    </form> : null}
-  </div>;
-}
-
-/** Login da empresa no portal. Sem ele, ninguém da empresa consegue entrar. */
-function ClientUsername({ client, notify, reload }: { client: CompanyClient; notify: (message: string) => void; reload: () => Promise<void> }) {
-  const [aberto, setAberto] = useState(false);
-  const [salvando, setSalvando] = useState(false);
-  const [valor, setValor] = useState(client.username ?? '');
-
-  async function salvar(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSalvando(true);
-    try {
-      await setClientUsername(client.id, valor);
-      notify('Nome de usuário salvo. Avise a empresa: é com ele que ela entra no portal.');
-      setAberto(false);
-      await reload();
-    } catch (error) {
-      notify(error instanceof Error ? error.message : 'Erro ao salvar o nome de usuário.');
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  return <div>
-    <div className="flex flex-wrap items-start justify-between gap-2">
-      <div className="min-w-0">
-        <span className="ds-caps text-ds-amarelo-texto">Nome de usuário (login)</span>
-        <p className={`mt-1 text-xs ${client.username ? 'font-mono font-bold text-ds-texto' : 'font-bold text-ds-perigo'}`}>{client.username ?? 'Não definido'}</p>
-        {!client.username ? <p className="mt-1 text-[11px] leading-relaxed text-ds-texto-2">Sem ele, a empresa não consegue entrar no portal.</p> : null}
-      </div>
-      <button type="button" onClick={() => setAberto((v) => !v)} className="rounded-md inline-flex h-10 shrink-0 items-center gap-2 border border-ds-borda bg-ds-superficie px-3 ds-botao hover:bg-ds-inverso hover:text-ds-texto-inv">
-        <UserRound className="size-3.5" />{aberto ? 'Fechar' : client.username ? 'Alterar' : 'Definir'}
-      </button>
-    </div>
-
-    {aberto ? <form onSubmit={salvar} className="rounded-lg mt-4 flex flex-col gap-3 border border-ds-borda bg-ds-superficie p-4 sm:flex-row sm:items-start">
-      <label className="flex-1" htmlFor={`usuario-${client.id}`}><span className="mb-1.5 block ds-caps">Nome de usuário</span><Input id={`usuario-${client.id}`} required minLength={3} maxLength={40} value={valor} onChange={(e) => setValor(limparDigitacaoUsuario(e.target.value))} placeholder="ex.: empresaexemplo1" autoCapitalize="none" spellCheck={false} className={`${fieldClass} font-mono`} /><span className="mt-1.5 block text-[11px] leading-relaxed text-ds-texto-2">{USUARIO_REGRA}</span></label>
-      <Button type="submit" disabled={salvando} className="h-11 bg-ds-amarelo px-5 ds-botao text-ds-texto hover:bg-[#eab900] sm:mt-[22px]">
-        {salvando ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}Salvar
-      </Button>
-    </form> : null}
-  </div>;
-}
-
-function ClientRow({ client, turmas, arquivos, inscritos, aberta, alternar, acoes, notify, reload }: {
-  client: CompanyClient;
-  turmas: number;
-  arquivos: number;
-  inscritos: number;
-  aberta: boolean;
-  alternar: () => void;
-  acoes: { approve: () => void; reset: () => void; remove: () => void };
-  notify: (message: string) => void;
-  reload: () => Promise<void>;
-}) {
-  const pendente = client.status === 'pending';
-  const tom = pendente ? 'bg-ds-amarelo-suave text-ds-amarelo-texto' : client.status === 'invited' ? 'bg-ds-info-suave text-ds-info' : 'bg-ds-sucesso-suave text-ds-sucesso';
-  const rotulo = pendente ? 'Aguardando' : client.status === 'invited' ? 'Convidado' : 'Ativo';
-  const semEndereco = !enderecoCompleto(client);
-
-  return <article className="border border-ds-borda bg-ds-superficie">
-    <button type="button" onClick={alternar} aria-expanded={aberta} className="flex w-full items-center gap-4 p-4 text-left hover:bg-ds-amarelo-suave">
-      <span className="rounded-md flex size-11 shrink-0 items-center justify-center bg-black text-ds-amarelo"><Building2 className="size-5" /></span>
-      <span className="min-w-0 flex-1">
-        <strong className="block truncate ds-body-s font-semibold">{client.name}</strong>
-        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ds-texto-2">
-          <span className="truncate">{client.document}</span>
-          <span className="truncate">{client.unit}</span>
-          <span>{turmas === 1 ? '1 turma' : `${turmas} turmas`}</span>
-          <span>{inscritos} inscrito(s)</span>
-        </span>
-      </span>
-      {semEndereco ? <span className="hidden shrink-0 items-center gap-1.5 bg-ds-perigo-suave px-2.5 py-1 ds-caps text-ds-perigo md:inline-flex"><TriangleAlert className="size-3.5" />Sem endereço</span> : null}
-      {!client.username ? <span className="hidden shrink-0 items-center gap-1.5 bg-ds-perigo-suave px-2.5 py-1 ds-caps text-ds-perigo md:inline-flex"><TriangleAlert className="size-3.5" />Sem usuário</span> : null}
-      <span className={`shrink-0 px-2.5 py-1 ds-caps ${tom}`}>{rotulo}</span>
-      <ChevronDown className={`size-4 shrink-0 text-ds-texto-2 transition ${aberta ? 'rotate-180' : ''}`} />
-    </button>
-
-    {aberta ? <div className="space-y-5 border-t border-ds-borda bg-ds-muted p-5">
-      <dl className="grid gap-2 text-xs sm:grid-cols-2">
-        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Razão social</dt><dd className="text-right font-bold">{client.legal_name}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Responsável</dt><dd className="text-right font-bold">{client.contact_name}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">E-mail de contato</dt><dd className="break-all text-right font-bold">{client.contact_email}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Telefone</dt><dd className="text-right font-bold">{client.contact_phone || '—'}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Arquivos</dt><dd className="text-right font-bold">{arquivos}</dd></div>
-        <div className="flex justify-between gap-4 border-b border-ds-borda pb-2"><dt className="text-ds-texto-2">Treinamentos</dt><dd className="text-right font-bold">{turmas}</dd></div>
-      </dl>
-      <ClientEdit client={client} notify={notify} reload={reload} />
-      <ClientUsername client={client} notify={notify} reload={reload} />
-      <ClientAddress client={client} notify={notify} reload={reload} />
-      <div className="flex flex-wrap gap-2">
-        {pendente ? <Button type="button" onClick={acoes.approve} className="h-11 bg-ds-amarelo px-4 ds-botao text-ds-texto hover:bg-[#eab900]"><Check className="size-4" />Aprovar acesso</Button> : null}
-        <button type="button" onClick={acoes.reset} className="rounded-md inline-flex h-11 items-center gap-2 border border-ds-borda bg-ds-superficie px-4 ds-botao text-ds-texto-2 hover:border-black hover:bg-ds-inverso hover:text-ds-texto-inv"><KeyRound className="size-3.5" />Redefinir senha</button>
-        <button type="button" onClick={acoes.remove} className="rounded-md ml-auto inline-flex h-11 items-center gap-2 border border-ds-perigo bg-ds-superficie px-4 ds-botao text-ds-perigo hover:bg-ds-perigo hover:text-ds-texto-inv"><Trash2 className="size-3.5" />Excluir</button>
-      </div>
-    </div> : null}
-  </article>;
-}
-
-export function CompanyClients({ data, reload, notify }: { data: CompanyDashboardData; reload: () => Promise<void>; notify: (message: string) => void }) {
-  const [aba, setAba] = useState<Aba>('lista');
-  const [query, setQuery] = useState('');
-  const [filtro, setFiltro] = useState<'todos' | 'pending' | 'active' | 'sem_endereco' | 'sem_usuario'>('todos');
-  const [aberta, setAberta] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
-  const [createdAccess, setCreatedAccess] = useState<{ username: string; temporaryPassword: string } | null>(null);
-  const [resetAccess, setResetAccess] = useState<{ name: string; username: string | null; temporaryPassword: string; active: boolean } | null>(null);
-
-  const alvo = query.trim().toLowerCase();
-  const alvoDigitos = digitos(query);
-  const filtered = useMemo(() => data.clients.filter((client) => {
-    const casa = !alvo
-      || `${client.name} ${client.legal_name} ${client.contact_email} ${client.username ?? ''}`.toLowerCase().includes(alvo)
-      || (alvoDigitos.length > 0 && digitos(client.document).includes(alvoDigitos));
-    if (!casa) return false;
-    if (filtro === 'sem_endereco') return !enderecoCompleto(client);
-    if (filtro === 'sem_usuario') return !client.username;
-    if (filtro === 'todos') return true;
-    return client.status === filtro;
-  }), [data.clients, alvo, alvoDigitos, filtro]);
-
-  const semEndereco = data.clients.filter((client) => !enderecoCompleto(client)).length;
-  const semUsuario = data.clients.filter((client) => !client.username).length;
-
-  async function save(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    try {
-      const access = await createMockClient(draft);
-      setCreatedAccess(access);
-      setDraft(emptyDraft);
-      setAba('lista');
-      notify('Cliente cadastrado e acesso temporário gerado.');
-      await reload();
-    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao cadastrar cliente.'); }
-  }
-
-  async function approve(id: string) {
-    try { await approveClient(id); notify('Acesso do cliente aprovado.'); await reload(); }
-    catch (error) { notify(error instanceof Error ? error.message : 'Erro ao aprovar o cliente.'); }
-  }
-
-  async function remove(client: { id: string; name: string }) {
+  async function excluir() {
     if (!window.confirm(`Excluir "${client.name}" e TODOS os seus treinamentos, participantes e arquivos? Esta ação não pode ser desfeita.`)) return;
-    try { await deleteClient(client.id); notify('Cliente excluído.'); await reload(); }
+    try { await deleteClient(client.id); notify('Cliente excluído.'); aoExcluir(); await reload(); }
     catch (error) { notify(error instanceof Error ? error.message : 'Erro ao excluir o cliente.'); }
   }
+  const campoEnd = (chave: keyof Endereco, rotulo: string, extra: { placeholder?: string; max?: number } = {}) =>
+    <Campo rotulo={rotulo}><input value={endereco[chave]} maxLength={extra.max} placeholder={extra.placeholder} onChange={(e) => setEndereco({ ...endereco, [chave]: chave === 'state' ? e.target.value.toUpperCase().slice(0, 2) : e.target.value })} className={campoClasses} /></Campo>;
+  return <PainelLateral aberto={aberto} onFechar={onFechar} sobretitulo={client.short_code || undefined} titulo="Editar cliente" subtitulo="Razão social, CNPJ e endereço saem impressos nos documentos." largura={520}
+    acoes={<><Botao type="submit" form="form-editar-cliente" disabled={salvando} className="flex-1">{salvando ? <Loader2 className="animate-spin" /> : <Check />}Salvar</Botao><Botao tipo="fantasma" onClick={() => void excluir()} className="text-ds-perigo"><Trash2 />Excluir cliente</Botao></>}>
+    <form id="form-editar-cliente" onSubmit={salvar} className="flex flex-col gap-4">
+      <CamposDoCliente draft={draft} setDraft={setDraft} />
+      <CampoSigla valor={draft.shortCode} onChange={(shortCode) => setDraft({ ...draft, shortCode })} ajuda="Trocar a sigla só vale para as turmas novas; as que já existem mantêm o código." />
+      <h3 className="mt-2 ds-caps text-ds-texto-2">Endereço da edificação (sai no atestado)</h3>
+      {campoEnd('address', 'Logradouro e número', { placeholder: 'Ex.: Rua das Palmeiras, 120' })}
+      <div className="grid gap-4 sm:grid-cols-2">{campoEnd('district', 'Bairro')}{campoEnd('postalCode', 'CEP', { placeholder: '01000-000' })}</div>
+      <div className="grid gap-4 sm:grid-cols-[1fr_96px]">{campoEnd('city', 'Município')}{campoEnd('state', 'UF', { placeholder: 'SP', max: 2 })}</div>
+    </form>
+  </PainelLateral>;
+}
 
-  async function resetPassword(client: { id: string; name: string }) {
+/* ─── Ficha do cliente (Figma "Equipe · Ficha do cliente", 80:1545) ─────── */
+
+type AbaFicha = 'resumo' | 'turmas' | 'participantes' | 'acesso';
+
+function FichaDoCliente({ client, data, hoje, agora, reload, notify, navegar, voltar }: { client: CompanyClient; data: CompanyDashboardData; hoje: string; agora: number; reload: Reload; notify: Notify; navegar: NavegarEquipe; voltar: () => void }) {
+  const [aba, setAba] = useState<AbaFicha>('resumo');
+  const [editando, setEditando] = useState(false);
+  const [usuario, setUsuario] = useState(client.username ?? '');
+  const [salvandoUsuario, setSalvandoUsuario] = useState(false);
+  const [senhaNova, setSenhaNova] = useState<{ username: string | null; temporaryPassword: string; active: boolean } | null>(null);
+
+  const turmas = useMemo(() => data.trainings.filter((t) => t.client_id === client.id).sort((a, b) => ultimoDia(b).localeCompare(ultimoDia(a))), [data.trainings, client.id]);
+  const participantes = useMemo(() => { const ids = new Set(turmas.map((t) => t.id)); return data.participants.filter((p) => ids.has(p.training_id)); }, [data.participants, turmas]);
+  const reciclagens = useMemo(() => reciclagensDoCliente(turmas, hoje), [turmas, hoje]);
+  const ano = hoje.slice(0, 4);
+
+  const numeros = useMemo(() => {
+    const doAno = turmas.filter((t) => ultimoDia(t).startsWith(ano));
+    const normas = new Set(doAno.map((t) => t.nr)).size;
+    const certificadas = turmas.filter((t) => t.status === 'completed' && t.certificate_generated_at);
+    const venceDe = (t: CompanyTraining) => (t.validity_months ?? 0) > 0 ? somarMeses(ultimoDia(t), t.validity_months ?? 0) : null;
+    const validas = certificadas.filter((t) => { const v = venceDe(t); return !v || v >= hoje; });
+    const em90 = validas.filter((t) => { const v = venceDe(t); return v && diasAte(v, hoje) <= 90; }).reduce((s, t) => s + t.participant_count, 0);
+    const ultima = turmas.find((t) => ultimoDia(t) <= hoje) ?? turmas[turmas.length - 1];
+    return {
+      treinados: doAno.reduce((s, t) => s + t.participant_count, 0),
+      normas,
+      validos: validas.reduce((s, t) => s + t.participant_count, 0),
+      em90,
+      ultima,
+    };
+  }, [turmas, ano, hoje]);
+
+  const desde = client.created_at ? `${client.created_at.slice(5, 7)}/${client.created_at.slice(0, 4)}` : '';
+  const zap = whatsappLink(client.contact_phone ?? '', `Olá, ${client.contact_name.split(' ')[0]}! Aqui é da Space Light Engenharia.`);
+  const pendencias = useMemo(() => pendenciasDaEquipe(data, hoje, agora), [data, hoje, agora]);
+
+  async function salvarUsuario(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSalvandoUsuario(true);
+    try { await setClientUsername(client.id, usuario); notify('Nome de usuário salvo. Avise a empresa: é com ele que ela entra no portal.'); await reload(); }
+    catch (error) { notify(error instanceof Error ? error.message : 'Erro ao salvar o nome de usuário.'); }
+    finally { setSalvandoUsuario(false); }
+  }
+  async function aprovar() {
+    try { await approveClient(client.id); notify('Acesso do cliente aprovado.'); await reload(); }
+    catch (error) { notify(error instanceof Error ? error.message : 'Erro ao aprovar o cliente.'); }
+  }
+  async function novaSenha() {
     if (!window.confirm(`Gerar uma nova senha temporária para "${client.name}"? A senha atual deixa de funcionar imediatamente.`)) return;
-    try { setResetAccess(await resetUserPassword({ clientId: client.id })); notify('Senha temporária gerada.'); }
+    try { setSenhaNova(await resetUserPassword({ clientId: client.id })); notify('Senha temporária gerada.'); }
     catch (error) { notify(error instanceof Error ? error.message : 'Erro ao redefinir a senha.'); }
   }
 
-  return <div className="space-y-6">
-    <SubTabs label="Seções de clientes" active={aba} onChange={setAba} tabs={[
-      { id: 'lista', label: 'Clientes', count: data.clients.length },
-      { id: 'criar', label: 'Cadastrar' },
+  return <div className="flex flex-col gap-5">
+    <button type="button" onClick={voltar} className={botaoClasses('link', 'P', 'w-fit min-h-0 gap-1.5 py-0 text-ds-texto-2 [&_svg]:size-4')}><ArrowLeft />Clientes</button>
+    <BarraSuperior
+      titulo={client.name}
+      subtitulo={[`CNPJ ${client.document}`, client.unit, desde ? `cliente desde ${desde}` : ''].filter(Boolean).join(' · ')}
+      acoes={<><Botao tipo="secundario" onClick={() => setEditando(true)}>Editar</Botao><Botao onClick={() => navegar('trainings', undefined, 'criar', { clienteId: client.id })}>Nova turma<Plus /></Botao></>}
+      notificacoes={<SinoEquipe pendencias={pendencias} navegar={navegar} />}
+    />
+
+    <Abas rotulo="Seções do cliente" ativa={aba} onChange={setAba} abas={[
+      { id: 'resumo', rotulo: 'Resumo' },
+      { id: 'turmas', rotulo: 'Turmas', contador: turmas.length },
+      { id: 'participantes', rotulo: 'Participantes', contador: participantes.length },
+      { id: 'acesso', rotulo: 'Pessoas com acesso', contador: client.username ? 1 : 0 },
     ]} />
 
-    {createdAccess ? <AccessCredentials eyebrow="Envie ao cliente" note="Esta senha temporária aparece somente agora. O cliente deverá trocá-la no primeiro acesso." loginLabel="Nome de usuário" email={createdAccess.username} password={createdAccess.temporaryPassword} onDismiss={() => setCreatedAccess(null)} /> : null}
-    {resetAccess ? <AccessCredentials eyebrow={`Nova senha de ${resetAccess.name}`} note={resetAccess.active ? 'Anote agora: a senha aparece somente desta vez. A senha antiga já não funciona e, no próximo acesso, o cliente terá de criar uma nova.' : 'Anote agora: a senha aparece somente desta vez. Atenção: este acesso ainda está inativo — aprove o cliente para ele conseguir entrar.'} loginLabel="Nome de usuário" email={resetAccess.username ?? 'Não definido — defina antes de enviar'} password={resetAccess.temporaryPassword} onDismiss={() => setResetAccess(null)} /> : null}
-
-    {aba === 'lista' ? <>
-      {semUsuario > 0 ? <button type="button" onClick={() => setFiltro('sem_usuario')} className="flex w-full items-center gap-3 border-l-4 border-ds-perigo bg-ds-perigo-suave p-4 text-left hover:bg-ds-perigo-suave">
-        <TriangleAlert className="size-5 shrink-0 text-ds-perigo" />
-        <span className="text-xs font-bold text-ds-perigo">{semUsuario === 1 ? '1 cliente está sem nome de usuário' : `${semUsuario} clientes estão sem nome de usuário`} — sem ele a empresa não consegue entrar no portal. Ver quais →</span>
-      </button> : null}
-
-      {semEndereco > 0 ? <button type="button" onClick={() => setFiltro('sem_endereco')} className="flex w-full items-center gap-3 border-l-4 border-ds-perigo bg-ds-perigo-suave p-4 text-left hover:bg-ds-perigo-suave">
-        <TriangleAlert className="size-5 shrink-0 text-ds-perigo" />
-        <span className="text-xs font-bold text-ds-perigo">{semEndereco === 1 ? '1 cliente está sem endereço da edificação' : `${semEndereco} clientes estão sem endereço da edificação`} — sem ele o atestado sai incompleto. Ver quais →</span>
-      </button> : null}
-
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1"><Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ds-texto-2" /><Input aria-label="Buscar cliente ou CNPJ" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nome, usuário, CNPJ ou e-mail" className={`${fieldClass} pl-11`} /></div>
-        <label className="sm:w-60" htmlFor="clientes-filtro"><span className="sr-only">Filtrar clientes</span>
-          <select id="clientes-filtro" value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)} className={selectClass}>
-            <option value="todos">Todos</option>
-            <option value="active">Ativos</option>
-            <option value="pending">Aguardando aprovação</option>
-            <option value="sem_endereco">Sem endereço</option>
-            <option value="sem_usuario">Sem nome de usuário</option>
-          </select>
-        </label>
+    {aba === 'resumo' ? <>
+      {!enderecoCompleto(client) ? <Faixa tom="perigo" titulo="Endereço da edificação não preenchido" acao={<Botao tamanho="P" tipo="escuro" onClick={() => setEditando(true)}>Preencher</Botao>}>Sem ele, o atestado de treinamento sai incompleto.</Faixa> : null}
+      {!client.username ? <Faixa tom="atencao" titulo="Sem nome de usuário" acao={<Botao tamanho="P" tipo="escuro" onClick={() => setAba('acesso')}>Definir</Botao>}>Sem ele, a empresa não consegue entrar no portal.</Faixa> : null}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Indicador rotulo={`Treinados em ${ano}`} valor={numeros.treinados} apoio={numeros.normas ? `em ${numeros.normas} ${numeros.normas === 1 ? 'norma' : 'normas'}` : 'nenhuma turma no ano'} />
+        <Indicador rotulo="Certificados válidos" valor={numeros.validos} apoio={numeros.em90 ? `${numeros.em90} vencem em 90 dias` : 'nenhum vence em 90 dias'} />
+        <Indicador rotulo="Última turma" valor={numeros.ultima ? formatDayMonth(ultimoDia(numeros.ultima)) : '—'} apoio={numeros.ultima ? `${numeros.ultima.nr} · ${numeros.ultima.internal_label || numeros.ultima.title}` : 'nenhuma turma ainda'} />
       </div>
-
-      <div className="space-y-3">{filtered.map((client) => {
-        const turmas = data.trainings.filter((item) => item.client_id === client.id);
-        return <ClientRow key={client.id} client={client} notify={notify} reload={reload}
-          turmas={turmas.length}
-          arquivos={data.files.filter((item) => item.client_id === client.id).length}
-          inscritos={turmas.reduce((soma, item) => soma + item.participant_count, 0)}
-          aberta={aberta === client.id} alternar={() => setAberta((atual) => (atual === client.id ? null : client.id))}
-          acoes={{
-            approve: () => void approve(client.id),
-            reset: () => void resetPassword({ id: client.id, name: client.name }),
-            remove: () => void remove({ id: client.id, name: client.name }),
-          }} />;
-      })}</div>
-      {filtered.length === 0 ? <EmptyState icon={Building2} title="Nenhum cliente encontrado" text="Ajuste a busca ou cadastre uma nova empresa na aba Cadastrar." /> : null}
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+        <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-ds-superficie">
+          <div className="border-b border-ds-borda px-5 py-4"><h2 className="ds-h4">Reciclagens previstas</h2></div>
+          {reciclagens.length ? reciclagens.map((r) => {
+            const p = prazo(r.dias);
+            return <div key={r.training.id} className="flex items-center gap-3 border-b border-ds-borda px-5 py-3.5 last:border-b-0">
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate ds-body-s font-medium">{r.training.nr} · {r.training.title}</span>
+                <span className="truncate ds-caption text-ds-texto-2">{r.training.participant_count} {r.training.participant_count === 1 ? 'pessoa' : 'pessoas'} · vence {dataBr(r.vence)}</span>
+              </div>
+              <Tag tom={p.tom} className="shrink-0">{p.texto}</Tag>
+              <Botao tipo="secundario" onClick={() => navegar('trainings', undefined, 'criar', { clienteId: client.id, nr: r.training.nr })}>Agendar</Botao>
+            </div>;
+          }) : <p className="px-5 py-4 ds-body-s text-ds-texto-2">Nenhuma reciclagem prevista. A previsão sai da validade informada em cada turma concluída.</p>}
+        </section>
+        <section className="flex w-full shrink-0 flex-col overflow-hidden rounded-lg bg-ds-superficie lg:w-[340px]">
+          <div className="border-b border-ds-borda px-5 py-4"><h2 className="ds-h4">Contatos</h2></div>
+          <div className="flex items-center gap-3 px-5 py-3">
+            <Avatar nome={client.contact_name || client.name} />
+            <div className="flex min-w-0 flex-1 flex-col gap-px">
+              <span className="truncate ds-body-s font-medium">{client.contact_name}</span>
+              <span className="truncate ds-caption text-ds-texto-2">{[client.contact_email, client.contact_phone].filter(Boolean).join(' · ')}</span>
+            </div>
+            <a href={zap ?? `mailto:${client.contact_email}`} target="_blank" rel="noreferrer" aria-label={zap ? `WhatsApp de ${client.contact_name}` : `E-mail para ${client.contact_name}`} className="rounded-md p-1 text-ds-texto hover:bg-ds-muted ds-foco"><MessageCircle className="size-[18px]" /></a>
+          </div>
+        </section>
+      </div>
     </> : null}
 
-    {aba === 'criar' ? <form onSubmit={save} className="rounded-lg max-w-3xl border border-ds-borda bg-ds-superficie p-6 md:p-8">
-      <span className="eyebrow text-ds-amarelo-texto">Cadastro corporativo</span>
-      <h2 className="mt-2 ds-h4">Novo cliente</h2>
-      <p className="mt-3 max-w-xl text-xs leading-relaxed text-ds-texto-2">O endereço da edificação é preenchido depois, na própria lista — é ele que sai impresso no atestado de treinamento.</p>
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <label htmlFor="cliente-nome"><span className={labelClass}>Nome de exibição</span><Input id="cliente-nome" required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className={fieldClass} /></label>
-        <label htmlFor="cliente-razao"><span className={labelClass}>Razão social</span><Input id="cliente-razao" required value={draft.legalName} onChange={(e) => setDraft({ ...draft, legalName: e.target.value })} className={fieldClass} /></label>
-        <label htmlFor="cliente-cnpj"><span className={labelClass}>CNPJ</span><Input id="cliente-cnpj" required value={draft.document} onChange={(e) => setDraft({ ...draft, document: e.target.value })} className={fieldClass} /></label>
-        <label htmlFor="cliente-unidade"><span className={labelClass}>Unidade / cidade</span><Input id="cliente-unidade" required value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} className={fieldClass} /></label>
-        <label htmlFor="cliente-responsavel"><span className={labelClass}>Responsável na empresa</span><Input id="cliente-responsavel" required value={draft.contactName} onChange={(e) => setDraft({ ...draft, contactName: e.target.value })} className={fieldClass} /></label>
-        <label htmlFor="cliente-email"><span className={labelClass}>E-mail do responsável (contato)</span><Input id="cliente-email" required type="email" value={draft.contactEmail} onChange={(e) => setDraft({ ...draft, contactEmail: e.target.value })} className={fieldClass} /></label>
-        <label htmlFor="cliente-usuario"><span className={labelClass}>Nome de usuário (login)</span><Input id="cliente-usuario" required minLength={3} maxLength={40} value={draft.username} onChange={(e) => setDraft({ ...draft, username: limparDigitacaoUsuario(e.target.value) })} placeholder="ex.: empresaexemplo1" autoCapitalize="none" spellCheck={false} className={`${fieldClass} font-mono`} /><span className="mt-1.5 block text-[11px] leading-relaxed text-ds-texto-2">{USUARIO_REGRA}</span></label>
-        <label htmlFor="cliente-telefone"><span className={labelClass}>Telefone</span><Input id="cliente-telefone" value={draft.contactPhone} onChange={(e) => setDraft({ ...draft, contactPhone: e.target.value })} className={fieldClass} /></label>
-        <CampoSigla id="cliente-sigla" valor={draft.shortCode} sugestao={sugerirSigla(draft.name)} onChange={(shortCode) => setDraft({ ...draft, shortCode })} ajuda="Em branco, fica a sugestão tirada do nome." />
-      </div>
-      <Button type="submit" className="mt-6 h-12 bg-ds-amarelo px-8 ds-botao text-ds-texto hover:bg-[#eab900]"><Plus className="size-4" />Salvar e gerar acesso</Button>
-    </form> : null}
+    {aba === 'turmas' ? turmas.length ? <div className={tb.moldura}><div className={tb.rolagem}><table className={cn(tb.tabela, 'min-w-[640px]')}>
+      <thead className={tb.cabeca}><tr><th className={tb.th}>Turma</th><th className={tb.th}>Treinamento</th><th className={tb.th}>Data</th><th className={tb.th}>Pessoas</th><th className={tb.th}>Situação</th></tr></thead>
+      <tbody>{turmas.map((t) => <tr key={t.id} onClick={() => navegar('trainings', t.id)} className={cn(tb.linha, tb.linhaClicavel)}>
+        <td className={tb.td}><span className={tb.codigo}>{t.code}</span></td>
+        <td className={cn(tb.td, 'w-full max-w-0')}><span className="block truncate font-medium">{t.nr} · {t.internal_label || t.title}</span></td>
+        <td className={cn(tb.td, 'whitespace-nowrap')}>{dataBr(ultimoDia(t))}</td>
+        <td className={tb.td}>{t.participant_count}</td>
+        <td className={tb.td}><Tag tom={t.status === 'completed' ? 'sucesso' : t.status === 'in_progress' ? 'info' : 'neutro'}>{t.status === 'completed' ? 'Concluída' : t.status === 'in_progress' ? 'Em andamento' : 'Agendada'}</Tag></td>
+      </tr>)}</tbody>
+    </table></div></div> : <Vazio icone={<Building2 />} titulo="Nenhuma turma ainda" texto="Crie a primeira em Nova turma." /> : null}
+
+    {aba === 'participantes' ? participantes.length ? <div className={tb.moldura}><div className={tb.rolagem}><table className={cn(tb.tabela, 'min-w-[640px]')}>
+      <thead className={tb.cabeca}><tr><th className={tb.th}>Participante</th><th className={tb.th}>CPF</th><th className={tb.th}>Turma</th></tr></thead>
+      <tbody>{participantes.map((p) => { const t = turmas.find((x) => x.id === p.training_id); return <tr key={p.id} onClick={() => navegar('trainings', p.training_id)} className={cn(tb.linha, tb.linhaClicavel)}>
+        <td className={cn(tb.td, 'w-full max-w-0')}><span className="block truncate font-medium">{p.full_name}</span></td>
+        <td className={cn(tb.td, 'whitespace-nowrap')}><span className={tb.codigo}>{p.document_id}</span></td>
+        <td className={cn(tb.td, 'whitespace-nowrap')}>{t ? `${t.code} · ${t.nr}` : '—'}</td>
+      </tr>; })}</tbody>
+    </table></div></div> : <Vazio icone={<Building2 />} titulo="Nenhum participante ainda" texto="Os participantes entram pelo QR de cada turma." /> : null}
+
+    {aba === 'acesso' ? <div className="flex flex-col gap-4">
+      {senhaNova ? <AccessCredentials eyebrow={`Nova senha de ${client.name}`} note={senhaNova.active ? 'Anote agora: a senha aparece somente desta vez. A senha antiga já não funciona e, no próximo acesso, o cliente terá de criar uma nova.' : 'Anote agora: a senha aparece somente desta vez. Atenção: este acesso ainda está inativo — aprove o cliente para ele conseguir entrar.'} loginLabel="Nome de usuário" email={senhaNova.username ?? 'Não definido — defina antes de enviar'} password={senhaNova.temporaryPassword} onDismiss={() => setSenhaNova(null)} /> : null}
+      <section className="flex flex-col overflow-hidden rounded-lg bg-ds-superficie">
+        <div className="flex items-center gap-3 border-b border-ds-borda px-5 py-4">
+          <h2 className="min-w-0 flex-1 ds-h4">Acesso da empresa ao portal</h2>
+          <Tag tom={client.status === 'pending' ? 'atencao' : client.username ? 'sucesso' : 'atencao'}>{client.status === 'pending' ? 'Aguardando aprovação' : client.username ? 'Ativo' : 'Sem acesso'}</Tag>
+        </div>
+        <form onSubmit={salvarUsuario} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-end">
+          <Campo rotulo="Nome de usuário (login)" ajuda={USUARIO_REGRA} className="flex-1"><input required minLength={3} maxLength={40} value={usuario} onChange={(e) => setUsuario(limparDigitacaoUsuario(e.target.value))} placeholder="ex.: empresaexemplo1" autoCapitalize="none" spellCheck={false} className={cn(campoClasses, 'font-mono')} /></Campo>
+          <Botao type="submit" tipo="secundario" disabled={salvandoUsuario || usuario === (client.username ?? '')} className="sm:mb-6">{salvandoUsuario ? <Loader2 className="animate-spin" /> : <Check />}Salvar</Botao>
+        </form>
+        <div className="flex flex-wrap gap-2.5 border-t border-ds-borda px-5 py-4">
+          {client.status === 'pending' ? <Botao onClick={() => void aprovar()}><Check />Aprovar acesso</Botao> : null}
+          <Botao tipo="secundario" onClick={() => void novaSenha()}><KeyRound />Gerar nova senha</Botao>
+        </div>
+      </section>
+    </div> : null}
+
+    <EditarCliente key={`${client.id}-${editando}`} client={client} aberto={editando} onFechar={() => setEditando(false)} notify={notify} reload={reload} aoExcluir={voltar} />
   </div>;
 }
+
+/* ─── Lista (Figma "Equipe · Clientes", 80:1179) ────────────────────────── */
+
+function Filtro({ rotulo, valor, onChange, opcoes }: { rotulo: string; valor: string; onChange: (v: string) => void; opcoes: Array<{ valor: string; texto: string }> }) {
+  return <label className="relative inline-flex shrink-0">
+    <span className="sr-only">{rotulo}</span>
+    <select value={valor} onChange={(e) => onChange(e.target.value)} className="h-10 appearance-none rounded-md border border-ds-borda bg-ds-superficie py-2 pr-9 pl-3 font-ds-sans text-sm leading-5 font-medium text-ds-texto ds-foco">
+      {opcoes.map((o) => <option key={o.valor} value={o.valor}>{rotulo}: {o.texto}</option>)}
+    </select>
+    <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-3.5 -translate-y-1/2" />
+  </label>;
+}
+
+export function CompanyClients({ data, reload, notify, navegar }: { data: CompanyDashboardData; reload: Reload; notify: Notify; navegar: NavegarEquipe }) {
+  const [agora] = useState(() => Date.now());
+  const hoje = isoFromDate(new Date(agora));
+  const [aberto, setAberto] = useState<string | null>(null);
+  const [novo, setNovo] = useState(false);
+  const [acessoCriado, setAcessoCriado] = useState<{ username: string; temporaryPassword: string } | null>(null);
+  const [busca, setBusca] = useState('');
+  const [norma, setNorma] = useState('todas');
+  const [periodo, setPeriodo] = useState(hoje.slice(0, 4));
+
+  const normas = useMemo(() => [...new Set(data.trainings.map((t) => t.nr))].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true })), [data.trainings]);
+  const anos = useMemo(() => [...new Set([hoje.slice(0, 4), ...data.trainings.map((t) => ultimoDia(t).slice(0, 4))])].sort().reverse(), [data.trainings, hoje]);
+  const pendencias = useMemo(() => pendenciasDaEquipe(data, hoje, agora), [data, hoje, agora]);
+
+  const linhas = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    const numeros = digitos(busca);
+    return data.clients
+      .filter((c) => !termo || `${c.name} ${c.legal_name} ${c.short_code ?? ''} ${c.username ?? ''}`.toLowerCase().includes(termo) || (numeros.length > 0 && digitos(c.document).includes(numeros)))
+      .map((c) => {
+        const todas = data.trainings.filter((t) => t.client_id === c.id);
+        const doFiltro = todas.filter((t) => (periodo === 'todos' || ultimoDia(t).startsWith(periodo)) && (norma === 'todas' || t.nr === norma));
+        const reciclagens = reciclagensDoCliente(todas, hoje);
+        return { client: c, turmas: doFiltro.length, temNorma: norma === 'todas' || todas.some((t) => t.nr === norma), reciclagens, situacao: situacao(c, reciclagens) };
+      })
+      .filter((l) => l.temNorma);
+  }, [data, busca, norma, periodo, hoje]);
+
+  const semEndereco = data.clients.filter((c) => !enderecoCompleto(c)).length;
+  const cliente = aberto ? data.clients.find((c) => c.id === aberto) : null;
+  if (cliente) return <FichaDoCliente key={cliente.id} client={cliente} data={data} hoje={hoje} agora={agora} reload={reload} notify={notify} navegar={navegar} voltar={() => setAberto(null)} />;
+
+  function exportar() {
+    const cab = ['Cliente', 'CNPJ', 'Sigla', 'Unidade', `Turmas ${periodo === 'todos' ? '' : periodo}`.trim(), 'Acesso', 'Próxima reciclagem', 'Situação'];
+    const linhasCsv = linhas.map(({ client: c, turmas, reciclagens, situacao: s }) => [c.name, c.document, c.short_code ?? '', c.unit, String(turmas), c.username ? 'sim' : 'não', reciclagens[0] ? `${reciclagens[0].training.nr} ${dataBr(reciclagens[0].vence)}` : '', s.texto]);
+    const csv = [cab, ...linhasCsv].map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clientes-${hoje}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const proxima = (r: Reciclagem | undefined) => !r ? '—' : r.dias < 0 ? `${r.training.nr} · vencida` : `${r.training.nr} · ${r.dias === 0 ? 'hoje' : `em ${r.dias} ${r.dias === 1 ? 'dia' : 'dias'}`}`;
+
+  return <div className="flex flex-col gap-5">
+    <BarraSuperior titulo="Clientes" subtitulo="Empresas atendidas e o status de cada uma."
+      acoes={<Botao onClick={() => setNovo(true)}>Novo cliente<Plus /></Botao>}
+      notificacoes={<SinoEquipe pendencias={pendencias} navegar={navegar} />} />
+
+    {acessoCriado ? <AccessCredentials eyebrow="Envie ao cliente" note="Esta senha temporária aparece somente agora. O cliente deverá trocá-la no primeiro acesso." loginLabel="Nome de usuário" email={acessoCriado.username} password={acessoCriado.temporaryPassword} onDismiss={() => setAcessoCriado(null)} /> : null}
+    {semEndereco ? <Faixa tom="perigo" titulo={semEndereco === 1 ? '1 cliente sem endereço da edificação' : `${semEndereco} clientes sem endereço da edificação`}>Sem ele, o atestado sai incompleto. Abra o cliente e use Editar.</Faixa> : null}
+
+    <section className="flex flex-col overflow-hidden rounded-lg bg-ds-superficie">
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-ds-borda px-5 py-4">
+        <label className="relative w-full sm:w-[320px]"><Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ds-texto-2" /><input aria-label="Buscar por nome ou CNPJ" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou CNPJ" className={cn(campoClasses, 'min-h-10 py-2.5 pl-10 ds-body-s')} /></label>
+        <Filtro rotulo="Norma" valor={norma} onChange={setNorma} opcoes={[{ valor: 'todas', texto: 'todas' }, ...normas.map((n) => ({ valor: n, texto: n }))]} />
+        <Filtro rotulo="Período" valor={periodo} onChange={setPeriodo} opcoes={[...anos.map((a) => ({ valor: a, texto: a })), { valor: 'todos', texto: 'todos' }]} />
+        <span className="hidden flex-1 sm:block" />
+        <button type="button" onClick={exportar} className="inline-flex h-10 items-center gap-2 rounded-md border border-ds-borda px-3 font-ds-sans text-sm leading-5 font-medium text-ds-texto hover:border-ds-borda-forte ds-foco"><Download className="size-4" />Exportar</button>
+      </div>
+      {linhas.length ? <div className={tb.rolagem}><table className={cn(tb.tabela, 'min-w-[900px] table-fixed')}>
+        <thead className={tb.cabeca}><tr>
+          <th className={cn(tb.th, 'pl-5 first:pl-5')}>Cliente</th>
+          <th className={cn(tb.th, 'w-[160px]')}>Unidade</th>
+          <th className={cn(tb.th, 'w-[130px]')}>Turmas {periodo === 'todos' ? '' : periodo}</th>
+          <th className={cn(tb.th, 'w-[100px]')}>Acessos</th>
+          <th className={cn(tb.th, 'w-[190px]')}>Próxima reciclagem</th>
+          <th className={cn(tb.th, 'w-[150px] pr-5 last:pr-5')}>Situação</th>
+        </tr></thead>
+        <tbody>{linhas.map(({ client: c, turmas, reciclagens, situacao: s }) => <tr key={c.id} onClick={() => setAberto(c.id)} className={cn(tb.linha, tb.linhaClicavel)}>
+          <td className={cn(tb.td, 'py-3 pl-5 first:pl-5')}>
+            <button type="button" aria-label={`Abrir ${c.name}`} onClick={(e) => { e.stopPropagation(); setAberto(c.id); }} className="flex w-full min-w-0 items-center gap-3 text-left ds-foco">
+              <span className="flex shrink-0 rounded-lg bg-ds-muted p-2"><Building2 className="size-4" /></span>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate ds-body-s font-medium">{c.name}</span>
+                <span className="truncate ds-mono text-ds-texto-2">{c.document}</span>
+              </span>
+            </button>
+          </td>
+          <td className={cn(tb.td, 'truncate py-3')}>{c.unit || '—'}</td>
+          <td className={cn(tb.td, 'py-3')}>{turmas}</td>
+          <td className={cn(tb.td, 'py-3')}>{c.username ? 1 : 0}</td>
+          <td className={cn(tb.td, 'truncate py-3')}>{proxima(reciclagens[0])}</td>
+          <td className={cn(tb.td, 'py-3 pr-5 last:pr-5')}><Tag tom={s.tom}>{s.texto}</Tag></td>
+        </tr>)}</tbody>
+      </table></div> : <p className="px-5 py-6 ds-body-s text-ds-texto-2">Nenhum cliente encontrado. Ajuste a busca ou os filtros.</p>}
+    </section>
+
+    <NovoCliente aberto={novo} onFechar={() => setNovo(false)} notify={notify} reload={reload} aoCriar={setAcessoCriado} />
+  </div>;
+}
+

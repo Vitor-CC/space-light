@@ -10,7 +10,9 @@ import { BotaoIcone, campoClasses } from '@/components/ds/base';
 import type { CompanyDashboardData, CompanyTraining } from '@/lib/company-types';
 import { cn } from '@/lib/utils';
 
-export type NavegarEquipe = (section: CompanySection, trainingId?: string, vista?: 'agenda' | 'criar') => void;
+/** Turma nova já com cliente (e norma) escolhidos: vem da ficha do cliente. */
+export type NovaTurmaPreset = { clienteId?: string; nr?: string };
+export type NavegarEquipe = (section: CompanySection, trainingId?: string, vista?: 'agenda' | 'criar', preset?: NovaTurmaPreset) => void;
 
 /** "Rafael Souza" → "Rafael S.", como o Figma escreve o instrutor. */
 export function nomeCurto(nome: string | null | undefined) {

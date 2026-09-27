@@ -12,6 +12,7 @@ import { CompanyParticipants } from '@/components/company-portal/company-partici
 import { CompanyRequests, solicitacoesAbertas } from '@/components/company-portal/company-requests';
 import { CompanySettings } from '@/components/company-portal/company-settings';
 import { CompanyTrainings } from '@/components/company-portal/company-trainings';
+import type { NovaTurmaPreset } from '@/components/company-portal/company-topo';
 import { SectionHeading } from '@/components/company-portal/company-ui';
 import type { CompanySection } from '@/components/company-portal/company-ui';
 import { BotaoIcone } from '@/components/ds/base';
@@ -20,23 +21,25 @@ import type { CompanyDashboardData } from '@/lib/company-types';
 import { readMockCompanyDatabase } from '@/lib/mock-company-database';
 
 /** Seções que desenham o próprio cabeçalho (as demais usam o SectionHeading). */
-const COM_CABECALHO_PROPRIO: CompanySection[] = ['dashboard', 'trainings', 'certificates', 'requests', 'settings'];
+const COM_CABECALHO_PROPRIO: CompanySection[] = ['dashboard', 'clients', 'trainings', 'certificates', 'requests', 'settings'];
 
 export function CompanyPortal({ initialData }: { initialData: CompanyDashboardData }) {
   const [section, setSection] = useState<CompanySection>('dashboard');
   const [turmaAlvo, setTurmaAlvo] = useState<string | null>(null);
   const [vistaTurmas, setVistaTurmas] = useState<'agenda' | 'criar' | null>(null);
+  const [presetTurma, setPresetTurma] = useState<NovaTurmaPreset | null>(null);
   const [data, setData] = useState<CompanyDashboardData>(initialData);
   const [aviso, setAviso] = useAviso(6000);
   const [atualizando, setAtualizando] = useState(false);
 
   // Ir para uma seção, opcionalmente já abrindo uma turma. Entrar pelo menu
   // limpa o alvo, senão a turma reabriria na próxima visita à seção.
-  const irPara = useCallback((destino: CompanySection, trainingId?: string, vista?: 'agenda' | 'criar') => {
+  const irPara = useCallback((destino: CompanySection, trainingId?: string, vista?: 'agenda' | 'criar', preset?: NovaTurmaPreset) => {
     // Funcionários e Atividade moram em Configurações.
     const alvo = destino === 'team' || destino === 'audit' ? 'settings' : destino;
     setTurmaAlvo(trainingId ?? null);
     setVistaTurmas(vista ?? null);
+    setPresetTurma(preset ?? null);
     setSection(alvo);
     window.scrollTo({ top: 0 });
   }, []);
@@ -62,9 +65,9 @@ export function CompanyPortal({ initialData }: { initialData: CompanyDashboardDa
 
   let conteudo: React.ReactNode = null;
   if (section === 'dashboard') conteudo = <CompanyDashboard data={data} navigate={irPara} />;
-  else if (section === 'clients') conteudo = <CompanyClients data={data} reload={reload} notify={setAviso} />;
+  else if (section === 'clients') conteudo = <CompanyClients data={data} reload={reload} notify={setAviso} navegar={irPara} />;
   else if (section === 'instructors') conteudo = <CompanyInstructors data={data} reload={reload} notify={setAviso} />;
-  else if (section === 'trainings') conteudo = <CompanyTrainings data={data} reload={reload} notify={setAviso} turmaAlvo={turmaAlvo} vistaInicial={vistaTurmas} />;
+  else if (section === 'trainings') conteudo = <CompanyTrainings data={data} reload={reload} notify={setAviso} turmaAlvo={turmaAlvo} vistaInicial={vistaTurmas} presetNova={presetTurma} />;
   else if (section === 'certificates') conteudo = <CompanyCertificates data={data} reload={reload} notify={setAviso} abrirDocumentos={() => irPara('files')} />;
   else if (section === 'files') conteudo = <CompanyFiles data={data} reload={reload} notify={setAviso} />;
   else if (section === 'participants') conteudo = <CompanyParticipants data={data} reload={reload} notify={setAviso} />;

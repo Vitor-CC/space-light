@@ -495,10 +495,12 @@ function ClientPicker({ clients, value, onChange }: { clients: CompanyDashboardD
   </div>;
 }
 
-function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; reload: Reload; notify: Notify; aoCriar: (id: string) => void }) {
+function Criar({ data, reload, notify, aoCriar, preset = null }: { data: CompanyDashboardData; reload: Reload; notify: Notify; aoCriar: (id: string) => void; preset?: { clienteId?: string; nr?: string } | null }) {
   const instrutores = data.instructors.filter((item) => item.status === 'active');
   const [salvando, setSalvando] = useState(false);
-  const [draft, setDraft] = useState<Draft>({ clientId: data.clients[0]?.id || '', nr: 'NR 23', title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: nrInfo('NR 23')?.content ?? '', duration: cargaHorariaPadrao('NR 23'), location: '' });
+  // Vindo da ficha do cliente ("Nova turma" ou "Agendar" uma reciclagem), já chega com cliente e norma.
+  const nrInicial = preset?.nr && nrInfo(preset.nr) ? preset.nr : 'NR 23';
+  const [draft, setDraft] = useState<Draft>({ clientId: preset?.clienteId || data.clients[0]?.id || '', nr: nrInicial, title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: nrInfo(nrInicial)?.content ?? '', duration: cargaHorariaPadrao(nrInicial), location: '' });
 
   function changeNr(nr: string) {
     setDraft((current) => {
@@ -579,7 +581,7 @@ function Criar({ data, reload, notify, aoCriar }: { data: CompanyDashboardData; 
 // Tela de turmas (Figma 18:170)
 // ---------------------------------------------------------------------------
 
-export function CompanyTrainings({ data, reload, notify, turmaAlvo = null, vistaInicial = null }: { data: CompanyDashboardData; reload: Reload; notify: Notify; turmaAlvo?: string | null; vistaInicial?: 'agenda' | 'criar' | null }) {
+export function CompanyTrainings({ data, reload, notify, turmaAlvo = null, vistaInicial = null, presetNova = null }: { data: CompanyDashboardData; reload: Reload; notify: Notify; turmaAlvo?: string | null; vistaInicial?: 'agenda' | 'criar' | null; presetNova?: { clienteId?: string; nr?: string } | null }) {
   const [vista, setVista] = useState<Vista>(vistaInicial ?? 'tabela');
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<Filtro>('todas');
@@ -627,7 +629,7 @@ export function CompanyTrainings({ data, reload, notify, turmaAlvo = null, vista
     {vista === 'criar' ? <div className="flex flex-col gap-4">
       {nova ? <Faixa tom="sucesso" titulo={`Turma criada: ${nova.nr} · ${nova.title}`} acao={<Botao tamanho="P" tipo="escuro" onClick={() => { setAberta(nova.id); setVista('tabela'); setCriada(null); }}>Abrir a ficha</Botao>}>{(nova.sessions ?? []).some((dia) => !dia.instructor_id) ? 'Escale o instrutor de cada dia na ficha da turma; de lá você avisa cada um pelo WhatsApp.' : 'Instrutores escalados. Avise cada um pela ficha da turma.'}</Faixa> : null}
       <button type="button" onClick={() => setVista('tabela')} className={botaoClasses('link', 'P', 'w-fit')}>← Voltar às turmas</button>
-      <Criar data={data} reload={reload} notify={notify} aoCriar={setCriada} />
+      <Criar data={data} reload={reload} notify={notify} aoCriar={setCriada} preset={presetNova} />
     </div> : null}
 
     {vista === 'tabela' ? <>
