@@ -1,8 +1,8 @@
 import { ArrowRight, ArrowUpRight, Calendar, Check, ChevronRight, Download, MapPin, MessageCircle, Plus, Star, User, Users, X } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 
+import { Cabecalho, FotoLegendada, Onda, Resp, Rotulo, miolo, tituloDeSecao } from '@/components/site-novo/blocos';
 import { botao } from '@/components/site-novo/botao';
 import { CardNorma } from '@/components/site-novo/card-norma';
 import { Tag } from '@/components/ds/base';
@@ -23,73 +23,20 @@ import {
   TEXTOS,
 } from '@/lib/site-novo/home';
 import { ETAPAS } from '@/lib/site-novo/metodo';
-import { NORMAS } from '@/lib/site-novo/normas';
+import { NORMAS, NORMA_MAIS_APLICADA } from '@/lib/site-novo/normas';
 import { rotas } from '@/lib/site-novo/rotas';
 import { cn } from '@/lib/utils';
 
 /*
  * Home do Figma ("02 · Site Desktop" e "03 · Site Mobile"). Uma seção por
- * componente, na ordem da página. Medidas: 1440 com margem de 120, 390 com
- * margem de 20.
+ * componente, na ordem da página. As peças comuns ficam em `blocos.tsx`.
  */
-
-const miolo = 'mx-auto w-full max-w-[1440px] px-5 md:px-10 xl:px-[120px]';
-const tituloDeSecao =
-  'font-ds-display text-[26px] leading-8 font-bold tracking-[-0.01em] lg:text-[40px] lg:leading-[46px] lg:tracking-[-0.02em]';
-/** A NR 23 é a mais aplicada: vem em destaque na grade e primeiro na lista do celular. */
-const DESTAQUE = 'nr-23';
-
-/** Texto do celular e do desktop, quando o Figma encurta no celular. */
-function Resp({ curto, longo }: { curto: string; longo: string }) {
-  if (curto === longo) return <>{longo}</>;
-  return <><span className="lg:hidden">{curto}</span><span className="hidden lg:inline">{longo}</span></>;
-}
 
 function Estrelas({ className }: { className?: string }) {
   return <span className={cn('inline-flex items-center gap-0.5 text-ds-amarelo', className)}>
     <span className="sr-only">5 de 5 estrelas</span>
     {[0, 1, 2, 3, 4].map((i) => <Star key={i} className="size-[1em] fill-current" aria-hidden="true" />)}
   </span>;
-}
-
-function Rotulo({ children, escuro = false, className }: { children: ReactNode; escuro?: boolean; className?: string }) {
-  return <p className={cn('ds-caps', escuro ? 'text-ds-amarelo' : 'text-ds-amarelo-texto', className)}>{children}</p>;
-}
-
-/** "Cabeçalho da seção": rótulo e título à esquerda, texto de apoio à direita no desktop. */
-function Cabecalho({ id, rotulo, titulo, apoio, escuro = false, largura = 'lg:w-[640px]', apoioNoCelular = true }: { id?: string; rotulo: string; titulo: ReactNode; apoio?: ReactNode; escuro?: boolean; largura?: string; apoioNoCelular?: boolean }) {
-  return <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:gap-16">
-    <div className={cn('flex flex-col gap-4 lg:shrink-0 lg:gap-5', largura)}>
-      <Rotulo escuro={escuro}>{rotulo}</Rotulo>
-      <h2 id={id} className={cn(tituloDeSecao, escuro ? 'text-ds-texto-inv' : 'text-ds-texto')}>{titulo}</h2>
-    </div>
-    {apoio ? <p className={cn('ds-body-s lg:flex-1 lg:ds-body-m', escuro ? 'text-ds-texto-inv-2' : 'text-ds-texto-2', !apoioNoCelular && 'hidden lg:block')}>{apoio}</p> : null}
-  </div>;
-}
-
-/** Foto com o degradê escuro embaixo e a legenda por cima, como os blocos "FOTO · NR" do Figma. */
-function FotoLegendada({ src, alt, norma, legenda, sizes, className, prioridade = false }: { src: string; alt: string; norma: string; legenda: string; sizes: string; className?: string; prioridade?: boolean }) {
-  return <figure className={cn('relative flex flex-col justify-end overflow-hidden rounded-md bg-[#3b3b3b] p-3.5 lg:p-5', className)}>
-    <Image src={src} alt={alt} fill sizes={sizes} priority={prioridade} className="object-cover" />
-    <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,19,21,0)_35%,rgba(17,19,21,0.9)_100%)]" />
-    <figcaption className="relative flex flex-col gap-1 lg:gap-1.5">
-      <span className="ds-caps text-ds-amarelo">Foto · {norma}</span>
-      <span className="ds-body-s text-ds-texto-inv">{legenda}</span>
-    </figcaption>
-  </figure>;
-}
-
-/** As duas ondas da marca, montadas com as três camadas exportadas do Figma. */
-function Onda({ tipo }: { tipo: 'divisor' | 'cta' }) {
-  const camadas = tipo === 'divisor'
-    ? { altura: 'h-14 lg:h-[120px]', degrade: 'inset-[25.62%_0_0_0]', linha: 'inset-[13.95%_0_25.78%_0]', folga: 'inset-[-1.04%_0]' }
-    : { altura: 'h-12 lg:h-[120px]', degrade: 'inset-[18.75%_0_0_0]', linha: 'inset-[7.08%_0_38.92%_0]', folga: 'inset-[-1.16%_0]' };
-  const base = `/images/branding/onda-${tipo}`;
-  return <div aria-hidden="true" className={cn('relative w-full', camadas.altura)}>
-    <Image src={`${base}-fundo.svg`} alt="" width={1440} height={120} unoptimized className="absolute inset-0 block size-full" />
-    <div className={cn('absolute', camadas.degrade)}><Image src={`${base}-degrade.svg`} alt="" width={1440} height={90} unoptimized className="absolute inset-0 block size-full" /></div>
-    <div className={cn('absolute', camadas.linha)}><div className={cn('absolute', camadas.folga)}><Image src={`${base}-linha.svg`} alt="" width={1440} height={72} unoptimized className="block size-full" /></div></div>
-  </div>;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,14 +92,14 @@ export function Numeros() {
 // ---------------------------------------------------------------------------
 
 export function Treinamentos() {
-  const listaDoCelular = [...NORMAS].sort((a, b) => Number(b.slug === DESTAQUE) - Number(a.slug === DESTAQUE));
+  const listaDoCelular = [...NORMAS].sort((a, b) => Number(b.slug === NORMA_MAIS_APLICADA) - Number(a.slug === NORMA_MAIS_APLICADA));
   return <section id="treinamentos" aria-labelledby="treinamentos-titulo" className="scroll-mt-header bg-ds-superficie text-ds-texto">
     <div className={cn(miolo, 'flex flex-col gap-4 pt-14 pb-12 lg:gap-14 lg:py-32')}>
       <Cabecalho id="treinamentos-titulo" rotulo="02 — Treinamentos regulamentares" titulo="Conhecimento técnico. Aplicação imediata." apoio="Programas que conectam o requisito da norma à realidade da operação — para que o participante saia sabendo o que fazer, e não apenas o que a norma diz." apoioNoCelular={false} />
 
       <ul className="flex flex-col gap-2 lg:hidden">
         {listaDoCelular.map((norma) => {
-          const destaque = norma.slug === DESTAQUE;
+          const destaque = norma.slug === NORMA_MAIS_APLICADA;
           return <li key={norma.slug}><Link href={rotas.norma(norma.slug)} className={cn('doc-focus flex items-center gap-3.5 rounded-lg p-4', destaque ? 'bg-ds-inverso text-ds-texto-inv' : 'bg-ds-muted text-ds-texto')}>
             <span className={cn('font-ds-display text-[19px] leading-[26px] font-extrabold whitespace-nowrap', destaque && 'text-ds-amarelo')}>{norma.codigo}</span>
             <span className="min-w-0 flex-1 ds-body-s font-medium">{norma.curto}</span>
@@ -163,7 +110,7 @@ export function Treinamentos() {
       <p className="ds-caption text-ds-texto-2 lg:hidden">Atendemos outras NRs — <Link href={rotas.contato} className="underline underline-offset-4">fale com a gente</Link>.</p>
 
       <ul data-surgir className="hidden gap-6 lg:grid lg:grid-cols-4">
-        {NORMAS.map((norma) => <li key={norma.slug} className="flex"><CardNorma norma={norma} destaque={norma.slug === DESTAQUE} className="w-full" /></li>)}
+        {NORMAS.map((norma) => <li key={norma.slug} className="flex"><CardNorma norma={norma} destaque={norma.slug === NORMA_MAIS_APLICADA} className="w-full" /></li>)}
         <li className="flex">
           <div className="flex min-h-[323px] w-full flex-col justify-between rounded-md border border-dashed border-ds-amarelo bg-ds-amarelo-suave p-7">
             <Plus className="size-8" aria-hidden="true" />

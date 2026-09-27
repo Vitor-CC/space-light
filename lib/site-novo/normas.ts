@@ -8,7 +8,7 @@ import { TREINAMENTO_OUTRO } from '@/lib/site-novo/proposta';
  *
  * O conteúdo de cada página foi escrito a partir do texto oficial da norma
  * publicado no gov.br (links em `fontes`). O que é específico da Space —
- * carga horária, turma, modalidade — fica como {{CONFIRMAR}} na ficha técnica.
+ * carga horária, turma, modalidade — a ficha técnica deixa para a proposta.
  *
  * Mora em `lib/` e não em `data/` porque `data/` está no .gitignore — é onde
  * fica o banco SQLite local — e um arquivo ali nunca seria versionado.
@@ -16,6 +16,8 @@ import { TREINAMENTO_OUTRO } from '@/lib/site-novo/proposta';
 export type PaginaDaNorma = {
   /** Uma linha do que a norma exige, no cabeçalho da página. */
   exige: string;
+  /** Texto da abertura, quando é mais que `exige` (Figma: longo no desktop, curto no celular). */
+  abertura?: { curto: string; longo: string };
   /** O que a norma exige: até dois parágrafos curtos. */
   exigencias: readonly string[];
   /** Pontos da norma, em lista, ao lado dos parágrafos. */
@@ -29,12 +31,12 @@ export type PaginaDaNorma = {
   aplicacao: readonly { titulo: string; texto: string }[];
   /** Grade oficial da Space, quando já transcrita. */
   programa?: {
-    legenda: string;
+    titulo: string;
     origem: string;
     modulos: readonly { modulo: string; pratica: boolean }[];
   };
   /** Conteúdo mínimo que a própria norma define, quando define. */
-  conteudoMinimo?: { legenda: string; itens: readonly string[] };
+  conteudoMinimo?: { titulo: string; origem: string; itens: readonly string[] };
   figura: { src: string; alt: string; legenda: string };
 };
 
@@ -124,7 +126,8 @@ const PAGINA_NR05: PaginaDaNorma = {
     REGISTRO,
   ],
   conteudoMinimo: {
-    legenda: 'Conteúdo mínimo do treinamento, conforme o item 5.7.2 da NR 05',
+    titulo: 'Conteúdo mínimo do treinamento',
+    origem: 'Conforme o item 5.7.2 da NR 05.',
     itens: [
       'Ambiente e condições de trabalho e riscos do processo produtivo',
       'Acidentes e doenças relacionados ao trabalho e sua prevenção',
@@ -203,8 +206,8 @@ const PAGINA_NR06: PaginaDaNorma = {
     REGISTRO,
   ],
   conteudoMinimo: {
-    legenda:
-      'Informações obrigatórias na entrega do EPI, conforme o item 6.7.2 da NR 06',
+    titulo: 'Informações obrigatórias na entrega do EPI',
+    origem: 'Conforme o item 6.7.2 da NR 06.',
     itens: [
       'Descrição do equipamento e dos seus componentes',
       'Risco contra o qual o EPI protege',
@@ -288,8 +291,8 @@ const PAGINA_NR10: PaginaDaNorma = {
     REGISTRO,
   ],
   conteudoMinimo: {
-    legenda:
-      'Programação mínima do curso básico, conforme o Anexo III da NR 10 em vigor',
+    titulo: 'Programação mínima do curso básico',
+    origem: 'Conforme o Anexo III da NR 10 em vigor.',
     itens: [
       'Introdução à segurança com eletricidade',
       'Choque elétrico, arco elétrico e campos eletromagnéticos',
@@ -505,8 +508,8 @@ const PAGINA_NR35: PaginaDaNorma = {
     REGISTRO,
   ],
   conteudoMinimo: {
-    legenda:
-      'Conteúdo mínimo do treinamento inicial, conforme o item 35.4.2.1 da NR 35',
+    titulo: 'Conteúdo mínimo do treinamento inicial',
+    origem: 'Conforme o item 35.4.2.1 da NR 35.',
     itens: [
       'Normas e regulamentos aplicáveis ao trabalho em altura',
       'Análise de Risco e condições impeditivas',
@@ -558,6 +561,12 @@ const MODULOS_NR23: Record<string, string> = {
 const PAGINA_NR23: PaginaDaNorma = {
   exige:
     'Medidas de prevenção contra incêndios nos locais de trabalho, conforme a legislação estadual.',
+  abertura: {
+    curto:
+      'Prevenção contra incêndios conforme a legislação estadual, com formação e reciclagem de brigada e prática com fogo controlado.',
+    longo:
+      'Medidas de prevenção contra incêndios nos locais de trabalho, conforme a legislação estadual — com formação e reciclagem de brigada, teoria aplicada e prática com fogo controlado.',
+  },
   exigencias: [
     'A NR 23 obriga a empresa a adotar medidas de prevenção contra incêndios nos locais de trabalho, seguindo a legislação estadual.',
     'Todo trabalhador deve receber informações sobre os equipamentos de combate, os procedimentos de emergência e os alarmes.',
@@ -610,7 +619,7 @@ const PAGINA_NR23: PaginaDaNorma = {
     REGISTRO,
   ],
   programa: {
-    legenda: 'Tabela 1. Conteúdo programático da formação de brigada',
+    titulo: 'Conteúdo programático da formação de brigada',
     origem: 'Grade do documento oficial da Space Light para a NR 23.',
     modulos: NR23_PROGRAM.map((linha) => ({
       modulo: MODULOS_NR23[linha.modulo] ?? linha.modulo,
@@ -623,6 +632,9 @@ const PAGINA_NR23: PaginaDaNorma = {
     legenda: 'Operação de extintor portátil com orientação do instrutor.',
   },
 };
+
+/** A NR 23 é a mais aplicada pela Space: vem em destaque na home e ganha o selo na página dela. */
+export const NORMA_MAIS_APLICADA = 'nr-23';
 
 export const NORMAS: readonly Norma[] = [
   {
