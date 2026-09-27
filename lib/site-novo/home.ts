@@ -13,6 +13,8 @@ export const PROVA_SOCIAL = {
   avaliacoes: 33,
   treinados: 'mais de 26 mil profissionais treinados',
   treinadosCurto: '+26 mil treinados',
+  /** Na coluna do formulário de proposta, onde cabe uma linha só. */
+  treinadosMedio: '+26 mil profissionais treinados',
 } as const;
 
 /**

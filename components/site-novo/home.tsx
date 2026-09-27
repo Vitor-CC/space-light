@@ -1,8 +1,8 @@
-import { ArrowRight, ArrowUpRight, Calendar, Check, ChevronRight, Download, MapPin, MessageCircle, Plus, Star, User, Users, X } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Calendar, Check, ChevronRight, Download, MapPin, MessageCircle, Plus, User, Users, X } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { Cabecalho, FotoLegendada, Onda, Resp, Rotulo, miolo, tituloDeSecao } from '@/components/site-novo/blocos';
+import { Cabecalho, Estrelas, FotoLegendada, Onda, Resp, Rotulo, miolo, tituloDeSecao } from '@/components/site-novo/blocos';
 import { botao } from '@/components/site-novo/botao';
 import { CardNorma } from '@/components/site-novo/card-norma';
 import { Tag } from '@/components/ds/base';
@@ -31,13 +31,6 @@ import { cn } from '@/lib/utils';
  * Home do Figma ("02 · Site Desktop" e "03 · Site Mobile"). Uma seção por
  * componente, na ordem da página. As peças comuns ficam em `blocos.tsx`.
  */
-
-function Estrelas({ className }: { className?: string }) {
-  return <span className={cn('inline-flex items-center gap-0.5 text-ds-amarelo', className)}>
-    <span className="sr-only">5 de 5 estrelas</span>
-    {[0, 1, 2, 3, 4].map((i) => <Star key={i} className="size-[1em] fill-current" aria-hidden="true" />)}
-  </span>;
-}
 
 // ---------------------------------------------------------------------------
 // 01 · Abertura

@@ -722,5 +722,5 @@ export const OPCOES_DE_TREINAMENTO: readonly {
   rotulo: string;
 }[] = [
   ...NORMAS.map((norma) => ({ valor: norma.slug, rotulo: norma.codigo })),
-  { valor: TREINAMENTO_OUTRO, rotulo: 'Outro' },
+  { valor: TREINAMENTO_OUTRO, rotulo: 'Outra NR' },
 ];

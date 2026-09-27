@@ -1,3 +1,4 @@
+import { Star } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 
@@ -18,6 +19,14 @@ export const tituloDeSecao =
 export function Resp({ curto, longo }: { curto: string; longo: string }) {
   if (curto === longo) return <>{longo}</>;
   return <><span className="lg:hidden">{curto}</span><span className="hidden lg:inline">{longo}</span></>;
+}
+
+/** Cinco estrelas da nota do Google; o número vem sempre em texto ao lado. */
+export function Estrelas({ className }: { className?: string }) {
+  return <span className={cn('inline-flex items-center gap-0.5 text-ds-amarelo', className)}>
+    <span className="sr-only">5 de 5 estrelas</span>
+    {[0, 1, 2, 3, 4].map((i) => <Star key={i} className="size-[1em] fill-current" aria-hidden="true" />)}
+  </span>;
 }
 
 export function Rotulo({ children, escuro = false, className }: { children: ReactNode; escuro?: boolean; className?: string }) {
