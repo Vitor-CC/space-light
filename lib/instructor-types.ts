@@ -1,3 +1,4 @@
+import type { ChecklistDaNorma, MarcaDoChecklist } from '@/lib/checklist';
 import type {
   CompanyInstructor,
   CompanyInstructorDocument,
@@ -20,5 +21,7 @@ export type InstructorDashboardData = {
   availability: InstructorAvailability[];
   documents: CompanyInstructorDocument[];
   participants: CompanyParticipant[];
+  checklistTemplates: ChecklistDaNorma[];
+  checklistMarks: MarcaDoChecklist[];
   currentUser: { id: string; name: string; email: string };
 };

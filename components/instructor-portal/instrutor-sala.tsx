@@ -9,6 +9,7 @@ import type { ReactNode, SyntheticEvent } from 'react';
 import { formatDate, formatMoment, janelaDoDia, meuDia, requestJson, rotuloDoDia } from '@/components/instructor-portal/instrutor-util';
 import { BarraProgresso, Botao, botaoClasses, BotaoIcone, Campo, campoClasses, Cartao, Faixa, selectClasses, Tag, Vazio } from '@/components/ds/base';
 import { Segmentado } from '@/components/ds/interativo';
+import { checklistDaTurma } from '@/lib/checklist';
 import type { CompanyParticipant } from '@/lib/company-types';
 import { limparDigitacaoCpf, limparDigitacaoRg, problemaCpf, problemaRg } from '@/lib/documentos';
 import type { InstructorDashboardData } from '@/lib/instructor-types';
@@ -37,6 +38,9 @@ export function Sala({ data, selectedId, selectTraining, reload, notify }: { dat
   const [manual, setManual] = useState(manualVazio);
   const [savingManual, setSavingManual] = useState(false);
   const [marcando, setMarcando] = useState('');
+  // Marcação do checklist na hora do toque, antes da volta do servidor: chave turma|item.
+  const [marcasNaTela, setMarcasNaTela] = useState<Map<string, boolean>>(new Map());
+  const [salvandoItem, setSalvandoItem] = useState('');
   // Ausência não é gravada (o banco só guarda presença): o vermelho marca quem
   // o instrutor tocou como ausente nesta tela, não todo mundo sem check-in.
   const [ausentes, setAusentes] = useState<Set<string>>(new Set());
@@ -225,6 +229,23 @@ export function Sala({ data, selectedId, selectTraining, reload, notify }: { dat
     input.value = '';
   }
 
+  const checklistBase = checklistDaTurma(training, data.checklistTemplates, data.checklistMarks);
+  const itensChecklist = checklistBase.itens.map((item) => ({ ...item, feito: marcasNaTela.get(`${training.id}|${item.texto}`) ?? item.feito }));
+  const checklistAberto = itensChecklist.filter((item) => !item.feito).length;
+
+  async function marcarItem(texto: string, feito: boolean) {
+    const chave = `${training.id}|${texto}`;
+    setMarcasNaTela((atual) => new Map(atual).set(chave, feito));
+    setSalvandoItem(texto);
+    try {
+      await requestJson(`/api/instructor/trainings/${encodeURIComponent(training.id)}/checklist`, { method: 'POST', body: JSON.stringify({ item: texto, done: feito }) });
+      await reload();
+    } catch (error) {
+      setMarcasNaTela((atual) => new Map(atual).set(chave, !feito));
+      notify(error instanceof Error ? error.message : 'Erro ao marcar o item.');
+    } finally { setSalvandoItem(''); }
+  }
+
   const acaoEncerrar = ultimoPendente ? 'Finalizar turma' : `Encerrar o dia ${diaAtual?.day_number ?? 1}`;
 
   return <div className="flex flex-col gap-4 pb-28">
@@ -323,18 +344,29 @@ export function Sala({ data, selectedId, selectTraining, reload, notify }: { dat
       </Cartao>
     </div> : null}
 
-    {aba === 'checklist' ? <Cartao className="px-5 py-2">
+    {aba === 'checklist' ? <div className="flex flex-col gap-4">
+      {/* Itens da norma (Figma 72:7467): marcado fica riscado. */}
+      {itensChecklist.length ? <ul className="overflow-hidden rounded-[10px] bg-ds-superficie">{itensChecklist.map((item) => <li key={item.texto} className="border-b border-ds-borda last:border-b-0">
+        <label className={cn('flex cursor-pointer items-center gap-2.5 px-4 py-3', training.status === 'completed' && 'cursor-default')}>
+          <input type="checkbox" checked={item.feito} disabled={training.status === 'completed' || salvandoItem === item.texto} onChange={(e) => void marcarItem(item.texto, e.target.checked)} className="peer sr-only" />
+          <span aria-hidden className={cn('flex size-[18px] shrink-0 items-center justify-center rounded-[4px] border-[1.5px] peer-focus-visible:ring-2 peer-focus-visible:ring-ds-amarelo/60', item.feito ? 'border-ds-inverso bg-ds-inverso text-ds-amarelo' : 'border-ds-borda-forte bg-ds-superficie')}>{item.feito ? <Check className="size-[13px]" strokeWidth={3} /> : null}</span>
+          <span className={cn('ds-body-s', item.feito ? 'text-ds-texto-2 line-through' : 'text-ds-texto')}>{item.texto}</span>
+        </label>
+      </li>)}</ul> : <p className="rounded-[10px] border border-dashed border-ds-borda bg-ds-superficie p-4 ds-caption text-ds-texto-2">A Space ainda não definiu o checklist da {training.nr}. O andamento abaixo continua valendo.</p>}
+      <span className="ds-caps text-ds-texto-2">Andamento</span>
+      <Cartao className="px-5 py-2">
       <ItemChecklist ok={Boolean(meuDiaAberto || meuDiaFechado || training.status === 'completed')} titulo="Dia iniciado" detalhe={diaAtual ? `Dia ${diaAtual.day_number}${dias.length > 1 ? ` de ${dias.length}` : ''}${janela ? ` · ${janela}` : ''}` : 'Sem dia atribuído'} />
       <ItemChecklist ok={participants.length > 0 && presentes === participants.length} parcial={presentes > 0} titulo="Chamada do dia" detalhe={`${presentes} de ${participants.length} presentes`} />
       <ItemChecklist ok={listasEnviadas > 0} obrigatorio={ultimoPendente} titulo="Lista assinada enviada" detalhe={listasEnviadas ? `${listasEnviadas} ${listasEnviadas === 1 ? 'arquivo' : 'arquivos'}` : ultimoPendente ? 'Obrigatória para finalizar a turma' : 'Cobrada no último dia'} acao={<button type="button" onClick={() => setAba('fotos')} className={botaoClasses('link', 'P')}>Enviar</button>} />
       <ItemChecklist ok={fotosDaAula.length > 0} titulo="Fotos da aula" detalhe={fotosDaAula.length ? `${fotosDaAula.length} ${fotosDaAula.length === 1 ? 'foto' : 'fotos'}` : 'Opcional, mas o cliente vê'} acao={<button type="button" onClick={() => setAba('fotos')} className={botaoClasses('link', 'P')}>Enviar</button>} />
       <ItemChecklist ok={completos === participants.length && participants.length > 0} parcial={completos > 0} titulo="Presença completa" detalhe={`${completos} de ${participants.length} com presença em todos os dias (recebem certificado)`} />
-    </Cartao> : null}
+      </Cartao>
+    </div> : null}
 
     {/* Barra inferior (Figma): Fotos + Finalizar turma. */}
     {training.status !== 'completed' && !meuDiaFechado ? <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ds-borda bg-ds-superficie px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] lg:left-[264px] lg:px-10">
       {confirmando ? <div className="mx-auto flex max-w-4xl flex-col gap-3">
-        <div><strong className="block ds-body-s font-semibold text-ds-perigo">{ultimoPendente ? 'Finalizar esta turma?' : `Encerrar o dia ${diaAtual?.day_number ?? 1}?`}</strong><p className="ds-caption text-ds-texto-2">{ultimoPendente ? `A lista é congelada e os certificados saem para ${completos} de ${participants.length} participante(s): só quem tem presença em todos os dias. Não dá para reabrir.` : 'O seu dia é fechado e a turma segue nos outros dias. Os certificados saem só no último.'}</p></div>
+        <div><strong className="block ds-body-s font-semibold text-ds-perigo">{ultimoPendente ? 'Finalizar esta turma?' : `Encerrar o dia ${diaAtual?.day_number ?? 1}?`}</strong><p className="ds-caption text-ds-texto-2">{ultimoPendente ? `A lista é congelada e os certificados saem para ${completos} de ${participants.length} participante(s): só quem tem presença em todos os dias. Não dá para reabrir.` : 'O seu dia é fechado e a turma segue nos outros dias. Os certificados saem só no último.'}</p>{checklistAberto ? <p className="mt-1 ds-caption font-medium text-ds-atencao">Checklist: {checklistAberto === 1 ? '1 item em aberto' : `${checklistAberto} itens em aberto`}.</p> : null}</div>
         <div className="flex gap-2.5"><Botao tipo="secundario" onClick={() => setConfirmando(false)}>Voltar</Botao><Botao tipo="perigo" className="flex-1" onClick={() => void complete()} disabled={ending}>{ending ? <Loader2 className="animate-spin" /> : <Check />}{ending ? 'Encerrando…' : 'Sim, encerrar'}</Botao></div>
       </div> : <div className="mx-auto flex max-w-4xl flex-col gap-2">
         {travadoSemLista && meuDiaAberto ? <p className="ds-caption text-ds-perigo">Último dia: envie a foto da lista assinada para liberar a finalização.</p> : null}

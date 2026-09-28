@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Award, CalendarDays, CalendarPlus, Check, CheckCircle2, ChevronRight, Circle, Clock3, Download, FileText, ImageIcon, Loader2, MessageCircle, Pencil, Plus, Search, Signature, Trash2, Upload, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, Award, CalendarDays, CalendarPlus, Check, CheckCircle2, ChevronRight, Circle, ClipboardCheck, Clock3, Download, FileText, ImageIcon, Loader2, MessageCircle, Pencil, Plus, Search, Signature, Trash2, Upload, UsersRound, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode, SyntheticEvent } from 'react';
 import { ptBR } from 'date-fns/locale';
@@ -10,7 +10,8 @@ import { areaClasses, Avatar, Botao, botaoClasses, BotaoIcone, Campo, campoClass
 import { Interruptor, PainelLateral, Segmentado } from '@/components/ds/interativo';
 import { Calendar } from '@/components/ui/calendar';
 import type { CompanyDashboardData, CompanyInstructor, CompanyTraining, TrainingSession } from '@/lib/company-types';
-import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTraining, generateCertificates, readInstructorDocuments, removeTrainingDay, renameTraining, saveProgramTemplate, updateTrainingDay, updateTrainingDetails, uploadCompanyFiles } from '@/lib/mock-company-database';
+import { checklistDaTurma, itensDoTexto } from '@/lib/checklist';
+import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTraining, generateCertificates, readInstructorDocuments, removeTrainingDay, renameTraining, saveChecklistTemplate, saveProgramTemplate, setTrainingChecklistItem, updateTrainingDay, updateTrainingDetails, uploadCompanyFiles } from '@/lib/mock-company-database';
 import type { NovoDia } from '@/lib/mock-company-database';
 import { dataDoDia as dataDaTurma, proximoDiaDaTurma as proximoDia } from '@/lib/dias-da-turma';
 import { nrInfo } from '@/lib/nr-catalog';
@@ -198,6 +199,51 @@ function CampoConteudo({ data, nr, valor, onChange, reload, notify }: { data: Co
   </div>;
 }
 
+/**
+ * Checklist operacional da turma: a equipe vê o que o instrutor marcou, marca
+ * no lugar dele se preciso, e define os itens da norma (valem para todas as
+ * turmas dela, inclusive as já criadas).
+ */
+function ChecklistDaTurma({ training, data, reload, notify }: { training: CompanyTraining; data: CompanyDashboardData; reload: Reload; notify: Notify }) {
+  const checklist = checklistDaTurma(training, data.checklistTemplates, data.checklistMarks);
+  const [editando, setEditando] = useState(false);
+  const [texto, setTexto] = useState('');
+  const [ocupado, setOcupado] = useState('');
+
+  async function marcar(item: string, feito: boolean) {
+    setOcupado(item);
+    try { await setTrainingChecklistItem(training.id, item, feito); await reload(); }
+    catch (error) { notify(error instanceof Error ? error.message : 'Erro ao marcar o item.'); }
+    finally { setOcupado(''); }
+  }
+  async function salvar() {
+    setOcupado('__modelo__');
+    try {
+      await saveChecklistTemplate(training.nr, texto);
+      notify(itensDoTexto(texto).length ? `Checklist da ${training.nr} salvo. Vale para todas as turmas dessa norma.` : `Checklist da ${training.nr} removido.`);
+      setEditando(false);
+      await reload();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao salvar o checklist.'); }
+    finally { setOcupado(''); }
+  }
+
+  if (editando) return <div className="flex flex-col gap-3">
+    <Campo rotulo={`Itens do checklist da ${training.nr}`} ajuda="Um item por linha. Vale para todas as turmas dessa norma; o instrutor marca na sala da turma."><textarea rows={8} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={'Ex.:\nConferir extintores e cilindros de prática\nKit de primeiros socorros no local'} className={areaClasses} /></Campo>
+    <div className="flex flex-wrap gap-2"><Botao onClick={() => void salvar()} disabled={ocupado === '__modelo__'}>{ocupado === '__modelo__' ? <Loader2 className="animate-spin" /> : <Check />}Salvar checklist da {training.nr}</Botao><Botao tipo="fantasma" onClick={() => setEditando(false)}>Cancelar</Botao></div>
+  </div>;
+
+  return <div className="flex flex-col gap-3">
+    {checklist.total ? <ul className="overflow-hidden rounded-lg border border-ds-borda">{checklist.itens.map((item) => <li key={item.texto} className="border-b border-ds-borda last:border-b-0">
+      <label className="flex cursor-pointer items-center gap-2.5 px-3.5 py-2.5">
+        <input type="checkbox" checked={item.feito} disabled={Boolean(ocupado)} onChange={(e) => void marcar(item.texto, e.target.checked)} className="peer sr-only" />
+        <span aria-hidden className={cn('flex size-[18px] shrink-0 items-center justify-center rounded-[4px] border-[1.5px] peer-focus-visible:ring-2 peer-focus-visible:ring-ds-amarelo/60', item.feito ? 'border-ds-inverso bg-ds-inverso text-ds-amarelo' : 'border-ds-borda-forte bg-ds-superficie')}>{ocupado === item.texto ? <Loader2 className="size-3 animate-spin" /> : item.feito ? <Check className="size-[13px]" strokeWidth={3} /> : null}</span>
+        <span className={cn('ds-body-s', item.feito ? 'text-ds-texto-2 line-through' : 'text-ds-texto')}>{item.texto}</span>
+      </label>
+    </li>)}</ul> : <p className="ds-body-s text-ds-texto-2">A {training.nr} ainda não tem checklist. Defina os itens e o instrutor passa a marcar na sala da turma.</p>}
+    <button type="button" onClick={() => { setTexto(checklist.itens.map((i) => i.texto).join('\n')); setEditando(true); }} className={botaoClasses('fantasma', 'P', 'w-fit')}><Pencil />{checklist.total ? `Editar itens da ${training.nr}` : `Definir checklist da ${training.nr}`}</button>
+  </div>;
+}
+
 /** O que sai no certificado e na lista: cliente, norma, título, carga horária, endereço e conteúdo. */
 function TrainingDetails({ training, data, reload, notify }: { training: CompanyTraining; data: CompanyDashboardData; reload: Reload; notify: Notify }) {
   const clients = data.clients;
@@ -282,6 +328,7 @@ function AndamentoDaTurma({ training, data, hojeIso }: { training: CompanyTraini
   const fotos = data.files.filter((f) => f.training_id === training.id && f.kind === 'photo').length;
   const listas = data.files.filter((f) => f.training_id === training.id && f.kind === 'attendance').length;
   const emitidos = Boolean(training.certificate_generated_at);
+  const checklist = checklistDaTurma(training, data.checklistTemplates, data.checklistMarks);
   return <div className="flex flex-col gap-5">
     <div className="flex flex-wrap gap-2">
       <Tag tom={situacao.tom}>{situacao.texto}</Tag>
@@ -293,6 +340,7 @@ function AndamentoDaTurma({ training, data, hojeIso }: { training: CompanyTraini
       <div>
         <LinhaAndamento icone={<UsersRound />} titulo={training.sessions.length > 1 && dia ? `Chamada · dia ${dia.day_number}` : 'Chamada'} valor={inscritos.length ? `${presentes} de ${inscritos.length}` : 'Ninguém inscrito'} pronto={inscritos.length > 0 && presentes >= inscritos.length} />
         <LinhaAndamento icone={<ImageIcon />} titulo="Fotos" valor={fotos ? `${fotos} ${fotos === 1 ? 'enviada' : 'enviadas'}` : 'Nenhuma'} pronto={fotos > 0} />
+        <LinhaAndamento icone={<ClipboardCheck />} titulo="Checklist" valor={checklist.total ? `${checklist.feitos} de ${checklist.total}` : 'Sem itens na norma'} pronto={checklist.total > 0 && checklist.feitos === checklist.total} />
         <LinhaAndamento icone={<Signature />} titulo="Lista assinada" valor={listas ? `${listas} ${listas === 1 ? 'arquivo' : 'arquivos'}` : 'Pendente'} pronto={listas > 0} />
         <LinhaAndamento icone={<Award />} titulo="Certificados" valor={emitidos ? `Emitidos em ${formatDayMonth((training.certificate_generated_at as string).slice(0, 10))}` : concluida ? 'Aguardando emissão' : 'Após encerrar'} pronto={emitidos} />
       </div>
@@ -432,6 +480,8 @@ function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoE
       <div>{training.sessions.map((dia) => <DayRow key={dia.id} training={training} session={dia} instructors={instructors} reload={reload} notify={notify} />)}</div>
       <AddDay training={training} instructors={instructors} reload={reload} notify={notify} />
     </Secao>
+
+    <Secao titulo="Checklist da turma"><ChecklistDaTurma training={training} data={data} reload={reload} notify={notify} /></Secao>
 
     <Secao titulo="Dados do treinamento"><TrainingDetails training={training} data={data} reload={reload} notify={notify} /></Secao>
 

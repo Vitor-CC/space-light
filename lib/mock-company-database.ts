@@ -283,3 +283,15 @@ export function removeClientDocument(documentId: string) {
 export function setDocumentRequestStatus(requestId: string, status: 'open' | 'sent' | 'declined') {
   return requestJson<{ ok: true }>(`/api/company/document-requests/${encodeURIComponent(requestId)}`, { method: 'PATCH', body: JSON.stringify({ status }) });
 }
+
+// --- Checklist operacional ---
+
+/** Itens do checklist da norma, um por linha; texto vazio apaga o checklist dela. */
+export function saveChecklistTemplate(nr: string, items: string) {
+  return requestJson<{ ok: true }>('/api/company/checklist-templates', { method: 'PUT', body: JSON.stringify({ nr, items }) });
+}
+
+/** A equipe marca ou desmarca um item do checklist da turma. */
+export function setTrainingChecklistItem(trainingId: string, item: string, done: boolean) {
+  return requestJson<{ ok: true }>(`/api/company/trainings/${encodeURIComponent(trainingId)}/checklist`, { method: 'POST', body: JSON.stringify({ item, done }) });
+}

@@ -1,3 +1,5 @@
+import type { ChecklistDaNorma, MarcaDoChecklist } from '@/lib/checklist';
+
 export type CompanyClient = {
   id: string;
   name: string;
@@ -292,6 +294,10 @@ export type CompanyDashboardData = {
   clientDocuments: CompanyClientDocument[];
   documentRequests: CompanyDocumentRequest[];
   programTemplates: CompanyProgramTemplate[];
+  /** Itens do checklist operacional de cada norma, um por linha. */
+  checklistTemplates: ChecklistDaNorma[];
+  /** Itens marcados em cada turma. */
+  checklistMarks: MarcaDoChecklist[];
   /** Há envio de e-mail configurado (RESEND_API_KEY + MAIL_FROM no servidor)? */
   mailConfigured: boolean;
   currentUser: { id: string; email: string; name: string; jobTitle: string; isOwner: boolean };

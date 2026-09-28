@@ -1,4 +1,5 @@
 import { getD1 } from '@/db';
+import { itensDoTexto, type ChecklistDaNorma, type MarcaDoChecklist } from '@/lib/checklist';
 import { formatarCpf, formatarRg, problemaCpf, problemaRg } from '@/lib/documentos';
 import { INSTRUCTOR_DOCUMENT_CATEGORIES } from '@/lib/instructor-documents';
 import { clientePedeLogin } from '@/lib/login-do-participante';
@@ -213,6 +214,30 @@ const TABELAS_POR_MARCADOR = [
       content TEXT NOT NULL,
       updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  // Checklist operacional por norma: os itens, um por linha, definidos pela equipe.
+  {
+    marcador: 'tab_checklist_templates',
+    tabela: 'checklist_templates',
+    criar: `CREATE TABLE IF NOT EXISTS checklist_templates (
+      nr TEXT PRIMARY KEY,
+      items TEXT NOT NULL,
+      updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  // Item do checklist marcado numa turma. Guarda o texto do item: se a equipe
+  // muda a lista da norma depois, a marca de um item que saiu deixa de contar.
+  {
+    marcador: 'tab_training_checklist',
+    tabela: 'training_checklist',
+    criar: `CREATE TABLE IF NOT EXISTS training_checklist (
+      training_id TEXT NOT NULL REFERENCES trainings(id) ON DELETE CASCADE,
+      item TEXT NOT NULL,
+      done_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+      done_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (training_id, item)
     )`,
   },
   // Documento avulso do cliente (laudo etc.), enviado pela equipe fora de turma.
@@ -1366,7 +1391,7 @@ export async function getInstructorDashboardData(
     .first<CompanyInstructor>();
   if (!instructor) return null;
 
-  const [trainingsResult, availabilityResult, participantsResult, documentsResult, sessoes] =
+  const [trainingsResult, availabilityResult, participantsResult, documentsResult, sessoes, checklistsResult, marcasResult] =
     await Promise.all([
       d1
         .prepare(`SELECT t.id, t.client_id, t.instructor_id,
@@ -1415,6 +1440,13 @@ export async function getInstructorDashboardData(
         .bind(instructor.id)
         .all<CompanyInstructorDocument>(),
       sessoesPorTurma(d1, instructor.id),
+      d1.prepare('SELECT nr, items FROM checklist_templates').all<ChecklistDaNorma>(),
+      d1
+        .prepare(`SELECT c.training_id, c.item FROM training_checklist c
+          JOIN trainings t ON t.id = c.training_id
+          WHERE ${INSTRUTOR_NA_TURMA}`)
+        .bind(instructor.id)
+        .all<MarcaDoChecklist>(),
     ]);
 
   return {
@@ -1423,6 +1455,8 @@ export async function getInstructorDashboardData(
     availability: rows(availabilityResult),
     documents: rows(documentsResult),
     participants: rows(participantsResult),
+    checklistTemplates: rows(checklistsResult),
+    checklistMarks: rows(marcasResult),
     currentUser: {
       id: currentUser.id,
       name: currentUser.name,
@@ -2454,6 +2488,53 @@ export async function saveProgramTemplate(input: { nr: string; content: string; 
   return { ok: true as const };
 }
 
+/* ─── Checklist operacional da turma ─────────────────────────────────────── */
+
+/** A equipe define os itens do checklist de uma norma. Lista vazia apaga o checklist dela. */
+export async function saveChecklistTemplate(input: { nr: string; items: string; byUserId: string }) {
+  await ensurePortalSchema();
+  const nr = (input.nr ?? '').trim().slice(0, 60);
+  if (!nr) throw new Error('Norma não informada.');
+  const itens = itensDoTexto(input.items).slice(0, 40);
+  const d1 = getD1();
+  if (!itens.length) {
+    await d1.prepare('DELETE FROM checklist_templates WHERE nr = ?').bind(nr).run();
+  } else {
+    await d1
+      .prepare(`INSERT INTO checklist_templates (nr, items, updated_by, updated_at) VALUES (?, ?, ?, datetime('now'))
+        ON CONFLICT(nr) DO UPDATE SET items = excluded.items, updated_by = excluded.updated_by, updated_at = excluded.updated_at`)
+      .bind(nr, itens.join('\n'), input.byUserId)
+      .run();
+  }
+  await writeAudit(input.byUserId, 'checklist_template.saved', 'checklist_template', nr, { itens: itens.length });
+  return { ok: true as const };
+}
+
+/**
+ * Marca ou desmarca um item do checklist da turma. Com `instructorId`, só vale
+ * para instrutor escalado em algum dia dela; sem, é a equipe.
+ */
+export async function setTrainingChecklistItem(input: { trainingId: string; item: string; done: boolean; byUserId: string; instructorId?: string }) {
+  await ensurePortalSchema();
+  const d1 = getD1();
+  const turma = input.instructorId
+    ? await d1.prepare(`SELECT t.nr FROM trainings t WHERE t.id = ? AND ${INSTRUTOR_NA_TURMA} LIMIT 1`).bind(input.trainingId, input.instructorId).first<{ nr: string }>()
+    : await d1.prepare('SELECT nr FROM trainings WHERE id = ? LIMIT 1').bind(input.trainingId).first<{ nr: string }>();
+  if (!turma) throw new Error('Turma não encontrada.');
+  const modelo = await d1.prepare('SELECT items FROM checklist_templates WHERE nr = ? LIMIT 1').bind(turma.nr).first<{ items: string }>();
+  const item = (input.item ?? '').trim();
+  if (!itensDoTexto(modelo?.items ?? '').includes(item)) throw new Error('Este item não está no checklist da norma.');
+  if (input.done) {
+    await d1
+      .prepare('INSERT OR IGNORE INTO training_checklist (training_id, item, done_by) VALUES (?, ?, ?)')
+      .bind(input.trainingId, item, input.byUserId)
+      .run();
+  } else {
+    await d1.prepare('DELETE FROM training_checklist WHERE training_id = ? AND item = ?').bind(input.trainingId, item).run();
+  }
+  return { ok: true as const };
+}
+
 /* ─── Documentos avulsos (laudo etc.) e pedidos de documento ─────────────── */
 
 const STATUS_PEDIDO_DOCUMENTO = ['open', 'sent', 'declined'] as const;
@@ -3120,6 +3201,7 @@ export async function deleteTrainingByAdmin(input: { trainingId: string; byUserI
       .prepare('DELETE FROM session_attendance WHERE session_id IN (SELECT id FROM training_sessions WHERE training_id = ?)')
       .bind(input.trainingId),
     d1.prepare('DELETE FROM training_sessions WHERE training_id = ?').bind(input.trainingId),
+    d1.prepare('DELETE FROM training_checklist WHERE training_id = ?').bind(input.trainingId),
     d1.prepare('DELETE FROM trainings WHERE id = ?').bind(input.trainingId),
   ]);
   await writeAudit(input.byUserId, 'training.deleted', 'training', input.trainingId, {});
@@ -3278,7 +3360,7 @@ export async function getCompanyDashboardData(
 ): Promise<CompanyDashboardData> {
   await ensurePortalSchema();
   const d1 = getD1();
-  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult, requestsResult, siteLeadsResult, perfil, avulsosResult, pedidosDocResult, programasResult] =
+  const [clientsResult, instructorsResult, instructorAvailabilityResult, trainingsResult, filesResult, participantsResult, sessoes, presencasResult, requestsResult, siteLeadsResult, perfil, avulsosResult, pedidosDocResult, programasResult, checklistsResult, marcasResult] =
     await Promise.all([
       d1
         .prepare(
@@ -3380,6 +3462,8 @@ export async function getCompanyDashboardData(
         .prepare(`SELECT p.nr, p.content, p.updated_at, u.name AS updated_by_name
            FROM program_templates p LEFT JOIN users u ON u.id = p.updated_by`)
         .all<CompanyProgramTemplate>(),
+      d1.prepare('SELECT nr, items FROM checklist_templates').all<ChecklistDaNorma>(),
+      d1.prepare('SELECT training_id, item FROM training_checklist').all<MarcaDoChecklist>(),
     ]);
 
   return {
@@ -3395,6 +3479,8 @@ export async function getCompanyDashboardData(
     clientDocuments: rows(avulsosResult),
     documentRequests: rows(pedidosDocResult),
     programTemplates: rows(programasResult),
+    checklistTemplates: rows(checklistsResult),
+    checklistMarks: rows(marcasResult),
     mailConfigured: Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM),
     currentUser: {
       id: currentUser.id,
