@@ -22,7 +22,7 @@ import type { CompanyDashboardData } from '@/lib/company-types';
 import { readMockCompanyDatabase } from '@/lib/mock-company-database';
 
 /** Seções que desenham o próprio cabeçalho (as demais usam o SectionHeading). */
-const COM_CABECALHO_PROPRIO: CompanySection[] = ['dashboard', 'clients', 'trainings', 'instructors', 'certificates', 'requests', 'settings'];
+const COM_CABECALHO_PROPRIO: CompanySection[] = ['dashboard', 'clients', 'trainings', 'instructors', 'certificates', 'files', 'requests', 'settings'];
 
 export function CompanyPortal({ initialData }: { initialData: CompanyDashboardData }) {
   const [section, setSection] = useState<CompanySection>('dashboard');
@@ -70,7 +70,7 @@ export function CompanyPortal({ initialData }: { initialData: CompanyDashboardDa
   else if (section === 'instructors') conteudo = <CompanyInstructors data={data} reload={reload} notify={setAviso} navegar={irPara} />;
   else if (section === 'trainings') conteudo = <CompanyTrainings data={data} reload={reload} notify={setAviso} turmaAlvo={turmaAlvo} vistaInicial={vistaTurmas} presetNova={presetTurma} abrirQr={(id) => irPara('participants', id)} />;
   else if (section === 'certificates') conteudo = <CompanyCertificates data={data} reload={reload} notify={setAviso} navegar={irPara} />;
-  else if (section === 'files') conteudo = <CompanyFiles data={data} reload={reload} notify={setAviso} />;
+  else if (section === 'files') conteudo = <CompanyFiles data={data} reload={reload} notify={setAviso} navegar={irPara} />;
   else if (section === 'participants') conteudo = <CompanyParticipants data={data} reload={reload} notify={setAviso} turmaAlvo={turmaAlvo} />;
   else if (section === 'requests') conteudo = <CompanyRequests data={data} reload={reload} notify={setAviso} novaTurma={() => irPara('trainings', undefined, 'criar')} />;
   else if (section === 'settings') conteudo = <CompanySettings data={data} reload={reload} notify={setAviso} />;
