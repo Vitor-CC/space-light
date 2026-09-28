@@ -7,6 +7,7 @@ import { Certificados, Documentos, Galeria, Perfil, Sino, Solicitar } from '@/co
 import { BotaoZip, dataCurta, diasAte, identificacaoDaPessoa, rotuloDoStatus, situacaoCertificado, slug, tomDoStatus, vencimento, type Secao } from '@/components/client-portal/cliente-util';
 import { BarraProgresso, botaoClasses, campoClasses, Cartao, CartaoCabecalho, Indicador, LinhaArquivo, Meta, Pilula, tabelaClasses as tb, Tag, TopoDePagina, Vazio } from '@/components/ds/base';
 import { Abas, Aviso, PortalShell, useAviso } from '@/components/ds/interativo';
+import { urlDaFoto } from '@/lib/fotos';
 import type { ClientPortalData, ClientTraining } from '@/lib/client-portal-data';
 import { clientePedeLogin } from '@/lib/login-do-participante';
 import { cn } from '@/lib/utils';
@@ -39,9 +40,9 @@ export function ClientPortal({ data, user }: { data: ClientPortalData; user: { n
   else if (secao === 'certificates') conteudo = <Certificados data={data} abrirTurma={abrirTurma} />;
   else if (secao === 'documents') conteudo = <Documentos data={data} />;
   else if (secao === 'request') conteudo = <Solicitar data={data} baseId={baseDoPedido} aoEnviar={setAviso} />;
-  else conteudo = <Perfil data={data} />;
+  else conteudo = <Perfil data={data} notify={setAviso} />;
 
-  return <PortalShell area="Área do cliente" itens={itens} ativo={secao === 'profile' ? null : secao} onNavegar={(id) => navegar(id)} usuario={{ nome: user.name, detalhe: data.organization.displayName }} onUsuario={() => navegar('profile')}>
+  return <PortalShell area="Área do cliente" itens={itens} ativo={secao === 'profile' ? null : secao} onNavegar={(id) => navegar(id)} usuario={{ nome: data.organization.displayName, detalhe: user.name, foto: urlDaFoto('cliente', data.organization.id, data.organization.logoKey), logo: true }} onUsuario={() => navegar('profile')}>
     <div key={`${secao}-${turmaAberta ?? ''}`}>{conteudo}</div>
     <Aviso texto={aviso} onFechar={() => setAviso('')} />
   </PortalShell>;

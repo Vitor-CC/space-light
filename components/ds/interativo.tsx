@@ -128,7 +128,7 @@ export function PortalShell<T extends string>({ area, itens, ativo, onNavegar, u
   itens: ItemDeMenu<T>[];
   ativo: T | null;
   onNavegar: (id: T) => void;
-  usuario: { nome: string; detalhe: string };
+  usuario: { nome: string; detalhe: string; foto?: string | null; logo?: boolean };
   /** Clique no nome do usuário (abre o perfil/cadastro quando existe). */
   onUsuario?: () => void;
   children: ReactNode;
@@ -153,7 +153,7 @@ export function PortalShell<T extends string>({ area, itens, ativo, onNavegar, u
       {rodapeMenu}
     </nav>
     <div className="flex items-center gap-3 border-t border-ds-borda-inv pt-4">
-      <Avatar nome={usuario.nome} />
+      <Avatar nome={usuario.nome} foto={usuario.foto} quadrado={usuario.logo} />
       {onUsuario
         ? <button type="button" onClick={() => { setMenuAberto(false); onUsuario(); }} className="min-w-0 flex-1 text-left ds-foco rounded"><span className="block truncate ds-body-s font-medium text-ds-texto-inv">{usuario.nome}</span><span className="block truncate ds-caption text-ds-texto-inv-2">{usuario.detalhe}</span></button>
         : <div className="min-w-0 flex-1"><span className="block truncate ds-body-s font-medium text-ds-texto-inv">{usuario.nome}</span><span className="block truncate ds-caption text-ds-texto-inv-2">{usuario.detalhe}</span></div>}

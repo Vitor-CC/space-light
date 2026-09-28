@@ -6,7 +6,8 @@ import type { SyntheticEvent } from 'react';
 
 import { CompanyAudit } from '@/components/company-portal/company-audit';
 import { CompanyTeam } from '@/components/company-portal/company-team';
-import { Avatar, Botao, Campo, campoClasses, Cartao, TopoDePagina } from '@/components/ds/base';
+import { Botao, Campo, campoClasses, Cartao, TopoDePagina } from '@/components/ds/base';
+import { FotoDePerfil } from '@/components/foto-de-perfil';
 import { Abas } from '@/components/ds/interativo';
 import type { CompanyDashboardData } from '@/lib/company-types';
 import { saveEmployeeJobTitle } from '@/lib/mock-company-database';
@@ -32,7 +33,7 @@ export function CompanySettings({ data, reload, notify }: { data: CompanyDashboa
     <TopoDePagina titulo="Configurações" subtitulo={dono ? 'Seu perfil, os acessos da equipe e o histórico de atividade.' : 'Seu perfil de acesso à gestão.'} />
     {dono ? <Abas rotulo="Configurações" ativa={aba} onChange={setAba} abas={[{ id: 'perfil', rotulo: 'Meu perfil' }, { id: 'equipe', rotulo: 'Funcionários' }, { id: 'atividade', rotulo: 'Atividade' }]} /> : null}
     {aba === 'perfil' ? <Cartao className="max-w-2xl p-5 sm:p-7">
-      <div className="flex items-center gap-4 border-b border-ds-borda pb-5"><Avatar nome={data.currentUser.name} tamanho={48} /><div><h2 className="ds-h4">{data.currentUser.name}</h2><p className="ds-body-s text-ds-texto-2">{data.currentUser.email}{dono ? ' · dono da conta' : ''}</p></div></div>
+      <div className="flex flex-col gap-4 border-b border-ds-borda pb-5"><div><h2 className="ds-h4">{data.currentUser.name}</h2><p className="ds-body-s text-ds-texto-2">{data.currentUser.email}{dono ? ' · dono da conta' : ''}</p></div><FotoDePerfil tipo="equipe" id={data.currentUser.id} nome={data.currentUser.name} chave={data.currentUser.photoKey} aoMudar={reload} notify={notify} /></div>
       <form onSubmit={salvar} className="mt-5 flex flex-col gap-5">
         <Campo rotulo="Cargo" ajuda="Aparece no pé do menu da gestão."><input value={cargo} onChange={(e) => setCargo(e.target.value)} maxLength={80} placeholder="Ex.: Diretora administrativa" className={campoClasses} /></Campo>
         <div><Botao type="submit" disabled={salvando || cargo === data.currentUser.jobTitle}>{salvando ? <Loader2 className="animate-spin" /> : <Check />}Salvar</Botao></div>

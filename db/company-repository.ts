@@ -1,5 +1,6 @@
 import { getD1 } from '@/db';
 import { itensDoTexto, type ChecklistDaNorma, type MarcaDoChecklist } from '@/lib/checklist';
+import type { TipoDeFoto } from '@/lib/fotos';
 import { formatarCpf, formatarRg, problemaCpf, problemaRg } from '@/lib/documentos';
 import { INSTRUCTOR_DOCUMENT_CATEGORIES } from '@/lib/instructor-documents';
 import { clientePedeLogin } from '@/lib/login-do-participante';
@@ -170,6 +171,26 @@ const COLUNAS_POR_MARCADOR = [
     tabela: 'trainings',
     coluna: 'kind',
     alter: "ALTER TABLE trainings ADD COLUMN kind TEXT NOT NULL DEFAULT ''",
+  },
+  // Foto de perfil do instrutor, do funcionário da Space e logo do cliente:
+  // chave do arquivo em disco ('' = sem foto, o avatar mostra as iniciais).
+  {
+    marcador: 'col_instructors_photo_key',
+    tabela: 'instructors',
+    coluna: 'photo_key',
+    alter: "ALTER TABLE instructors ADD COLUMN photo_key TEXT NOT NULL DEFAULT ''",
+  },
+  {
+    marcador: 'col_users_photo_key',
+    tabela: 'users',
+    coluna: 'photo_key',
+    alter: "ALTER TABLE users ADD COLUMN photo_key TEXT NOT NULL DEFAULT ''",
+  },
+  {
+    marcador: 'col_clients_logo_key',
+    tabela: 'clients',
+    coluna: 'logo_key',
+    alter: "ALTER TABLE clients ADD COLUMN logo_key TEXT NOT NULL DEFAULT ''",
   },
   // Login interno do participante, pedido só por cliente Amazon no QR.
   {
@@ -375,6 +396,7 @@ export function ensurePortalSchema(): Promise<void> {
         state TEXT NOT NULL DEFAULT '',
         postal_code TEXT NOT NULL DEFAULT '',
         short_code TEXT NOT NULL DEFAULT '',
+        logo_key TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'invited',
         source TEXT NOT NULL DEFAULT 'admin',
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -391,6 +413,7 @@ export function ensurePortalSchema(): Promise<void> {
         base_city TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'pending',
         source TEXT NOT NULL DEFAULT 'self',
+        photo_key TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )`),
@@ -419,6 +442,7 @@ export function ensurePortalSchema(): Promise<void> {
         active INTEGER NOT NULL DEFAULT 1,
         must_reset INTEGER NOT NULL DEFAULT 0,
         job_title TEXT NOT NULL DEFAULT '',
+        photo_key TEXT NOT NULL DEFAULT '',
         last_login_at TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       )`),
@@ -1385,7 +1409,7 @@ export async function getInstructorDashboardData(
   const d1 = getD1();
   const instructor = await d1
     .prepare(`SELECT id, name, document, email, phone, professional_registry,
-      specialties, base_city, status, source, created_at
+      specialties, base_city, status, source, photo_key, created_at
       FROM instructors WHERE id = ? AND status != 'suspended' LIMIT 1`)
     .bind(currentUser.instructor_id)
     .first<CompanyInstructor>();
@@ -2488,6 +2512,33 @@ export async function saveProgramTemplate(input: { nr: string; content: string; 
   return { ok: true as const };
 }
 
+/* ─── Foto de perfil e logo ──────────────────────────────────────────────── */
+
+const COLUNA_DA_FOTO = {
+  instrutor: { tabela: 'instructors', coluna: 'photo_key' },
+  equipe: { tabela: 'users', coluna: 'photo_key' },
+  cliente: { tabela: 'clients', coluna: 'logo_key' },
+} as const;
+
+/** Chave do arquivo da foto; '' quando não tem, null quando o dono não existe. */
+export async function getPhotoKey(tipo: TipoDeFoto, id: string) {
+  await ensurePortalSchema();
+  if (!Object.hasOwn(COLUNA_DA_FOTO, tipo)) return null;
+  const { tabela, coluna } = COLUNA_DA_FOTO[tipo];
+  const linha = await getD1().prepare(`SELECT ${coluna} AS chave FROM ${tabela} WHERE id = ? LIMIT 1`).bind(id).first<{ chave: string }>();
+  return linha ? linha.chave ?? '' : null;
+}
+
+/** Grava a chave nova ('' remove) e devolve a anterior, para a rota apagar o arquivo velho. */
+export async function setPhotoKey(input: { tipo: TipoDeFoto; id: string; chave: string; byUserId: string }) {
+  const anterior = await getPhotoKey(input.tipo, input.id);
+  if (anterior === null) throw new Error('Cadastro não encontrado.');
+  const { tabela, coluna } = COLUNA_DA_FOTO[input.tipo];
+  await getD1().prepare(`UPDATE ${tabela} SET ${coluna} = ? WHERE id = ?`).bind(input.chave, input.id).run();
+  await writeAudit(input.byUserId, input.chave ? 'photo.updated' : 'photo.removed', tabela.replace(/s$/, ''), input.id, {});
+  return { anterior };
+}
+
 /* ─── Checklist operacional da turma ─────────────────────────────────────── */
 
 /** A equipe define os itens do checklist de uma norma. Lista vazia apaga o checklist dela. */
@@ -3366,7 +3417,7 @@ export async function getCompanyDashboardData(
         .prepare(
           `SELECT id, name, legal_name, document, unit, contact_name,
            contact_email, contact_phone, address, district, city, state,
-           postal_code, short_code, status, created_at,
+           postal_code, short_code, logo_key, status, created_at,
            (SELECT u.username FROM users u WHERE u.client_id = clients.id AND u.role = 'client'
             ORDER BY u.created_at ASC LIMIT 1) AS username
            FROM clients ORDER BY name COLLATE NOCASE ASC`,
@@ -3375,7 +3426,7 @@ export async function getCompanyDashboardData(
       d1
         .prepare(
           `SELECT id, name, document, email, phone, professional_registry,
-           specialties, base_city, status, source, created_at
+           specialties, base_city, status, source, photo_key, created_at
            FROM instructors ORDER BY name COLLATE NOCASE ASC`,
         )
         .all<CompanyInstructor>(),
@@ -3448,7 +3499,7 @@ export async function getCompanyDashboardData(
            state, trainings, participants, modality, deadline, message, origin, status, created_at
            FROM site_leads ORDER BY created_at DESC`)
         .all<CompanySiteLead>(),
-      d1.prepare('SELECT name, job_title FROM users WHERE id = ? LIMIT 1').bind(currentUser.id).first<{ name: string; job_title: string }>(),
+      d1.prepare('SELECT name, job_title, photo_key FROM users WHERE id = ? LIMIT 1').bind(currentUser.id).first<{ name: string; job_title: string; photo_key: string }>(),
       d1
         .prepare(`SELECT d.id, d.client_id, c.name AS client_name, d.request_id, d.title, d.name, d.content_type, d.size, d.created_at
            FROM client_documents d JOIN clients c ON c.id = d.client_id ORDER BY d.created_at DESC`)
@@ -3487,6 +3538,7 @@ export async function getCompanyDashboardData(
       email: currentUser.email,
       name: perfil?.name ?? 'Equipe Space Light',
       jobTitle: perfil?.job_title ?? '',
+      photoKey: perfil?.photo_key ?? '',
       isOwner: isOwnerByEmailOrFlag(currentUser.email, currentUser.is_owner),
     },
   };
@@ -4033,7 +4085,7 @@ export async function getClientPortalData(
   const organization = await d1
     .prepare(
       `SELECT id, legal_name, name, document, unit, contact_name,
-       contact_email, contact_phone
+       contact_email, contact_phone, logo_key
        FROM clients WHERE id = ? AND status != 'suspended' LIMIT 1`,
     )
     .bind(clientId)
@@ -4046,6 +4098,7 @@ export async function getClientPortalData(
       contact_name: string;
       contact_email: string;
       contact_phone: string;
+      logo_key: string;
     }>();
   if (!organization) return null;
 
@@ -4291,6 +4344,7 @@ export async function getClientPortalData(
       contactRole: 'Responsável da empresa',
       email: organization.contact_email,
       phone: organization.contact_phone,
+      logoKey: organization.logo_key ?? '',
     },
     trainings,
     photos,

@@ -17,6 +17,7 @@ import { dataDoDia as dataDaTurma, proximoDiaDaTurma as proximoDia } from '@/lib
 import { nrInfo } from '@/lib/nr-catalog';
 import { cargaHorariaPadrao } from '@/lib/nr-programs';
 import { scheduleWindow, trainingReminderMessage, trainingScheduleMessage, whatsappLink } from '@/lib/whatsapp';
+import { urlDaFoto } from '@/lib/fotos';
 import { cn } from '@/lib/utils';
 
 type Notify = (message: string) => void;
@@ -805,7 +806,7 @@ function NovaTurma({ data, reload, notify, aoCriar, onFechar, preset = null }: {
           const marcado = draft.instructorId === instrutor.id;
           return <label key={instrutor.id} className={cn('flex cursor-pointer items-center gap-3 border-b border-ds-borda px-3 py-2.5 last:border-b-0', marcado && 'bg-ds-amarelo-suave', ocupado && 'opacity-50')}>
             <input type="radio" name="instrutor" checked={marcado} onChange={() => setDraft((atual) => ({ ...atual, instructorId: instrutor.id }))} className="size-[18px] shrink-0 accent-ds-inverso" />
-            <Avatar nome={instrutor.name} tamanho={28} />
+            <Avatar nome={instrutor.name} foto={urlDaFoto('instrutor', instrutor.id, instrutor.photo_key)} tamanho={28} />
             <span className="min-w-0 flex-1"><span className="block truncate ds-body-s font-medium">{instrutor.name}</span><span className={cn('block truncate ds-caption', destaque ? 'text-ds-sucesso' : 'text-ds-texto-2')}>{texto}</span></span>
           </label>;
         })}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Award, Bell, Building2, CheckCircle2, Download, Eye, FileText, ImageIcon, Loader2, MessageCircle, Search, Send } from 'lucide-react';
+import { Award, Bell, CheckCircle2, Download, Eye, FileText, ImageIcon, Loader2, MessageCircle, Search, Send } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -8,6 +8,7 @@ import type { SyntheticEvent } from 'react';
 
 import { BotaoZip, NORMAS_PEDIDO, dataCurta, diasAte, identificacaoDaPessoa, situacaoCertificado, slug, type Secao } from '@/components/client-portal/cliente-util';
 import { areaClasses, botaoClasses, BotaoIcone, Campo, campoClasses, Cartao, CartaoCabecalho, Faixa, LinhaArquivo, selectClasses, tabelaClasses as tb, Tag, TopoDePagina, Vazio } from '@/components/ds/base';
+import { FotoDePerfil } from '@/components/foto-de-perfil';
 import { Segmentado } from '@/components/ds/interativo';
 import type { ClientPortalData } from '@/lib/client-portal-data';
 import { cn } from '@/lib/utils';
@@ -234,7 +235,7 @@ export function Solicitar({ data, baseId, aoEnviar }: { data: ClientPortalData; 
 
 /* ─── Perfil da empresa ─────────────────────────────────────────────────── */
 
-export function Perfil({ data }: { data: ClientPortalData }) {
+export function Perfil({ data, notify }: { data: ClientPortalData; notify: (mensagem: string) => void }) {
   const org = data.organization;
   const router = useRouter();
   const [draft, setDraft] = useState({ unit: org.unit, contactName: org.contactName, contactPhone: org.phone });
@@ -263,9 +264,9 @@ export function Perfil({ data }: { data: ClientPortalData }) {
     <TopoDePagina titulo="Perfil da empresa" subtitulo="Dados cadastrais vinculados a este acesso." />
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <Cartao className="p-5 sm:p-7">
-        <div className="flex items-center gap-4 border-b border-ds-borda pb-5">
-          <span className="flex size-12 items-center justify-center rounded-lg bg-ds-amarelo-suave"><Building2 className="size-6" /></span>
+        <div className="flex flex-col gap-4 border-b border-ds-borda pb-5">
           <div><span className="ds-caps text-ds-texto-2">Empresa contratante</span><h2 className="ds-h4">{org.displayName}</h2></div>
+          <FotoDePerfil tipo="cliente" id={org.id} nome={org.displayName} chave={org.logoKey} aoMudar={() => router.refresh()} notify={notify} />
         </div>
         <form onSubmit={salvar} className="mt-6 grid gap-5 sm:grid-cols-2">
           <Campo rotulo="Unidade / cidade" className="sm:col-span-2"><input required value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} className={campoClasses} /></Campo>

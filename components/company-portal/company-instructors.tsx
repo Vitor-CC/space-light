@@ -6,6 +6,7 @@ import type { SyntheticEvent } from 'react';
 import { ptBR } from 'date-fns/locale';
 
 import { CompanyAvailability } from '@/components/company-portal/company-availability';
+import { FotoDePerfil } from '@/components/foto-de-perfil';
 import { pendenciasDaEquipe, SinoEquipe } from '@/components/company-portal/company-topo';
 import type { NavegarEquipe } from '@/components/company-portal/company-topo';
 import { situacaoDaTurma } from '@/components/company-portal/company-trainings';
@@ -18,6 +19,7 @@ import { registroValido } from '@/lib/certificate-config';
 import type { CompanyDashboardData, CompanyInstructor } from '@/lib/company-types';
 import { REQUIRED_INSTRUCTOR_DOCUMENTS } from '@/lib/instructor-documents';
 import { approveInstructor, createInstructor, deleteInstructor, readInstructorDocuments, resetUserPassword, reviewInstructorDocument, updateInstructor } from '@/lib/mock-company-database';
+import { urlDaFoto } from '@/lib/fotos';
 import { cn } from '@/lib/utils';
 import { whatsappLink } from '@/lib/whatsapp';
 
@@ -156,6 +158,7 @@ function DadosDoInstrutor({ instructor, notify, reload, aprovar, novaSenha, excl
 
   return <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
     <div className="flex flex-col gap-4 rounded-lg bg-ds-superficie p-5">
+      <FotoDePerfil tipo="instrutor" id={instructor.id} nome={instructor.name} chave={instructor.photo_key} aoMudar={reload} notify={notify} className="border-b border-ds-borda pb-4" />
       {semRegistro ? <Faixa tom="perigo" titulo="Registro profissional em branco ou zerado">Nos documentos deste instrutor sai só a assinatura da responsável técnica. Preencha o MTE/RE para ele voltar a assinar.</Faixa> : null}
       {editando ? <form onSubmit={salvar} className="grid gap-4 sm:grid-cols-2">
         {campo('name', 'Nome completo')}
@@ -345,7 +348,7 @@ export function CompanyInstructors({ data, reload, notify, navegar }: { data: Co
           const livres = livresNos30(i.id);
           return <tr key={i.id} onClick={() => { setAberto(i.id); setAbaFicha(regras.documentos(i) ? 'documentos' : 'dados'); }} className={cn(tb.linha, tb.linhaClicavel)}>
             <td className={tb.td}><button type="button" onClick={(e) => { e.stopPropagation(); setAberto(i.id); }} className="flex items-center gap-3 text-left ds-foco">
-              <Avatar nome={i.name} tamanho={36} />
+              <Avatar nome={i.name} foto={urlDaFoto('instrutor', i.id, i.photo_key)} tamanho={36} />
               <span className="min-w-0"><span className="block truncate ds-body-s font-medium">{i.name}</span><span className="flex items-center gap-1.5 ds-caption text-ds-texto-2">{i.base_city || 'Sem cidade base'}{!registroValido(i.professional_registry) ? <span className="inline-flex items-center gap-1 text-ds-perigo"><TriangleAlert className="size-3" />sem registro</span> : null}</span></span>
             </button></td>
             <td className={tb.td}>{normasCurtas(i.specialties)}</td>

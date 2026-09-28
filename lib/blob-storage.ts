@@ -142,3 +142,12 @@ export async function deleteStoredFile(objectKey: string) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
 }
+
+/**
+ * Foto de perfil ou logo, já tratada (quadrada, 256 px, WebP). O nome leva um
+ * sufixo aleatório: a foto nova tem endereço novo, e o cache não segura a velha.
+ */
+export async function uploadProfilePhoto(input: { tipo: string; id: string; body: ArrayBuffer }) {
+  const pathname = `fotos/${input.tipo}/${input.id}-${crypto.randomUUID().slice(0, 8)}.webp`;
+  return gravar(pathname, input.body);
+}

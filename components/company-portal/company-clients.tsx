@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 
 import { EnviarDocumento, ListaDeAvulsos, PedidoDeDocumento } from '@/components/company-portal/company-avulsos';
+import { FotoDePerfil } from '@/components/foto-de-perfil';
 import { pendenciasDaEquipe, SinoEquipe, ultimoDia } from '@/components/company-portal/company-topo';
 import type { NavegarEquipe } from '@/components/company-portal/company-topo';
 import { AccessCredentials, formatDayMonth, isoFromDate } from '@/components/company-portal/company-ui';
@@ -146,6 +147,7 @@ function EditarCliente({ client, aberto, onFechar, notify, reload, aoExcluir }: 
     <Campo rotulo={rotulo}><input value={endereco[chave]} maxLength={extra.max} placeholder={extra.placeholder} onChange={(e) => setEndereco({ ...endereco, [chave]: chave === 'state' ? e.target.value.toUpperCase().slice(0, 2) : e.target.value })} className={campoClasses} /></Campo>;
   return <PainelLateral aberto={aberto} onFechar={onFechar} sobretitulo={client.short_code || undefined} titulo="Editar cliente" subtitulo="Razão social, CNPJ e endereço saem impressos nos documentos." largura={520}
     acoes={<><Botao type="submit" form="form-editar-cliente" disabled={salvando} className="flex-1">{salvando ? <Loader2 className="animate-spin" /> : <Check />}Salvar</Botao><Botao tipo="fantasma" onClick={() => void excluir()} className="text-ds-perigo"><Trash2 />Excluir cliente</Botao></>}>
+    <FotoDePerfil tipo="cliente" id={client.id} nome={client.name} chave={client.logo_key} aoMudar={reload} notify={notify} className="mb-5 border-b border-ds-borda pb-5" />
     <form id="form-editar-cliente" onSubmit={salvar} className="flex flex-col gap-4">
       <CamposDoCliente draft={draft} setDraft={setDraft} />
       <CampoSigla valor={draft.shortCode} onChange={(shortCode) => setDraft({ ...draft, shortCode })} ajuda="Trocar a sigla só vale para as turmas novas; as que já existem mantêm o código." />

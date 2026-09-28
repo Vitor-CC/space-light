@@ -17,6 +17,7 @@ import { SectionHeading } from '@/components/company-portal/company-ui';
 import type { CompanySection } from '@/components/company-portal/company-ui';
 import { BotaoIcone } from '@/components/ds/base';
 import { Aviso, PortalShell, useAviso } from '@/components/ds/interativo';
+import { urlDaFoto } from '@/lib/fotos';
 import type { CompanyDashboardData } from '@/lib/company-types';
 import { readMockCompanyDatabase } from '@/lib/mock-company-database';
 
@@ -74,7 +75,7 @@ export function CompanyPortal({ initialData }: { initialData: CompanyDashboardDa
   else if (section === 'requests') conteudo = <CompanyRequests data={data} reload={reload} notify={setAviso} novaTurma={() => irPara('trainings', undefined, 'criar')} />;
   else if (section === 'settings') conteudo = <CompanySettings data={data} reload={reload} notify={setAviso} />;
 
-  return <PortalShell area="Equipe Space Light" itens={itens} ativo={section} onNavegar={(id) => irPara(id)} usuario={{ nome: data.currentUser.name, detalhe: data.currentUser.jobTitle || data.currentUser.email }} onUsuario={() => irPara('settings')}>
+  return <PortalShell area="Equipe Space Light" itens={itens} ativo={section} onNavegar={(id) => irPara(id)} usuario={{ nome: data.currentUser.name, detalhe: data.currentUser.jobTitle || data.currentUser.email, foto: urlDaFoto('equipe', data.currentUser.id, data.currentUser.photoKey) }} onUsuario={() => irPara('settings')}>
     <div key={`${section}-${turmaAlvo ?? ''}-${vistaTurmas ?? ''}`} className="flex flex-col gap-7">
       {COM_CABECALHO_PROPRIO.includes(section) ? null : <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><SectionHeading section={section} /></div><BotaoIcone rotulo="Atualizar dados" onClick={() => void reload()} disabled={atualizando}><RefreshCw className={atualizando ? 'animate-spin' : undefined} /></BotaoIcone></div>}
       {conteudo}

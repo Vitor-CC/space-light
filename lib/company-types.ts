@@ -16,6 +16,8 @@ export type CompanyClient = {
   postal_code: string;
   /** Sigla do código das turmas (PETZ-JAC → PETZ-JAC-03). */
   short_code: string;
+  /** Chave do logo em disco; '' = sem logo. */
+  logo_key?: string;
   /** Login da empresa no portal; nulo = ainda não consegue entrar. */
   username: string | null;
   status: string;
@@ -35,6 +37,8 @@ export type CompanyInstructor = {
   source: string;
   created_at: string;
   document_count: number;
+  /** Chave da foto em disco; '' = sem foto. */
+  photo_key?: string;
   pending_document_count: number;
 };
 
@@ -300,5 +304,5 @@ export type CompanyDashboardData = {
   checklistMarks: MarcaDoChecklist[];
   /** Há envio de e-mail configurado (RESEND_API_KEY + MAIL_FROM no servidor)? */
   mailConfigured: boolean;
-  currentUser: { id: string; email: string; name: string; jobTitle: string; isOwner: boolean };
+  currentUser: { id: string; email: string; name: string; jobTitle: string; photoKey: string; isOwner: boolean };
 };

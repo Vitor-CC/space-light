@@ -96,6 +96,8 @@ export type ClientOrganization = {
   contactRole: string;
   email: string;
   phone: string;
+  /** Chave do logo em disco; '' = sem logo. */
+  logoKey: string;
 };
 
 /** Documento avulso enviado pela Space (laudo etc.), fora de turma. */

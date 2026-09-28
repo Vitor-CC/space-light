@@ -8,6 +8,8 @@ import { ptBR } from 'date-fns/locale';
 import { Sala } from '@/components/instructor-portal/instrutor-sala';
 import { dateFromIso, formatDate, formatMoment, isoFromDate, janelaDoDia, longDate, meuDia, requestJson, statusLabel, statusTom, type DiaDeAula } from '@/components/instructor-portal/instrutor-util';
 import { Botao, botaoClasses, BotaoIcone, Campo, campoClasses, Cartao, CartaoCabecalho, Faixa, Indicador, Logo, Meta, Tag, TopoDePagina, Vazio } from '@/components/ds/base';
+import { FotoDePerfil } from '@/components/foto-de-perfil';
+import { urlDaFoto } from '@/lib/fotos';
 import { Aviso, PortalShell, useAviso } from '@/components/ds/interativo';
 import { Calendar } from '@/components/ui/calendar';
 import type { CompanyTraining } from '@/lib/company-types';
@@ -53,7 +55,7 @@ export function InstructorPortal({ initialData }: { initialData: InstructorDashb
   else if (section === 'documents') conteudo = <div className="flex flex-col gap-6"><TopoDePagina titulo="Meus documentos" subtitulo="CNH, assinatura e registro MTE/RE exigidos pela Space Light para liberar as turmas." /><MeusDocumentos notify={setAviso} /></div>;
   else conteudo = <MeuCadastro data={data} reload={reload} notify={setAviso} />;
 
-  return <PortalShell area="Área do instrutor" itens={itens} ativo={section === 'profile' ? null : section} onNavegar={setSection} usuario={{ nome: data.instructor.name, detalhe: 'Meu cadastro' }} onUsuario={() => setSection('profile')}>
+  return <PortalShell area="Área do instrutor" itens={itens} ativo={section === 'profile' ? null : section} onNavegar={setSection} usuario={{ nome: data.instructor.name, detalhe: 'Meu cadastro', foto: urlDaFoto('instrutor', data.instructor.id, data.instructor.photo_key) }} onUsuario={() => setSection('profile')}>
     <div key={section}>{conteudo}</div>
     <Aviso texto={aviso} onFechar={() => setAviso('')} />
   </PortalShell>;
@@ -289,6 +291,7 @@ function MeuCadastro({ data, reload, notify }: { data: InstructorDashboardData; 
   return <div className="flex flex-col gap-6">
     <TopoDePagina titulo="Meu cadastro" subtitulo="CPF e e-mail de acesso são alterados apenas pela gestão da Space Light." />
     <Cartao className="p-5 sm:p-7">
+      <FotoDePerfil tipo="instrutor" id={data.instructor.id} nome={data.instructor.name} chave={data.instructor.photo_key} aoMudar={reload} notify={notify} className="mb-6 border-b border-ds-borda pb-5" />
       <form onSubmit={save} className="grid gap-5 sm:grid-cols-2">
         <Campo rotulo="Nome completo" className="sm:col-span-2"><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={campoClasses} /></Campo>
         <Campo rotulo="CPF" ajuda="Não editável."><input value={data.instructor.document} disabled className={campoClasses} /></Campo>

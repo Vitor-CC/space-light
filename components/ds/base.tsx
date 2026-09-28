@@ -194,8 +194,16 @@ export function iniciais(nome: string) {
   return `${primeira}${ultima}`.toUpperCase();
 }
 
-export function Avatar({ nome, tamanho = 36, className }: { nome: string; tamanho?: number; className?: string }) {
-  return <span aria-hidden className={cn('inline-flex shrink-0 items-center justify-center rounded-full bg-ds-amarelo font-ds-sans text-sm leading-5 font-medium text-ds-texto', className)} style={{ width: tamanho, height: tamanho }}>{iniciais(nome)}</span>;
+/**
+ * Avatar: a foto quando há, senão as iniciais sobre o amarelo. `quadrado` é
+ * para logo de empresa, que não pode ser cortado em círculo.
+ */
+export function Avatar({ nome, foto, quadrado = false, tamanho = 36, className }: { nome: string; foto?: string | null; quadrado?: boolean; tamanho?: number; className?: string }) {
+  if (foto) {
+    // eslint-disable-next-line @next/next/no-img-element -- foto privada, servida pela rota do portal
+    return <img src={foto} alt="" aria-hidden width={tamanho} height={tamanho} className={cn('shrink-0 border border-ds-borda bg-ds-superficie object-cover', quadrado ? 'rounded-md' : 'rounded-full', className)} style={{ width: tamanho, height: tamanho }} />;
+  }
+  return <span aria-hidden className={cn('inline-flex shrink-0 items-center justify-center bg-ds-amarelo font-ds-sans text-sm leading-5 font-medium text-ds-texto', quadrado ? 'rounded-md' : 'rounded-full', className)} style={{ width: tamanho, height: tamanho }}>{iniciais(nome)}</span>;
 }
 
 /* ─── Cabeçalho de página do portal ─────────────────────────────────────── */
