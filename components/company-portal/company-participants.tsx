@@ -256,8 +256,9 @@ function SeletorDeTurma({ data, escolhida, aoEscolher }: { data: CompanyDashboar
   </div>;
 }
 
-export function CompanyParticipants({ data, reload, notify }: { data: CompanyDashboardData; reload: Reload; notify: Notify }) {
-  const [trainingId, setTrainingId] = useState(() => turmaInicial(data.trainings, isoFromDate(new Date()))?.id ?? '');
+export function CompanyParticipants({ data, reload, notify, turmaAlvo = null }: { data: CompanyDashboardData; reload: Reload; notify: Notify; turmaAlvo?: string | null }) {
+  // Vindo da ficha da turma ("Abrir QR e participantes"), abre direto nela.
+  const [trainingId, setTrainingId] = useState(() => (turmaAlvo && data.trainings.some((t) => t.id === turmaAlvo) ? turmaAlvo : turmaInicial(data.trainings, isoFromDate(new Date()))?.id ?? ''));
   const [trocando, setTrocando] = useState(false);
   const [gerando, setGerando] = useState(false);
   useEffect(() => {

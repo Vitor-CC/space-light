@@ -163,6 +163,13 @@ const COLUNAS_POR_MARCADOR = [
     coluna: 'short_code',
     alter: "ALTER TABLE clients ADD COLUMN short_code TEXT NOT NULL DEFAULT ''",
   },
+  // Tipo da turma: 'formacao' ou 'reciclagem' ('' = não informado). Só no portal.
+  {
+    marcador: 'col_trainings_kind',
+    tabela: 'trainings',
+    coluna: 'kind',
+    alter: "ALTER TABLE trainings ADD COLUMN kind TEXT NOT NULL DEFAULT ''",
+  },
   // Login interno do participante, pedido só por cliente Amazon no QR.
   {
     marcador: 'col_participants_employee_login',
@@ -401,6 +408,7 @@ export function ensurePortalSchema(): Promise<void> {
         training_dates TEXT NOT NULL DEFAULT '',
         internal_label TEXT NOT NULL DEFAULT '',
         theme TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL DEFAULT '',
         validity_months INTEGER NOT NULL DEFAULT 0,
         content_program TEXT NOT NULL DEFAULT '',
         duration TEXT NOT NULL,
@@ -2039,6 +2047,8 @@ export async function updateTrainingByAdmin(input: {
   location: string;
   contentProgram: string;
   theme?: string;
+  /** Tipo da turma; ausente = não mexe. */
+  kind?: string;
   /** Meses de validade do certificado; ausente = não mexe. */
   validityMonths?: number;
 }) {
@@ -2073,6 +2083,7 @@ export async function updateTrainingByAdmin(input: {
     // Arquivos seguem a turma: o cliente novo passa a vê-los no portal dele.
     d1.prepare('UPDATE files SET client_id = ? WHERE training_id = ?').bind(campos.clientId, input.trainingId),
     ...(meses === null ? [] : [d1.prepare('UPDATE trainings SET validity_months = ? WHERE id = ?').bind(meses, input.trainingId)]),
+    ...(input.kind === undefined ? [] : [d1.prepare('UPDATE trainings SET kind = ? WHERE id = ?').bind(tipoDaTurma(input.kind), input.trainingId)]),
   ]);
   await writeAudit(input.byUserId, 'training.updated', 'training', input.trainingId, {
     clienteTrocado: turma.client_id !== campos.clientId,
@@ -3301,7 +3312,7 @@ export async function getCompanyDashboardData(
       d1
         .prepare(
           `SELECT t.id, t.client_id, t.instructor_id, c.name AS client_name,
-           t.code, t.nr, t.title, t.internal_label, t.theme, t.training_date, t.duration, t.location, t.content_program,
+           t.code, t.nr, t.title, t.internal_label, t.theme, t.kind, t.training_date, t.duration, t.location, t.content_program,
            COALESCE(i.name, t.instructor) AS instructor,
            t.status, t.participant_limit, t.qr_token, t.qr_enabled,
            t.created_at, t.validity_months,
@@ -3427,6 +3438,11 @@ async function proximoCodigoDeTurma(d1: DatabaseBinding, clientId: string) {
   }
 }
 
+/** Tipo da turma aceito pelo banco; qualquer outra coisa fica como não informado. */
+function tipoDaTurma(valor: string | undefined) {
+  return valor === 'formacao' || valor === 'reciclagem' ? valor : '';
+}
+
 export async function createTraining(input: {
   clientId: string;
   nr: string;
@@ -3436,6 +3452,8 @@ export async function createTraining(input: {
   internalLabel?: string;
   /** Assunto da turma, para o instrutor saber o que preparar. */
   theme?: string;
+  /** 'formacao' ou 'reciclagem'; outro valor vira não informado. */
+  kind?: string;
   days: NovoDiaDeTreinamento[];
   contentProgram: string;
   duration: string;
@@ -3485,9 +3503,9 @@ export async function createTraining(input: {
   await d1.batch([
     d1
       .prepare(`INSERT INTO trainings (
-        id, client_id, instructor_id, code, nr, title, internal_label, theme, training_date, training_dates,
+        id, client_id, instructor_id, code, nr, title, internal_label, theme, kind, training_date, training_dates,
         content_program, duration, location, instructor, status, participant_limit, qr_token, qr_enabled
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, ?, 1)`)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, ?, 1)`)
       .bind(
         id,
         input.clientId,
@@ -3497,6 +3515,7 @@ export async function createTraining(input: {
         input.title.trim(),
         (input.internalLabel ?? '').trim(),
         (input.theme ?? '').trim(),
+        tipoDaTurma(input.kind),
         primaryDate,
         JSON.stringify(dias.map((dia) => dia.date)),
         (input.contentProgram ?? '').trim(),

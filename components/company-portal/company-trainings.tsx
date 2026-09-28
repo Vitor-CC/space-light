@@ -1,13 +1,13 @@
 'use client';
 
-import { AlertTriangle, Award, CalendarDays, CalendarPlus, Check, CheckCircle2, ChevronRight, Circle, Clock3, FileText, ImageIcon, Loader2, MessageCircle, Pencil, Plus, Search, Trash2, Upload, UserRound, X } from 'lucide-react';
+import { AlertTriangle, Award, CalendarDays, CalendarPlus, Check, CheckCircle2, ChevronRight, Circle, Clock3, Download, FileText, ImageIcon, Loader2, MessageCircle, Pencil, Plus, Search, Signature, Trash2, Upload, UsersRound, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode, SyntheticEvent } from 'react';
 import { ptBR } from 'date-fns/locale';
 
 import { dateFromIso, formatDate, formatDayMonth, formatWindow, isoFromDate } from '@/components/company-portal/company-ui';
-import { areaClasses, Botao, botaoClasses, BotaoIcone, Campo, campoClasses, Cartao, Faixa, Pilula, selectClasses, tabelaClasses as tb, Tag, TopoDePagina, Vazio, type Tom } from '@/components/ds/base';
-import { Interruptor, PainelLateral } from '@/components/ds/interativo';
+import { areaClasses, Avatar, Botao, botaoClasses, BotaoIcone, Campo, campoClasses, Cartao, Chip, Faixa, Pilula, selectClasses, tabelaClasses as tb, Tag, TopoDePagina, Vazio, type Tom } from '@/components/ds/base';
+import { Interruptor, PainelLateral, Segmentado } from '@/components/ds/interativo';
 import { Calendar } from '@/components/ui/calendar';
 import type { CompanyDashboardData, CompanyInstructor, CompanyTraining, TrainingSession } from '@/lib/company-types';
 import { addTrainingDay, completeTrainingByCompany, createMockTraining, deleteTraining, generateCertificates, readInstructorDocuments, removeTrainingDay, renameTraining, saveProgramTemplate, updateTrainingDay, updateTrainingDetails, uploadCompanyFiles } from '@/lib/mock-company-database';
@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 
 type Notify = (message: string) => void;
 type Reload = () => Promise<void>;
-type Vista = 'tabela' | 'agenda' | 'criar';
+type Vista = 'tabela' | 'agenda';
 type Filtro = 'todas' | 'scheduled' | 'in_progress' | 'atrasadas' | 'sem_instrutor' | 'aguardando' | 'completed';
 
 // NR 13, 15 e 16 são só laudo: não entram aqui (decisão de 27/09/2026).
@@ -38,14 +38,19 @@ function rotuloValidade(meses: number, aPartirDe?: string) {
   return `${meses} meses${aPartirDe ? ` a partir de ${formatDate(aPartirDe)}` : ''}`;
 }
 
-/** Situação da turma para a tabela: inclui "dia vencido" e "aguardando certificados". */
+/**
+ * Situação da turma para a tabela, nos tons do Figma (18:188): em andamento
+ * azul, aguardando certificados âmbar, agendada neutra e sem instrutor vermelha.
+ * "Dia vencido" não está no desenho e fica vermelho também.
+ */
 export function situacaoDaTurma(training: CompanyTraining, hojeIso: string): { tom: Tom; texto: string } {
   if (training.status === 'completed') {
-    return training.certificate_generated_at ? { tom: 'sucesso', texto: 'Concluída' } : { tom: 'sinal', texto: 'Aguardando certificados' };
+    return training.certificate_generated_at ? { tom: 'sucesso', texto: 'Concluída' } : { tom: 'atencao', texto: 'Aguardando certificados' };
   }
   if (dataDaTurma(training) < hojeIso) return { tom: 'perigo', texto: 'Dia vencido' };
-  if (training.status === 'in_progress') return { tom: 'atencao', texto: 'Em andamento' };
-  return { tom: 'info', texto: 'Agendada' };
+  if (training.status === 'in_progress') return { tom: 'info', texto: 'Em andamento' };
+  if ((training.sessions ?? []).some((dia) => !dia.instructor_id)) return { tom: 'perigo', texto: 'Sem instrutor' };
+  return { tom: 'neutro', texto: 'Agendada' };
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +160,9 @@ function AddDay({ training, instructors, reload, notify }: { training: CompanyTr
   </form>;
 }
 
-type DadosTreinamento = { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string; validityMonths: number };
+type DadosTreinamento = { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string; kind: string; validityMonths: number };
+
+const ROTULO_DO_TIPO: Record<string, string> = { formacao: 'Formação', reciclagem: 'Reciclagem' };
 
 /**
  * Conteúdo programático que a norma sugere: o salvo pela equipe, se houver;
@@ -194,7 +201,7 @@ function CampoConteudo({ data, nr, valor, onChange, reload, notify }: { data: Co
 /** O que sai no certificado e na lista: cliente, norma, título, carga horária, endereço e conteúdo. */
 function TrainingDetails({ training, data, reload, notify }: { training: CompanyTraining; data: CompanyDashboardData; reload: Reload; notify: Notify }) {
   const clients = data.clients;
-  const inicial = (): DadosTreinamento => ({ clientId: training.client_id, nr: training.nr, title: training.title, duration: training.duration, location: training.location, contentProgram: training.content_program ?? '', theme: training.theme ?? '', validityMonths: training.validity_months ?? 0 });
+  const inicial = (): DadosTreinamento => ({ clientId: training.client_id, nr: training.nr, title: training.title, duration: training.duration, location: training.location, contentProgram: training.content_program ?? '', theme: training.theme ?? '', kind: training.kind ?? '', validityMonths: training.validity_months ?? 0 });
   const [aberto, setAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [draft, setDraft] = useState<DadosTreinamento>(inicial);
@@ -216,6 +223,7 @@ function TrainingDetails({ training, data, reload, notify }: { training: Company
 
   if (!aberto) return <dl className="grid gap-x-4 gap-y-2 ds-body-s sm:grid-cols-[140px_1fr]">
     <dt className="text-ds-texto-2">Título no certificado</dt><dd className="font-medium">{training.title}</dd>
+    <dt className="text-ds-texto-2">Tipo</dt><dd>{ROTULO_DO_TIPO[training.kind ?? ''] ?? 'Não informado'}</dd>
     <dt className="text-ds-texto-2">Carga horária</dt><dd>{training.duration || '—'}</dd>
     <dt className="text-ds-texto-2">Endereço</dt><dd>{training.location || '—'}</dd>
     <dt className="text-ds-texto-2">Validade</dt><dd>{rotuloValidade(training.validity_months ?? 0)}</dd>
@@ -229,7 +237,8 @@ function TrainingDetails({ training, data, reload, notify }: { training: Company
       <Campo rotulo="Norma"><select value={draft.nr} onChange={(e) => setDraft({ ...draft, nr: e.target.value })} className={selectClasses}>{normas.map((nr) => <option key={nr}>{nr}</option>)}</select></Campo>
       <Campo rotulo="Título no certificado"><input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} className={campoClasses} /></Campo>
     </div>
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-3">
+      <Campo rotulo="Tipo"><select value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value })} className={selectClasses}>{draft.kind === '' ? <option value="">Não informado</option> : null}<option value="formacao">Formação</option><option value="reciclagem">Reciclagem</option></select></Campo>
       <Campo rotulo="Carga horária"><input required value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: e.target.value })} className={campoClasses} /></Campo>
       <Campo rotulo="Validade do certificado" ajuda="Só no portal do cliente; o PDF não muda."><select value={draft.validityMonths} onChange={(e) => setDraft({ ...draft, validityMonths: Number(e.target.value) })} className={selectClasses}>{VALIDADES.map((m) => <option key={m} value={m}>{rotuloValidade(m)}</option>)}</select></Campo>
     </div>
@@ -245,6 +254,50 @@ function Secao({ titulo, children, acao }: { titulo: string; children: ReactNode
     <div className="flex items-center gap-2"><h3 className="flex-1 ds-caps text-ds-texto-2">{titulo}</h3>{acao}</div>
     {children}
   </section>;
+}
+
+/** Local da turma pelo endereço gravado: não há campo próprio para a modalidade. */
+function localDaTurma(training: CompanyTraining) {
+  return /centro de treinamento/i.test(training.location) ? 'Centro de treinamento' : 'In company';
+}
+
+/** Linha do "Andamento" da ficha (Figma 78:1053): ícone, item, número e sinal de pronto. */
+function LinhaAndamento({ icone, titulo, valor, pronto }: { icone: ReactNode; titulo: string; valor: string; pronto: boolean }) {
+  return <div className="flex items-center gap-2.5 border-b border-ds-borda py-2.5 [&>svg:first-child]:size-4 [&>svg:first-child]:shrink-0">
+    {icone}
+    <span className="min-w-0 flex-1 ds-body-s font-medium">{titulo}</span>
+    <span className="ds-caption text-ds-texto-2">{valor}</span>
+    {pronto ? <CheckCircle2 className="size-4 shrink-0 text-ds-sucesso" aria-label="Pronto" /> : <Clock3 className="size-4 shrink-0 text-ds-texto-2" aria-label="Pendente" />}
+  </div>;
+}
+
+/** Topo da ficha no desenho do Figma: etiquetas e o andamento da turma, só leitura. */
+function AndamentoDaTurma({ training, data, hojeIso }: { training: CompanyTraining; data: CompanyDashboardData; hojeIso: string }) {
+  const situacao = situacaoDaTurma(training, hojeIso);
+  const inscritos = data.participants.filter((p) => p.training_id === training.id);
+  const concluida = training.status === 'completed';
+  // A chamada é do dia em curso (ou do próximo); turma encerrada mostra o último dia.
+  const dia = concluida ? training.sessions[training.sessions.length - 1] : proximoDia(training) ?? training.sessions[training.sessions.length - 1];
+  const presentes = dia ? new Set(data.attendance.filter((a) => a.session_id === dia.id).map((a) => a.participant_id)).size : 0;
+  const fotos = data.files.filter((f) => f.training_id === training.id && f.kind === 'photo').length;
+  const listas = data.files.filter((f) => f.training_id === training.id && f.kind === 'attendance').length;
+  const emitidos = Boolean(training.certificate_generated_at);
+  return <div className="flex flex-col gap-5">
+    <div className="flex flex-wrap gap-2">
+      <Tag tom={situacao.tom}>{situacao.texto}</Tag>
+      {ROTULO_DO_TIPO[training.kind ?? ''] ? <Tag tom="neutro">{ROTULO_DO_TIPO[training.kind ?? '']}</Tag> : null}
+      <Tag tom="neutro">{localDaTurma(training)}</Tag>
+    </div>
+    <div className="flex flex-col gap-1">
+      <span className="ds-caps text-ds-texto-2">Andamento</span>
+      <div>
+        <LinhaAndamento icone={<UsersRound />} titulo={training.sessions.length > 1 && dia ? `Chamada · dia ${dia.day_number}` : 'Chamada'} valor={inscritos.length ? `${presentes} de ${inscritos.length}` : 'Ninguém inscrito'} pronto={inscritos.length > 0 && presentes >= inscritos.length} />
+        <LinhaAndamento icone={<ImageIcon />} titulo="Fotos" valor={fotos ? `${fotos} ${fotos === 1 ? 'enviada' : 'enviadas'}` : 'Nenhuma'} pronto={fotos > 0} />
+        <LinhaAndamento icone={<Signature />} titulo="Lista assinada" valor={listas ? `${listas} ${listas === 1 ? 'arquivo' : 'arquivos'}` : 'Pendente'} pronto={listas > 0} />
+        <LinhaAndamento icone={<Award />} titulo="Certificados" valor={emitidos ? `Emitidos em ${formatDayMonth((training.certificate_generated_at as string).slice(0, 10))}` : concluida ? 'Aguardando emissão' : 'Após encerrar'} pronto={emitidos} />
+      </div>
+    </div>
+  </div>;
 }
 
 /** Ficha da turma no painel lateral: dias, dados, identificação e ações. */
@@ -325,6 +378,8 @@ function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoE
   const encerrando = ocupado === 'encerrando';
 
   return <div className="flex flex-col gap-6">
+    <AndamentoDaTurma training={training} data={data} hojeIso={isoFromDate(new Date())} />
+
     {/* Em destaque no topo: a lista assinada e o encerramento, que é o que a
         equipe mais procura na ficha. Turma encerrada sem lista continua
         mostrando o envio, porque a lista ainda pode chegar depois. */}
@@ -365,14 +420,13 @@ function FichaDaTurma({ training, data, instructors, reload, notify, emitir, aoE
       </div> : null}
     </section> : null}
 
-    <Secao titulo="Ações">
+    {concluido || cobraveisPorWhats.length > 0 || devedores.length > 0 ? <Secao titulo="Ações">
       <div className="flex flex-wrap gap-2">
         {concluido ? <Botao onClick={emitir}><Award />{training.certificate_generated_at ? 'Certificados' : 'Emitir certificados'}</Botao> : null}
         {!concluido ? cobraveisPorWhats.map((item) => <a key={item.nome} href={item.url as string} target="_blank" rel="noreferrer" className={botaoClasses('fantasma', 'M')}><MessageCircle />{cobraveisPorWhats.length > 1 ? `Cobrar ${item.nome.split(' ')[0]}` : 'Cobrar no WhatsApp'}</a>) : null}
-        <a href={`/lista-presenca/${training.id}`} target="_blank" rel="noopener" className={botaoClasses('fantasma', 'M')}><FileText />Lista para imprimir (PDF)</a>
       </div>
       {devedores.length > 0 && devedores.every((item) => !item.url) && !concluido ? <p className="ds-caption text-ds-texto-2">Sem telefone no cadastro do instrutor não dá para cobrar por WhatsApp: inclua o número em Instrutores.</p> : null}
-    </Secao>
+    </Secao> : null}
 
     <Secao titulo={`Datas, horários e instrutores · ${totalDias} ${totalDias === 1 ? 'dia' : 'dias'}`}>
       <div>{training.sessions.map((dia) => <DayRow key={dia.id} training={training} session={dia} instructors={instructors} reload={reload} notify={notify} />)}</div>
@@ -506,17 +560,44 @@ function Agenda({ data, reload, notify, abrirTurma }: { data: CompanyDashboardDa
 // Criação
 // ---------------------------------------------------------------------------
 
-type Draft = { clientId: string; nr: string; title: string; internalLabel: string; theme: string; days: NovoDia[]; contentProgram: string; duration: string; location: string };
+type Tipo = 'formacao' | 'reciclagem';
+type Modalidade = 'in_company' | 'centro';
+type Draft = { clientId: string; nr: string; kind: Tipo; duration: string; days: Omit<NovoDia, 'instructorId'>[]; modalidade: Modalidade; location: string; instructorId: string };
 
-function diaVazio(instructorId: string | null = null): NovoDia {
-  return { date: '', startTime: '08:00', endTime: '18:00', instructorId };
+/** Título do certificado sugerido pela norma; a equipe ajusta depois na ficha. */
+function tituloPadrao(nr: string) {
+  if (nr === 'EMERGÊNCIAS QUÍMICAS') return 'Atendimento a emergências químicas';
+  return nrInfo(nr)?.title ?? nr;
+}
+
+/** Endereço do cliente numa linha, para a turma in company. */
+function enderecoDoCliente(client: CompanyDashboardData['clients'][number] | undefined) {
+  if (!client) return '';
+  const cidade = [client.city, client.state].filter(Boolean).join('/');
+  return [client.address, client.district, cidade].filter(Boolean).join(', ');
+}
+
+/** O instrutor aplica a norma? Compara o número da NR com as especialidades cadastradas. */
+function aplicaNorma(especialidades: string, nr: string) {
+  const numero = nr.match(/\d+/)?.[0];
+  if (!numero) return especialidades.toLowerCase().includes(nr.toLowerCase());
+  return (especialidades.match(/\d+/g) ?? []).some((n) => Number(n) === Number(numero));
+}
+
+function diaVazio(): Omit<NovoDia, 'instructorId'> {
+  return { date: '', startTime: '08:00', endTime: '17:00' };
+}
+
+/** Rótulo de seção do painel: caixa alta com fio até a borda (Figma 79:1237). */
+function Divisor({ children }: { children: ReactNode }) {
+  return <div className="flex items-center gap-2 pt-1"><span className="ds-caps text-ds-texto-2">{children}</span><span className="h-px flex-1 bg-ds-borda" /></div>;
 }
 
 /**
  * Cliente da turma: só a busca. Os resultados aparecem enquanto digita; sem
  * lista aberta nem cliente pré-marcado, para a turma não cair no cliente errado.
  */
-function ClientPicker({ clients, value, onChange }: { clients: CompanyDashboardData['clients']; value: string; onChange: (id: string) => void }) {
+function ClientPicker({ clients, value, onChange, rotulo = 'Cliente' }: { clients: CompanyDashboardData['clients']; value: string; onChange: (id: string) => void; rotulo?: string }) {
   const [busca, setBusca] = useState('');
   const alvo = busca.trim().toLowerCase();
   const alvoDigitos = digitos(busca);
@@ -529,115 +610,176 @@ function ClientPicker({ clients, value, onChange }: { clients: CompanyDashboardD
   const escolhido = clients.find((client) => client.id === value);
   const escolher = (id: string) => { onChange(id); setBusca(''); };
   return <div className="flex flex-col gap-2">
-    <span className="font-ds-sans text-sm leading-5 font-medium">Cliente</span>
+    <span className="font-ds-sans text-sm leading-5 font-medium">{rotulo}</span>
     <div className="relative">
-      <label className="relative block"><Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ds-texto-2" /><input aria-label="Buscar cliente por nome, sigla ou CNPJ" value={busca} onChange={(e) => setBusca(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && filtrados[0]) { e.preventDefault(); escolher(filtrados[0].id); } if (e.key === 'Escape') setBusca(''); }} placeholder={escolhido ? 'Buscar outro cliente' : 'Buscar por nome, sigla ou CNPJ'} className={cn(campoClasses, 'pl-10')} /></label>
+      <label className="relative block"><Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ds-texto-2" /><input aria-label="Buscar cliente por nome, sigla ou CNPJ" value={busca} onChange={(e) => setBusca(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && filtrados[0]) { e.preventDefault(); escolher(filtrados[0].id); } if (e.key === 'Escape') setBusca(''); }} placeholder={escolhido ? escolhido.name : 'Nome, sigla ou CNPJ'} className={cn(campoClasses, 'pl-10', escolhido && !busca && 'placeholder:text-ds-texto')} /></label>
       {alvo ? <div className="absolute right-0 left-0 z-30 mt-1 overflow-hidden rounded-md border border-ds-borda bg-ds-superficie shadow-lg">
         {filtrados.length
           ? filtrados.map((client) => <button key={client.id} type="button" onClick={() => escolher(client.id)} className="flex w-full flex-col items-start border-b border-ds-borda px-3.5 py-2.5 text-left last:border-b-0 hover:bg-ds-muted"><span className="ds-body-s font-medium">{client.name}</span><span className="ds-caption text-ds-texto-2">{[client.short_code, client.document].filter(Boolean).join(' · ')}</span></button>)
           : <p className="px-3.5 py-3 ds-body-s text-ds-texto-2">Nenhum cliente com esse nome, sigla ou CNPJ.</p>}
       </div> : null}
     </div>
-    {escolhido
-      ? <p className="flex flex-wrap items-center gap-x-2 rounded-md bg-ds-amarelo-suave px-3.5 py-2.5 ds-body-s"><strong className="font-semibold">{escolhido.name}</strong><span className="ds-caption text-ds-texto-2">{[escolhido.short_code, escolhido.document, escolhido.legal_name].filter(Boolean).join(' · ')}</span></p>
-      : <p className="ds-caption text-ds-texto-2">Digite para buscar e escolha o cliente.</p>}
   </div>;
 }
 
-function Criar({ data, reload, notify, aoCriar, preset = null }: { data: CompanyDashboardData; reload: Reload; notify: Notify; aoCriar: (id: string) => void; preset?: { clienteId?: string; nr?: string } | null }) {
+/** Nova turma no painel lateral (Figma 79:1205): o essencial; o resto se completa na ficha. */
+function NovaTurma({ data, reload, notify, aoCriar, onFechar, preset = null }: { data: CompanyDashboardData; reload: Reload; notify: Notify; aoCriar: (id: string) => void; onFechar: () => void; preset?: { clienteId?: string; nr?: string } | null }) {
   const instrutores = data.instructors.filter((item) => item.status === 'active');
   const [salvando, setSalvando] = useState(false);
-  // Vindo da ficha do cliente ("Nova turma" ou "Agendar" uma reciclagem), já chega com cliente e norma.
-  const nrInicial = preset?.nr && nrInfo(preset.nr) ? preset.nr : 'NR 23';
-  const [draft, setDraft] = useState<Draft>({ clientId: preset?.clienteId || '', nr: nrInicial, title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: conteudoPadrao(data, nrInicial), duration: cargaHorariaPadrao(nrInicial), location: '' });
+  // Vindo da ficha do cliente já chega com o cliente; "Agendar" uma reciclagem traz também a norma.
+  const nrInicial = preset?.nr && NORMAS.includes(preset.nr) ? preset.nr : 'NR 23';
+  const clienteInicial = data.clients.find((c) => c.id === preset?.clienteId);
+  const [draft, setDraft] = useState<Draft>({ clientId: clienteInicial?.id ?? '', nr: nrInicial, kind: preset?.nr ? 'reciclagem' : 'formacao', duration: cargaHorariaPadrao(nrInicial), days: [diaVazio()], modalidade: 'in_company', location: enderecoDoCliente(clienteInicial), instructorId: '' });
+  const cliente = data.clients.find((c) => c.id === draft.clientId);
 
-  function changeNr(nr: string) {
-    setDraft((current) => {
-      const previous = conteudoPadrao(data, current.nr);
-      const custom = current.contentProgram.trim() !== '' && current.contentProgram !== previous;
-      // A carga horária sugerida acompanha a norma, mas nunca sobrescreve o que foi digitado.
-      const cargaIntocada = current.duration === cargaHorariaPadrao(current.nr);
-      return { ...current, nr, contentProgram: custom ? current.contentProgram : conteudoPadrao(data, nr), duration: cargaIntocada ? cargaHorariaPadrao(nr) : current.duration };
+  function mudarCliente(id: string) {
+    setDraft((atual) => {
+      const antigo = data.clients.find((c) => c.id === atual.clientId);
+      // O endereço acompanha o cliente enquanto ninguém o digitou à mão.
+      const enderecoIntocado = atual.modalidade === 'in_company' && (atual.location === '' || atual.location === enderecoDoCliente(antigo));
+      return { ...atual, clientId: id, location: enderecoIntocado ? enderecoDoCliente(data.clients.find((c) => c.id === id)) : atual.location };
     });
   }
-  function setDia(index: number, campos: Partial<NovoDia>) {
-    setDraft((current) => ({ ...current, days: current.days.map((dia, i) => (i === index ? { ...dia, ...campos } : dia)) }));
+  function mudarNorma(nr: string) {
+    // A carga horária sugerida acompanha a norma, mas nunca sobrescreve o que foi digitado.
+    setDraft((atual) => ({ ...atual, nr, duration: atual.duration === cargaHorariaPadrao(atual.nr) ? cargaHorariaPadrao(nr) : atual.duration }));
+  }
+  function mudarModalidade(modalidade: Modalidade) {
+    setDraft((atual) => ({ ...atual, modalidade, location: modalidade === 'in_company' ? enderecoDoCliente(cliente) : 'Centro de treinamento Space Light' }));
+  }
+  function setDia(index: number, campos: Partial<Draft['days'][number]>) {
+    setDraft((atual) => ({ ...atual, days: atual.days.map((dia, i) => (i === index ? { ...dia, ...campos } : dia)) }));
   }
   function addDia() {
-    // O dia novo repete o horário e o instrutor do anterior: é o caso comum.
-    setDraft((current) => {
-      const ultimo = current.days[current.days.length - 1];
-      return { ...current, days: [...current.days, { date: '', startTime: ultimo?.startTime ?? '08:00', endTime: ultimo?.endTime ?? '18:00', instructorId: ultimo?.instructorId ?? null }] };
+    // O dia novo repete o horário do anterior: é o caso comum.
+    setDraft((atual) => {
+      const ultimo = atual.days[atual.days.length - 1];
+      return { ...atual, days: [...atual.days, { date: '', startTime: ultimo?.startTime ?? '08:00', endTime: ultimo?.endTime ?? '17:00' }] };
     });
   }
-  function removeDia(index: number) {
-    setDraft((current) => ({ ...current, days: current.days.filter((_, i) => i !== index) }));
-  }
-  async function save(event: SyntheticEvent<HTMLFormElement>) {
+
+  // Instrutores na ordem do desenho: quem está livre e aplica a norma primeiro;
+  // quem já está escalado em outra turma na data vai para o fim, apagado.
+  const primeiraData = draft.days[0]?.date ?? '';
+  const sugestoes = instrutores.map((instrutor) => {
+    const livre = Boolean(primeiraData) && data.instructorAvailability.some((a) => a.instructor_id === instrutor.id && a.available_date === primeiraData);
+    const ocupado = Boolean(primeiraData) && data.trainings.some((t) => t.status !== 'completed' && (t.sessions ?? []).some((s) => s.session_date === primeiraData && s.instructor_id === instrutor.id));
+    const aplica = aplicaNorma(instrutor.specialties, draft.nr);
+    const partes = [
+      ocupado ? 'Escalado em outra turma nesse dia' : livre ? 'Disponível' : primeiraData ? 'Sem disponibilidade marcada' : '',
+      ocupado ? '' : aplica ? `aplica ${draft.nr}` : `não aplica ${draft.nr}`,
+      ocupado ? '' : instrutor.base_city,
+    ].filter(Boolean);
+    return { instrutor, texto: partes.join(' · '), destaque: livre && aplica && !ocupado, ocupado, peso: ocupado ? 3 : livre && aplica ? 0 : livre || aplica ? 1 : 2 };
+  }).sort((a, b) => a.peso - b.peso || a.instrutor.name.localeCompare(b.instrutor.name));
+  const escolhido = instrutores.find((i) => i.id === draft.instructorId);
+
+  async function criar(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.clientId) { notify('Escolha o cliente da turma.'); return; }
+    if (!draft.location.trim()) { notify('Informe o endereço do treinamento.'); return; }
+    // A aba do WhatsApp abre já no clique; depois da espera o navegador bloquearia.
+    const janela = escolhido?.phone ? window.open('', '_blank') : null;
     setSalvando(true);
     try {
-      const result = await createMockTraining(draft);
-      aoCriar(result.id);
-      setDraft({ ...draft, title: '', internalLabel: '', theme: '', days: [diaVazio()], contentProgram: conteudoPadrao(data, draft.nr), location: '' });
-      notify('Treinamento criado com QR Code próprio.');
+      const resultado = await createMockTraining({
+        clientId: draft.clientId,
+        nr: draft.nr,
+        kind: draft.kind,
+        title: tituloPadrao(draft.nr),
+        internalLabel: '',
+        theme: '',
+        days: draft.days.map((dia) => ({ ...dia, instructorId: draft.instructorId || null })),
+        contentProgram: conteudoPadrao(data, draft.nr),
+        duration: draft.duration,
+        location: draft.location,
+      });
+      const dias = [...draft.days].filter((d) => d.date).sort((a, b) => a.date.localeCompare(b.date));
+      const url = escolhido?.phone ? whatsappLink(escolhido.phone, trainingScheduleMessage({
+        instructorName: escolhido.name,
+        nr: draft.nr,
+        title: tituloPadrao(draft.nr),
+        clientName: cliente?.name ?? '',
+        dateLabel: dias.map((d) => formatDate(d.date)).join(', '),
+        timeLabel: scheduleWindow(dias[0]?.startTime ?? '', dias[0]?.endTime ?? ''),
+        duration: draft.duration,
+        location: draft.location,
+      })) : null;
+      if (janela && url) janela.location.href = url; else janela?.close();
+      notify(escolhido ? (url ? `Turma criada. A mensagem para ${escolhido.name.split(' ')[0]} abriu no WhatsApp.` : `Turma criada. ${escolhido.name} não tem telefone no cadastro para o aviso.`) : 'Turma criada. Escale o instrutor na ficha da turma.');
       await reload();
-    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao criar treinamento.'); }
-    finally { setSalvando(false); }
+      aoCriar(resultado.id);
+    } catch (error) {
+      janela?.close();
+      notify(error instanceof Error ? error.message : 'Erro ao criar a turma.');
+    } finally { setSalvando(false); }
   }
 
-  return <Cartao className="max-w-3xl p-5 sm:p-7"><form onSubmit={save} className="flex flex-col gap-5">
-    <div><h2 className="ds-h4">Nova turma</h2><p className="ds-body-s text-ds-texto-2">Cada data vira um dia com instrutor próprio. Dá para criar agora e escalar depois, na agenda.</p></div>
-    <ClientPicker clients={data.clients} value={draft.clientId} onChange={(id) => setDraft({ ...draft, clientId: id })} />
-    <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
-      <Campo rotulo="Norma"><select value={draft.nr} onChange={(e) => changeNr(e.target.value)} className={selectClasses}>{NORMAS.map((nr) => <option key={nr}>{nr}</option>)}</select></Campo>
-      <Campo rotulo="Título no certificado"><input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Ex.: Treinamento de Brigada de Incêndio - Intermediário" className={campoClasses} /></Campo>
-    </div>
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Campo rotulo="Identificação da turma" ajuda="Não aparece em nenhum documento."><input value={draft.internalLabel} onChange={(e) => setDraft({ ...draft, internalLabel: e.target.value })} placeholder="Ex.: Turma A - manhã" className={campoClasses} /></Campo>
-      <Campo rotulo="Tema da turma" ajuda="Vai na escala do instrutor. Não aparece em documento."><input value={draft.theme} onChange={(e) => setDraft({ ...draft, theme: e.target.value })} placeholder="Ex.: Reciclagem da manutenção" className={campoClasses} /></Campo>
-    </div>
-    <fieldset className="flex flex-col gap-3 rounded-lg border border-ds-borda p-4">
-      <legend className="px-1 font-ds-sans text-sm font-medium">Dias do treinamento</legend>
-      {draft.days.map((dia, index) => <div key={index} className="flex flex-col gap-2 rounded-lg bg-ds-muted p-3">
-        <div className="flex items-center justify-between"><span className="ds-caps text-ds-texto-2">Dia {index + 1}</span>{draft.days.length > 1 ? <BotaoIcone rotulo={`Remover o dia ${index + 1}`} tom="perigo" className="size-8" onClick={() => removeDia(index)}><X /></BotaoIcone> : null}</div>
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <input required type="date" aria-label={`Data do dia ${index + 1}`} value={dia.date} onChange={(e) => setDia(index, { date: e.target.value })} className={campoClasses} />
-          <div className="grid grid-cols-2 gap-2">
-            <input type="time" aria-label={`Início do dia ${index + 1}`} value={dia.startTime} onChange={(e) => setDia(index, { startTime: e.target.value })} className={campoClasses} />
-            <input type="time" aria-label={`Fim do dia ${index + 1}`} value={dia.endTime} onChange={(e) => setDia(index, { endTime: e.target.value })} className={campoClasses} />
-          </div>
-          <select aria-label={`Instrutor do dia ${index + 1}`} value={dia.instructorId ?? ''} onChange={(e) => setDia(index, { instructorId: e.target.value || null })} className={cn(selectClasses, 'sm:col-span-2')}>
-            <option value="">Sem instrutor — escalar depois</option>
-            {instrutores.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.specialties}</option>)}
-          </select>
+  return <PainelLateral aberto onFechar={onFechar} largura={520} sobretitulo="Turma nova" titulo="Nova turma" subtitulo="Preencha o essencial. Dá para completar depois."
+    acoes={<><Botao tipo="secundario" onClick={onFechar}>Cancelar</Botao><Botao type="submit" form="nova-turma" className="flex-1" disabled={salvando || data.clients.length === 0}>{salvando ? <Loader2 className="animate-spin" /> : null}{escolhido ? 'Criar turma e avisar instrutor' : 'Criar turma'}</Botao></>}>
+    <form id="nova-turma" onSubmit={criar} className="flex flex-col gap-[18px]">
+      {data.clients.length === 0 ? <Faixa tom="sinal">Cadastre um cliente antes de criar a turma.</Faixa> : null}
+      <Divisor>Cliente e treinamento</Divisor>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ClientPicker clients={data.clients} value={draft.clientId} onChange={mudarCliente} />
+        <Campo rotulo="Unidade"><input readOnly value={cliente ? cliente.unit || '—' : ''} placeholder="Vem do cliente" className={cn(campoClasses, 'bg-ds-muted')} /></Campo>
+      </div>
+      <div className="flex flex-col gap-2">
+        <span className="font-ds-sans text-sm leading-5 font-medium">Norma</span>
+        <div className="flex flex-wrap gap-1.5">{NORMAS.map((nr) => <Chip key={nr} selecionado={draft.nr === nr} onClick={() => mudarNorma(nr)}>{nr === 'EMERGÊNCIAS QUÍMICAS' ? 'Emerg. químicas' : nr}</Chip>)}</div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Campo rotulo="Tipo"><select value={draft.kind} onChange={(e) => { const valor = e.target.value as Tipo; setDraft((atual) => ({ ...atual, kind: valor })); }} className={selectClasses}><option value="formacao">Formação</option><option value="reciclagem">Reciclagem</option></select></Campo>
+        <Campo rotulo="Carga horária"><input required value={draft.duration} onChange={(e) => { const valor = e.target.value; setDraft((atual) => ({ ...atual, duration: valor })); }} placeholder="Ex.: 16 horas" className={campoClasses} /></Campo>
+      </div>
+
+      <Divisor>Data e local</Divisor>
+      {draft.days.map((dia, index) => <div key={index} className="flex flex-col gap-2">
+        {draft.days.length > 1 ? <div className="flex items-center justify-between"><span className="ds-caps text-ds-texto-2">Dia {index + 1}</span><BotaoIcone rotulo={`Remover o dia ${index + 1}`} tom="perigo" className="size-8" onClick={() => setDraft((atual) => ({ ...atual, days: atual.days.filter((_, i) => i !== index) }))}><X /></BotaoIcone></div> : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Campo rotulo="Data"><input required type="date" value={dia.date} onChange={(e) => setDia(index, { date: e.target.value })} className={campoClasses} /></Campo>
+          <Campo rotulo="Horário"><div className={cn(campoClasses, 'flex items-center gap-1.5 focus-within:border-ds-borda-forte focus-within:ring-2 focus-within:ring-ds-amarelo/40')}>
+            <input type="time" aria-label={`Início do dia ${index + 1}`} value={dia.startTime} onChange={(e) => setDia(index, { startTime: e.target.value })} className="min-w-0 flex-1 bg-transparent outline-none" />
+            <span className="text-ds-texto-2">às</span>
+            <input type="time" aria-label={`Fim do dia ${index + 1}`} value={dia.endTime} onChange={(e) => setDia(index, { endTime: e.target.value })} className="min-w-0 flex-1 bg-transparent outline-none" />
+          </div></Campo>
         </div>
       </div>)}
-      <button type="button" onClick={addDia} className={botaoClasses('link', 'P', 'w-fit')}><Plus />Adicionar dia</button>
-      <p className="ds-caption text-ds-texto-2">A lista de presença é impressa no 1º dia com uma coluna de assinatura por data. A foto dela é cobrada no último dia.</p>
-    </fieldset>
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Campo rotulo="Carga horária"><input required value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: e.target.value })} className={campoClasses} /></Campo>
-      <Campo rotulo="Endereço do treinamento"><input required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} placeholder="Rua, número, bairro e cidade" className={campoClasses} /></Campo>
-    </div>
-    <CampoConteudo data={data} nr={draft.nr} valor={draft.contentProgram} onChange={(contentProgram) => setDraft({ ...draft, contentProgram })} reload={reload} notify={notify} />
-    <div><Botao type="submit" disabled={data.clients.length === 0 || salvando}>{salvando ? <Loader2 className="animate-spin" /> : <CalendarPlus />}Criar turma e QR</Botao></div>
-    {data.clients.length === 0 ? <Faixa tom="sinal">Cadastre um cliente antes de criar a turma.</Faixa> : null}
-  </form></Cartao>;
+      <button type="button" onClick={addDia} className={botaoClasses('link', 'P', 'w-fit -mt-2')}><Plus />Adicionar dia</button>
+      <Segmentado rotulo="Local do treinamento" ativa={draft.modalidade} onChange={mudarModalidade} opcoes={[{ id: 'in_company', rotulo: 'In company' }, { id: 'centro', rotulo: 'Centro de treinamento' }]} />
+      <Campo rotulo="Endereço"><input required value={draft.location} onChange={(e) => { const valor = e.target.value; setDraft((atual) => ({ ...atual, location: valor })); }} placeholder={draft.modalidade === 'in_company' ? 'Endereço do cliente' : 'Endereço do centro de treinamento'} className={campoClasses} /></Campo>
+
+      <Divisor>Instrutor</Divisor>
+      <div role="radiogroup" aria-label="Instrutor" className="overflow-hidden rounded-lg border border-ds-borda">
+        {sugestoes.map(({ instrutor, texto, destaque, ocupado }) => {
+          const marcado = draft.instructorId === instrutor.id;
+          return <label key={instrutor.id} className={cn('flex cursor-pointer items-center gap-3 border-b border-ds-borda px-3 py-2.5 last:border-b-0', marcado && 'bg-ds-amarelo-suave', ocupado && 'opacity-50')}>
+            <input type="radio" name="instrutor" checked={marcado} onChange={() => setDraft((atual) => ({ ...atual, instructorId: instrutor.id }))} className="size-[18px] shrink-0 accent-ds-inverso" />
+            <Avatar nome={instrutor.name} tamanho={28} />
+            <span className="min-w-0 flex-1"><span className="block truncate ds-body-s font-medium">{instrutor.name}</span><span className={cn('block truncate ds-caption', destaque ? 'text-ds-sucesso' : 'text-ds-texto-2')}>{texto}</span></span>
+          </label>;
+        })}
+        <label className={cn('flex cursor-pointer items-center gap-3 px-3 py-2.5', !draft.instructorId && 'bg-ds-amarelo-suave', sugestoes.length > 0 && 'border-t border-ds-borda')}>
+          <input type="radio" name="instrutor" checked={!draft.instructorId} onChange={() => setDraft((atual) => ({ ...atual, instructorId: '' }))} className="size-[18px] shrink-0 accent-ds-inverso" />
+          <span className="ds-body-s font-medium">Escalar depois</span>
+        </label>
+      </div>
+      {!primeiraData ? <p className="-mt-2 ds-caption text-ds-texto-2">Escolha a data para ver quem está disponível.</p> : null}
+    </form>
+  </PainelLateral>;
 }
 
 // ---------------------------------------------------------------------------
 // Tela de turmas (Figma 18:170)
 // ---------------------------------------------------------------------------
 
-export function CompanyTrainings({ data, reload, notify, turmaAlvo = null, vistaInicial = null, presetNova = null }: { data: CompanyDashboardData; reload: Reload; notify: Notify; turmaAlvo?: string | null; vistaInicial?: 'agenda' | 'criar' | null; presetNova?: { clienteId?: string; nr?: string } | null }) {
-  const [vista, setVista] = useState<Vista>(vistaInicial ?? 'tabela');
+export function CompanyTrainings({ data, reload, notify, turmaAlvo = null, vistaInicial = null, presetNova = null, abrirQr }: { data: CompanyDashboardData; reload: Reload; notify: Notify; turmaAlvo?: string | null; vistaInicial?: 'agenda' | 'criar' | null; presetNova?: { clienteId?: string; nr?: string } | null; abrirQr?: (trainingId: string) => void }) {
+  const [vista, setVista] = useState<Vista>(vistaInicial === 'agenda' ? 'agenda' : 'tabela');
+  const [criando, setCriando] = useState(vistaInicial === 'criar');
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<Filtro>('todas');
   const [aberta, setAberta] = useState<string | null>(turmaAlvo);
   const [emissao, setEmissao] = useState<string | null>(null);
-  const [criada, setCriada] = useState<string | null>(null);
 
   const instrutores = data.instructors.filter((item) => item.status === 'active');
   const hojeIso = isoFromDate(new Date());
@@ -664,23 +806,35 @@ export function CompanyTrainings({ data, reload, notify, turmaAlvo = null, vista
   const lista = ordenadas.filter((t) => regras[filtro](t) && casa(t));
   const turmaAberta = aberta ? data.trainings.find((t) => t.id === aberta) : undefined;
   const turmaEmissao = emissao ? data.trainings.find((t) => t.id === emissao) : undefined;
-  const nova = criada ? data.trainings.find((item) => item.id === criada) : undefined;
+
+  // Planilha da lista que está na tela, com o filtro e a busca aplicados.
+  function exportar() {
+    const cabecalho = ['Turma', 'Cliente', 'Norma', 'Treinamento', 'Tipo', 'Data', 'Dias', 'Instrutor', 'Status'];
+    const linhas = lista.map((t) => {
+      const dia = proximoDia(t);
+      const [ano, mes, diaDoMes] = (dia?.session_date ?? t.training_date).split('-');
+      const instrutor = dia?.instructor_name ?? (dia ? '' : t.instructor);
+      return [t.code, t.client_name, t.nr, t.title, ROTULO_DO_TIPO[t.kind ?? ''] ?? '', `${diaDoMes}/${mes}/${ano}`, String(t.sessions.length), instrutor || 'A definir', situacaoDaTurma(t, hojeIso).texto];
+    });
+    const csv = [cabecalho, ...linhas].map((l) => l.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `turmas-${hojeIso}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const pilulas: Array<[Filtro, string]> = [['todas', 'Todas'], ['scheduled', 'Agendadas'], ['in_progress', 'Em andamento'], ['atrasadas', 'Dia vencido'], ['sem_instrutor', 'Sem instrutor'], ['aguardando', 'Aguardando certificados'], ['completed', 'Concluídas']];
 
   return <div className="flex flex-col gap-6">
     <TopoDePagina titulo="Turmas" subtitulo="Todas as turmas de todos os clientes, do agendamento ao certificado." acoes={<>
+      {vista === 'tabela' ? <Botao tipo="secundario" onClick={exportar} disabled={lista.length === 0}>Exportar<Download /></Botao> : null}
       <Botao tipo="secundario" onClick={() => setVista(vista === 'agenda' ? 'tabela' : 'agenda')}>{vista === 'agenda' ? 'Tabela' : 'Agenda'}<CalendarDays /></Botao>
-      <Botao onClick={() => setVista('criar')}>Nova turma<Plus /></Botao>
+      <Botao onClick={() => setCriando(true)}>Nova turma<Plus /></Botao>
     </>} />
 
     {vista === 'agenda' ? <Agenda data={data} reload={reload} notify={notify} abrirTurma={(id) => setAberta(id)} /> : null}
-
-    {vista === 'criar' ? <div className="flex flex-col gap-4">
-      {nova ? <Faixa tom="sucesso" titulo={`Turma criada: ${nova.nr} · ${nova.title}`} acao={<Botao tamanho="P" tipo="escuro" onClick={() => { setAberta(nova.id); setVista('tabela'); setCriada(null); }}>Abrir a ficha</Botao>}>{(nova.sessions ?? []).some((dia) => !dia.instructor_id) ? 'Escale o instrutor de cada dia na ficha da turma; de lá você avisa cada um pelo WhatsApp.' : 'Instrutores escalados. Avise cada um pela ficha da turma.'}</Faixa> : null}
-      <button type="button" onClick={() => setVista('tabela')} className={botaoClasses('link', 'P', 'w-fit')}>← Voltar às turmas</button>
-      <Criar data={data} reload={reload} notify={notify} aoCriar={setCriada} preset={presetNova} />
-    </div> : null}
 
     {vista === 'tabela' ? <>
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
@@ -701,16 +855,20 @@ export function CompanyTrainings({ data, reload, notify, turmaAlvo = null, vista
             <td className={cn(tb.td, 'font-medium')}><button type="button" onClick={(e) => { e.stopPropagation(); setAberta(t.id); }} className="text-left ds-foco">{t.client_name}{t.internal_label ? <span className="block ds-caption font-normal text-ds-texto-2">{t.internal_label}</span> : null}</button></td>
             <td className={cn(tb.td, 'max-w-[220px] truncate')} title={t.title}>{t.nr} · {t.title}</td>
             <td className={cn(tb.td, 'whitespace-nowrap')}>{formatDayMonth(dia?.session_date ?? t.training_date)}{t.sessions.length > 1 && dia ? <span className="block ds-caption text-ds-texto-2">dia {dia.day_number} de {t.sessions.length}</span> : null}</td>
-            <td className={cn(tb.td, !instrutor && t.status !== 'completed' && 'text-ds-perigo')}>{instrutor || (t.status === 'completed' ? '—' : 'A definir')}</td>
+            <td className={cn(tb.td, !instrutor && 'text-ds-texto-2')}>{instrutor || (t.status === 'completed' ? '—' : 'A definir')}</td>
             <td className={tb.td}>{sit.texto === 'Aguardando certificados' ? <button type="button" onClick={(e) => { e.stopPropagation(); setEmissao(t.id); }} className="ds-foco rounded"><Tag tom={sit.tom}>{sit.texto}</Tag></button> : <Tag tom={sit.tom}>{sit.texto}</Tag>}</td>
           </tr>;
         })}</tbody>
       </table></div></div> : <Vazio icone={<CalendarPlus />} titulo="Nenhuma turma neste filtro" texto={data.trainings.length === 0 ? 'Crie a primeira turma em "Nova turma".' : 'Ajuste a busca ou o filtro.'} />}
     </> : null}
 
-    {turmaAberta ? <PainelLateral aberto onFechar={() => setAberta(null)} largura={760} sobretitulo={`Turma ${turmaAberta.code}`} titulo={`${turmaAberta.nr} · ${turmaAberta.internal_label || turmaAberta.title}`} subtitulo={<span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="inline-flex items-center gap-1.5"><UserRound className="size-3.5" />{turmaAberta.client_name}</span><span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5" />{turmaAberta.duration}</span><span className="inline-flex items-center gap-1.5"><ImageIcon className="size-3.5" />{turmaAberta.file_count} arquivos</span><Tag tom={situacaoDaTurma(turmaAberta, hojeIso).tom}>{situacaoDaTurma(turmaAberta, hojeIso).texto}</Tag></span>}>
+    {turmaAberta ? <PainelLateral aberto onFechar={() => setAberta(null)} largura={760} sobretitulo={`Turma ${turmaAberta.code}`} titulo={`${turmaAberta.nr} · ${turmaAberta.internal_label || turmaAberta.title}`}
+      subtitulo={[turmaAberta.client_name, data.clients.find((c) => c.id === turmaAberta.client_id)?.unit].filter(Boolean).join(' · ')}
+      acoes={<><a href={`/lista-presenca/${turmaAberta.id}`} target="_blank" rel="noopener" className={botaoClasses('secundario', 'M')}><FileText />Lista para imprimir</a>{abrirQr ? <Botao className="flex-1" onClick={() => abrirQr(turmaAberta.id)}>Abrir QR e participantes</Botao> : null}</>}>
       <FichaDaTurma key={turmaAberta.id} training={turmaAberta} data={data} instructors={instrutores} reload={reload} notify={notify} emitir={() => { setEmissao(turmaAberta.id); setAberta(null); }} aoExcluir={() => setAberta(null)} />
     </PainelLateral> : null}
+
+    {criando ? <NovaTurma data={data} reload={reload} notify={notify} preset={presetNova} onFechar={() => setCriando(false)} aoCriar={(id) => { setCriando(false); setVista('tabela'); setAberta(id); }} /> : null}
 
     {turmaEmissao ? <EmitirCertificados key={turmaEmissao.id} training={turmaEmissao} data={data} aberto onFechar={() => setEmissao(null)} reload={reload} notify={notify} /> : null}
   </div>;

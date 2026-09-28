@@ -67,11 +67,11 @@ export function CompanyPortal({ initialData }: { initialData: CompanyDashboardDa
   if (section === 'dashboard') conteudo = <CompanyDashboard data={data} navigate={irPara} />;
   else if (section === 'clients') conteudo = <CompanyClients data={data} reload={reload} notify={setAviso} navegar={irPara} />;
   else if (section === 'instructors') conteudo = <CompanyInstructors data={data} reload={reload} notify={setAviso} />;
-  else if (section === 'trainings') conteudo = <CompanyTrainings data={data} reload={reload} notify={setAviso} turmaAlvo={turmaAlvo} vistaInicial={vistaTurmas} presetNova={presetTurma} />;
+  else if (section === 'trainings') conteudo = <CompanyTrainings data={data} reload={reload} notify={setAviso} turmaAlvo={turmaAlvo} vistaInicial={vistaTurmas} presetNova={presetTurma} abrirQr={(id) => irPara('participants', id)} />;
   else if (section === 'certificates') conteudo = <CompanyCertificates data={data} reload={reload} notify={setAviso} abrirDocumentos={() => irPara('files')} />;
   else if (section === 'files') conteudo = <CompanyFiles data={data} reload={reload} notify={setAviso} />;
-  else if (section === 'participants') conteudo = <CompanyParticipants data={data} reload={reload} notify={setAviso} />;
-  else if (section === 'requests') conteudo = <CompanyRequests data={data} reload={reload} notify={setAviso} novaTurma={() => irPara('trainings')} />;
+  else if (section === 'participants') conteudo = <CompanyParticipants data={data} reload={reload} notify={setAviso} turmaAlvo={turmaAlvo} />;
+  else if (section === 'requests') conteudo = <CompanyRequests data={data} reload={reload} notify={setAviso} novaTurma={() => irPara('trainings', undefined, 'criar')} />;
   else if (section === 'settings') conteudo = <CompanySettings data={data} reload={reload} notify={setAviso} />;
 
   return <PortalShell area="Equipe Space Light" itens={itens} ativo={section} onNavegar={(id) => irPara(id)} usuario={{ nome: data.currentUser.name, detalhe: data.currentUser.jobTitle || data.currentUser.email }} onUsuario={() => irPara('settings')}>

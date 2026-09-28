@@ -87,6 +87,8 @@ export type CompanyTraining = {
   internal_label: string;
   /** Assunto da turma, avisado ao instrutor na escala; vem só na gestão. */
   theme?: string;
+  /** 'formacao', 'reciclagem' ou '' (não informado); vem só na gestão. */
+  kind?: string;
   /** Conteúdo programático; vem só nos dados da gestão. */
   content_program?: string;
   training_date: string;
