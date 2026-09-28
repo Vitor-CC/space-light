@@ -21,7 +21,7 @@ import type { CompanyDashboardData } from '@/lib/company-types';
 import { readMockCompanyDatabase } from '@/lib/mock-company-database';
 
 /** Seções que desenham o próprio cabeçalho (as demais usam o SectionHeading). */
-const COM_CABECALHO_PROPRIO: CompanySection[] = ['dashboard', 'clients', 'trainings', 'certificates', 'requests', 'settings'];
+const COM_CABECALHO_PROPRIO: CompanySection[] = ['dashboard', 'clients', 'trainings', 'instructors', 'certificates', 'requests', 'settings'];
 
 export function CompanyPortal({ initialData }: { initialData: CompanyDashboardData }) {
   const [section, setSection] = useState<CompanySection>('dashboard');
@@ -66,7 +66,7 @@ export function CompanyPortal({ initialData }: { initialData: CompanyDashboardDa
   let conteudo: React.ReactNode = null;
   if (section === 'dashboard') conteudo = <CompanyDashboard data={data} navigate={irPara} />;
   else if (section === 'clients') conteudo = <CompanyClients data={data} reload={reload} notify={setAviso} navegar={irPara} />;
-  else if (section === 'instructors') conteudo = <CompanyInstructors data={data} reload={reload} notify={setAviso} />;
+  else if (section === 'instructors') conteudo = <CompanyInstructors data={data} reload={reload} notify={setAviso} navegar={irPara} />;
   else if (section === 'trainings') conteudo = <CompanyTrainings data={data} reload={reload} notify={setAviso} turmaAlvo={turmaAlvo} vistaInicial={vistaTurmas} presetNova={presetTurma} abrirQr={(id) => irPara('participants', id)} />;
   else if (section === 'certificates') conteudo = <CompanyCertificates data={data} reload={reload} notify={setAviso} abrirDocumentos={() => irPara('files')} />;
   else if (section === 'files') conteudo = <CompanyFiles data={data} reload={reload} notify={setAviso} />;
