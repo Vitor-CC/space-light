@@ -30,6 +30,22 @@ export const PROGRAMAS: Record<string, ProgramaDeCurso> = {
     }],
   },
 
+  // NR 06 e DEA: certificados do certificador recebidos em 29/09/2026.
+  'NR 06': {
+    cargaHoraria: '2 horas',
+    secoes: [{
+      itens: [
+        'Legislação;',
+        'Certificado de Aprovação - CA;',
+        'Finalidade dos EPIs utilizados na empresa;',
+        'Características técnicas e atenuações dos EPIs;',
+        'Modo de utilização dos EPIs;',
+        'Periodicidade de troca, higienização e conservação dos EPIs;',
+        'Treinamento prático com os EPIs.',
+      ],
+    }],
+  },
+
   'NR 10': {
     cargaHoraria: '40 horas',
     secoes: [{
@@ -232,6 +248,31 @@ export const PROGRAMAS: Record<string, ProgramaDeCurso> = {
         'EPIs — Equipamentos de Proteção Individual para trabalho em altura: seleção, inspeção, conservação e limitação de uso;',
         'Acidentes típicos em trabalhos em altura;',
         'Condutas em emergências, incluindo noções de técnicas de resgate e de primeiros socorros.',
+      ],
+    }],
+  },
+
+  'DEA': {
+    cargaHoraria: '4 horas',
+    secoes: [{
+      titulo: 'Formação',
+      itens: [
+        'Parada cardiorrespiratória, definição e epidemiologia;',
+        'Legislação e programa de acesso público a desfibrilador;',
+        'Cadeia de sobrevivência;',
+        'Suporte básico de vida;',
+        'Checagem de responsividade;',
+        'Respiração de resgate inicial;',
+        'Obstrução das vias aéreas por corpo estranho (OVACE);',
+        'Reanimação cardiopulmonar (RCP);',
+        'Desfibrilador externo automático (DEA);',
+        'Uso do equipamento DEA "treinamento";',
+        'Operação do aparelho DEA;',
+        'Aplicação na vítima;',
+        'Cuidados com o equipamento;',
+        'Procedimentos de reanimação de acordo com o Protocolo 2010 American Heart - BLS - Basic Life Support (Suporte Básico de Vida);',
+        'Demonstração do uso do aparelho DEA;',
+        'Ênfase em atividades práticas, com equipamento DEA e manequins em número suficiente para que todos possam operá-lo.',
       ],
     }],
   },

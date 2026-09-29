@@ -3066,6 +3066,8 @@ export type CertificateData = {
     nr: string;
     title: string;
     duration: string;
+    /** 'formacao', 'reciclagem' ou '' (turma sem tipo informado). */
+    kind: string;
     dates: string[];
   };
   client: {
@@ -3099,7 +3101,7 @@ export async function getCertificateData(input: {
   await ensurePortalSchema();
   const d1 = getD1();
   const training = await d1
-    .prepare(`SELECT t.id, t.nr, t.title, t.duration, t.training_date, t.training_dates,
+    .prepare(`SELECT t.id, t.nr, t.title, t.duration, t.kind, t.training_date, t.training_dates,
       t.instructor_id, t.client_id, c.legal_name, c.document AS client_document,
       c.address, c.district, c.city, c.state,
       COALESCE(i.name, t.instructor) AS instructor_name,
@@ -3110,7 +3112,7 @@ export async function getCertificateData(input: {
       WHERE t.id = ? LIMIT 1`)
     .bind(input.trainingId)
     .first<{
-      id: string; nr: string; title: string; duration: string;
+      id: string; nr: string; title: string; duration: string; kind: string | null;
       training_date: string; training_dates: string; instructor_id: string | null;
       client_id: string; legal_name: string; client_document: string;
       address: string; district: string; city: string; state: string;
@@ -3157,6 +3159,7 @@ export async function getCertificateData(input: {
       nr: training.nr,
       title: training.title,
       duration: training.duration,
+      kind: training.kind ?? '',
       dates,
     },
     client: {

@@ -119,9 +119,9 @@ export async function publishCertificateDocument(input: {
     nome: companyCertificateFileName(data),
     bytes: await buildCompanyCertificatePdf({ data, instructorSignature }),
   });
-  // Só a norma com texto de atestado cadastrado gera a peça do Corpo de
-  // Bombeiros; as demais entregam apenas os certificados.
-  if (certificateSetup(data.training.nr)?.attestationSubject) {
+  // Só a norma com atestado cadastrado gera o atestado; as demais entregam
+  // apenas os certificados.
+  if (certificateSetup(data.training.nr)?.attestation) {
     documentos.push({
       nome: attestationFileName(data),
       bytes: await buildAttestationPdf({ data, instructorSignature }),

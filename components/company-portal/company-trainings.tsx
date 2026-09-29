@@ -26,7 +26,7 @@ type Vista = 'tabela' | 'agenda';
 type Filtro = 'todas' | 'scheduled' | 'in_progress' | 'atrasadas' | 'sem_instrutor' | 'aguardando' | 'completed';
 
 // NR 13, 15 e 16 são só laudo: não entram aqui (decisão de 27/09/2026).
-const NORMAS = ['NR 05', 'NR 06', 'NR 07', 'NR 07 LEI LUCAS', 'NR 10', 'NR 10 SEP', 'NR 11', 'NR 12', 'NR 18', 'NR 20', 'NR 23', 'NR 26', 'NR 31', 'NR 33', 'NR 34', 'NR 35', 'EMERGÊNCIAS QUÍMICAS'];
+const NORMAS = ['NR 05', 'NR 06', 'NR 07', 'NR 07 LEI LUCAS', 'NR 10', 'NR 10 SEP', 'NR 11', 'NR 12', 'NR 18', 'NR 20', 'NR 23', 'NR 26', 'NR 31', 'NR 33', 'NR 34', 'NR 35', 'EMERGÊNCIAS QUÍMICAS', 'DEA'];
 /** Validade oferecida no cadastro e na emissão. Só aparece no portal; o PDF não muda. */
 const VALIDADES = [0, 6, 12, 24, 36, 48, 60];
 
@@ -618,6 +618,7 @@ type Draft = { clientId: string; nr: string; kind: Tipo; duration: string; days:
 /** Título do certificado sugerido pela norma; a equipe ajusta depois na ficha. */
 function tituloPadrao(nr: string) {
   if (nr === 'EMERGÊNCIAS QUÍMICAS') return 'Atendimento a emergências químicas';
+  if (nr === 'DEA') return 'Treinamento do DEA – Desfibrilador Externo Automático';
   return nrInfo(nr)?.title ?? nr;
 }
 

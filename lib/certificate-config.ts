@@ -11,31 +11,57 @@ export type CertificateSetup = {
   background?: string;
   seal?: string;
   sealAlt?: string;
-  /**
-   * Atestado é a peça que vai ao Corpo de Bombeiros, e o fecho dela fala de
-   * combate a incêndio. Só a norma que tem estes dois campos emite atestado;
-   * as demais emitem apenas os certificados.
-   */
-  attestationSubject?: string;
-  attestationLegalBasis?: string;
+  /** Só a norma com atestado cadastrado emite atestado; as demais, só certificados. */
+  attestation?: AttestationSetup;
 };
+
+export type AttestationTurma = { duration: string; kind: string };
+
+/**
+ * O atestado lista os participantes e a edificação do cliente. O parágrafo de
+ * abertura muda de norma para norma (base legal, fecho, às vezes a carga
+ * horária no meio), então cada uma guarda o texto inteiro, transcrito do
+ * atestado do certificador.
+ */
+export type AttestationSetup = {
+  texto: (turma: AttestationTurma) => string;
+  /** NR 23 e DEA listam a data de nascimento; as demais, o tipo do treinamento. */
+  colunaExtra: 'nascimento' | 'treinamento';
+};
+
+const ATESTO = 'Atesto, para os devidos fins, que as pessoas abaixo relacionadas participaram com bom aproveitamento';
+const EDIFICACAO = 'referente à edificação localizada no endereço abaixo';
 
 /**
  * Base legal transcrita dos certificados do certificador da Space Light
  * (documentos recebidos em 18/09/2026), com os erros de digitação da origem
  * corrigidos a pedido do Vitor: "DAREFERIDA NORMA", acentos faltando e caixa
- * alta corrida. Números de portaria, item e norma não foram tocados.
+ * alta corrida. Números de portaria, item e norma não foram tocados. Os
+ * atestados vieram em 29/09/2026, com o mesmo tratamento e o emissor
+ * padronizado como SPACE LIGHT ENGENHARIA.
  */
 export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
   'NR 05': {
     legalBasis: 'de acordo com a Portaria 3214/78 do MTB - NR 05 - CIPAA,',
   },
+  // Transcrito do certificado do certificador recebido em 29/09/2026.
+  'NR 06': {
+    legalBasis: 'de acordo com a Portaria 3214/78 - NR 06 - Equipamento de Proteção Individual,',
+  },
   'NR 10': {
     legalBasis: 'de acordo com a NR 10, item 10.8 e Anexo III da referida norma,',
+    attestation: {
+      texto: () => `${ATESTO} da formação do "CURSO DE NR 10 - FORMAÇÃO EM SEGURANÇA EM INSTALAÇÕES E SERVIÇOS COM ELETRICIDADE", ministrado pela SPACE LIGHT ENGENHARIA, ${EDIFICACAO}:`,
+      colunaExtra: 'treinamento',
+    },
   },
   // Curso complementar do SEP: mesma base legal da formação, conteúdo próprio.
   'NR 10 SEP': {
     legalBasis: 'de acordo com a NR 10, item 10.8 e Anexo III da referida norma,',
+    attestation: {
+      texto: ({ duration }) => `${ATESTO} do treinamento de "NR 10, SEGURANÇA EM INSTALAÇÕES E SERVIÇOS EM ELETRICIDADE - SISTEMA ELÉTRICO DE POTÊNCIA", ${duration.trim() ? `com carga horária de ${duration.trim()}, ` : ''}teórico e prático, de acordo com a NR 10, item 10.8 e Anexo III da referida norma, ministrado pela SPACE LIGHT ENGENHARIA, ${EDIFICACAO}:`,
+      colunaExtra: 'treinamento',
+    },
   },
   'NR 11': {
     legalBasis:
@@ -45,12 +71,25 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
     legalBasis:
       'de acordo com a Portaria 3214/78 - NR 12 - Segurança no Trabalho em Máquinas e Equipamentos,',
     background: '/images/certificado/fundo-nr12.jpg',
+    attestation: {
+      // O original diz "da bobcat": a máquina muda de cliente para cliente.
+      texto: ({ kind }) => `${ATESTO} do treinamento de "${kind === 'reciclagem' ? 'Reciclagem' : 'Formação'}", de acordo com a NR 12 - Segurança com Máquinas e Equipamentos, Portaria 3214/78, referente às máquinas alocadas na edificação localizada no endereço abaixo e estão aptas ao manuseio das máquinas da edificação:`,
+      colunaExtra: 'treinamento',
+    },
   },
   'NR 18': {
     legalBasis: 'de acordo com a NR 18, item 18.12.37,',
+    attestation: {
+      texto: () => `${ATESTO} do treinamento de "Plataforma Elevatória Móvel de Trabalho", ${EDIFICACAO} e estão aptas ao manuseio da máquina da edificação:`,
+      colunaExtra: 'treinamento',
+    },
   },
   'NR 20': {
     legalBasis: 'de acordo com a Portaria 3214/78 - NR 20,',
+    attestation: {
+      texto: () => `${ATESTO} do treinamento de "SEGURANÇA E SAÚDE NOS TRABALHOS COM LÍQUIDOS E COMBUSTÍVEIS INFLAMÁVEIS", de acordo com a Portaria 3214/78 - NR 20, ${EDIFICACAO} e estão aptas ao manuseio e contenção dos produtos líquidos e combustíveis inflamáveis da edificação:`,
+      colunaExtra: 'treinamento',
+    },
   },
   'NR 23': {
     legalBasis:
@@ -58,9 +97,11 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
     background: '/images/certificado/fundo-nr23.jpg',
     seal: '/images/certificado/selo-nr23.png',
     sealAlt: 'Selo Brigada de Incêndio',
-    attestationSubject: 'Brigada de Incêndio',
-    attestationLegalBasis:
-      'de acordo com o Decreto 69.118, de 09 de dezembro de 2024, IT 17 de 2025 do Corpo de Bombeiros do Estado de São Paulo, e NBR 14276 e 14277,',
+    // A peça que vai ao Corpo de Bombeiros.
+    attestation: {
+      texto: () => `${ATESTO} do treinamento de "Brigada de Incêndio", de acordo com o Decreto 69.118, de 09 de dezembro de 2024, IT 17 de 2025 do Corpo de Bombeiros do Estado de São Paulo, e NBR 14276 e 14277, ${EDIFICACAO} e estão aptas ao manuseio dos equipamentos de prevenção e combate a incêndio da edificação:`,
+      colunaExtra: 'nascimento',
+    },
   },
   'NR 31': {
     legalBasis: 'de acordo com a Portaria 3214/78 - NR 31,',
@@ -72,11 +113,26 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
   'NR 35': {
     legalBasis: 'de acordo com a NR 35 - Trabalho em Altura,',
     background: '/images/certificado/fundo-nr35.jpg',
+    attestation: {
+      texto: () => `${ATESTO} do treinamento de "Trabalho em Altura", de acordo com a NR 35 - Portaria 3214/78, ${EDIFICACAO} e estão aptas ao manuseio dos equipamentos de proteção individual e trabalho seguro:`,
+      colunaExtra: 'treinamento',
+    },
   },
   // Não é NR: a base é norma da ABNT, e por isso entra pelo nome do treinamento.
   'EMERGÊNCIAS QUÍMICAS': {
     legalBasis: 'de acordo com a ABNT NBR 14.064,',
     background: '/images/certificado/fundo-emergencias-quimicas.jpg',
+  },
+  // Também não é NR: lei municipal de São Paulo, com a NR 07 de apoio.
+  // Certificado e atestado recebidos em 29/09/2026. O fecho do atestado
+  // ("combate a incêndio") está assim no original.
+  'DEA': {
+    legalBasis:
+      'de acordo com a Lei nº 14.621, de 11 de dezembro de 2007, de São Paulo e a Portaria 3214/78 - NR 07 - Programa de Controle Médico de Saúde Ocupacional,',
+    attestation: {
+      texto: () => `${ATESTO} do "TREINAMENTO DO DEA – DESFIBRILADOR EXTERNO AUTOMÁTICO", de acordo com a Lei nº 14.621, de 11 de dezembro de 2007, de São Paulo e a Portaria 3214/78 - NR 07 - Programa de Controle Médico de Saúde Ocupacional, ministrado pela SPACE LIGHT ENGENHARIA, ${EDIFICACAO} e estão aptas ao manuseio dos equipamentos de prevenção e combate a incêndio da edificação:`,
+      colunaExtra: 'nascimento',
+    },
   },
 };
 

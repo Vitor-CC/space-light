@@ -80,6 +80,8 @@ function formatBirthDate(iso: string) {
   return `${day}/${month}/${year}`;
 }
 
+const TIPO_DO_TREINAMENTO: Record<string, string> = { formacao: 'FORMAÇÃO', reciclagem: 'RECICLAGEM' };
+
 export type AttestationPdfInput = {
   data: CertificateData;
   instructorSignature?: { bytes: Uint8Array; contentType: string } | null;
@@ -95,7 +97,8 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   if (!setup) {
     throw new Error(`A base legal da ${data.training.nr} ainda não foi cadastrada.`);
   }
-  if (!setup.attestationSubject || !setup.attestationLegalBasis) {
+  const atestado = setup.attestation;
+  if (!atestado) {
     throw new Error(`A ${data.training.nr} não tem texto de atestado cadastrado.`);
   }
 
@@ -119,7 +122,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   let y = 0;
 
   const corpo = 10.5;
-  const paragrafo = `Atesto, para os devidos fins, que as pessoas abaixo relacionadas participaram com bom aproveitamento do treinamento de "${setup.attestationSubject}", ${setup.attestationLegalBasis} referente à edificação localizada no endereço abaixo e estão aptas ao manuseio dos equipamentos de prevenção e combate a incêndio da edificação:`;
+  const paragrafo = atestado.texto({ duration: data.training.duration ?? '', kind: data.training.kind });
   const campos: [string, string][] = [
     ['EMPRESA', caixaAlta(data.client.legalName)],
     ['CNPJ', data.client.document || '—'],
@@ -210,13 +213,19 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
 
   abrirPagina();
 
-  const colunas: { titulo: string; largura: number; valor: (p: CertificateData['participants'][number]) => string }[] = [
+  type Coluna = { titulo: string; largura: number; valor: (p: CertificateData['participants'][number]) => string };
+  // Turma sem tipo informado (as antigas) fica sem a coluna, em vez de chutar.
+  const tipo = TIPO_DO_TREINAMENTO[data.training.kind] ?? '';
+  const extra: Coluna | null = atestado.colunaExtra === 'nascimento'
+    ? { titulo: 'DATA NASC.', largura: 0.14, valor: (p) => formatBirthDate(p.birthDate) }
+    : tipo ? { titulo: 'TREINAMENTO', largura: 0.14, valor: () => tipo } : null;
+  const colunas = ([
     // Sem coluna de RG: o atestado identifica pelo CPF, como o certificado.
-    { titulo: 'NOME', largura: CONTENT * 0.53, valor: (p) => caixaAlta(p.fullName) },
-    { titulo: 'CPF', largura: CONTENT * 0.18, valor: (p) => p.documentId },
-    { titulo: 'DATA NASC.', largura: CONTENT * 0.14, valor: (p) => formatBirthDate(p.birthDate) },
-    { titulo: 'CARGA HORÁRIA', largura: CONTENT * 0.15, valor: () => data.training.duration },
-  ];
+    { titulo: 'NOME', largura: extra ? 0.53 : 0.62, valor: (p) => caixaAlta(p.fullName) },
+    { titulo: 'CPF', largura: extra ? 0.18 : 0.21, valor: (p) => p.documentId },
+    ...(extra ? [extra] : []),
+    { titulo: 'CARGA HORÁRIA', largura: extra ? 0.15 : 0.17, valor: () => data.training.duration },
+  ] satisfies Coluna[]).map((coluna) => ({ ...coluna, largura: CONTENT * coluna.largura }));
   const alturaLinha = 16;
   const tabelaSize = 7.6;
   /** Data e assinaturas ficam sempre no mesmo lugar, porque vão em toda folha. */
