@@ -48,6 +48,14 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
   'NR 06': {
     legalBasis: 'de acordo com a Portaria 3214/78 - NR 06 - Equipamento de Proteção Individual,',
   },
+  // Primeiros socorros pela Lei Lucas (escolas). Certificado recebido em
+  // 30/09/2026; a NR 07 "pura" (primeiros socorros em empresa) ainda não veio.
+  'NR 07 LEI LUCAS': {
+    legalBasis:
+      'de acordo com a Lei nº 13.722, de 4 de outubro de 2018, e a Portaria 3214/78 - NR 07 - Programa de Controle Médico de Saúde Ocupacional,',
+    seal: '/images/certificado/selo-lei-lucas.png',
+    sealAlt: 'Lei Lucas',
+  },
   'NR 10': {
     legalBasis: 'de acordo com a NR 10, item 10.8 e Anexo III da referida norma,',
     attestation: {

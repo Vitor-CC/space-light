@@ -621,6 +621,7 @@ type Draft = { clientId: string; nr: string; kind: Tipo; machine: string; durati
 function tituloPadrao(nr: string) {
   if (nr === 'EMERGÊNCIAS QUÍMICAS') return 'Atendimento a emergências químicas';
   if (nr === 'DEA') return 'Treinamento do DEA – Desfibrilador Externo Automático';
+  if (nr === 'NR 07 LEI LUCAS') return 'Treinamento de Primeiros Socorros';
   return nrInfo(nr)?.title ?? nr;
 }
 

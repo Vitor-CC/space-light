@@ -46,6 +46,21 @@ export const PROGRAMAS: Record<string, ProgramaDeCurso> = {
     }],
   },
 
+  'NR 07 LEI LUCAS': {
+    cargaHoraria: '4 horas',
+    secoes: [{
+      titulo: 'Formação',
+      itens: [
+        'Conceitos de Primeiros Socorros e Características do Socorrista;',
+        'Segurança e Avaliação da Cena;',
+        'Traumas: Quedas, Fraturas e Luxações, Ferimentos e Hemorragias;',
+        'Bandagens e Controle de Hemorragias;',
+        'Ressuscitação Cardiopulmonar - RCP;',
+        'Conteúdo Básico da Bolsa de Primeiros Socorros.',
+      ],
+    }],
+  },
+
   'NR 10': {
     cargaHoraria: '40 horas',
     secoes: [{
