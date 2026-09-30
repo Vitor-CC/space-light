@@ -140,15 +140,15 @@ export function CompanyCertificates({ data, reload, notify, navegar }: { data: C
       </div>
       {visiveis.length ? <div className={tb.rolagem}><table className={cn(tb.tabela, 'min-w-[900px]')}>
         <thead className={tb.cabeca}><tr><th className={tb.th}>Participante</th><th className={tb.th}>Treinamento</th><th className={tb.th}>Cliente</th><th className={tb.th}>Turma</th><th className={tb.th}>Emissão</th><th className={tb.th}>Validade</th><th className={tb.th}>Situação</th><th className={tb.th}><span className="sr-only">Baixar</span></th></tr></thead>
-        <tbody>{visiveis.map((l) => <tr key={l.chave} className={tb.linha}>
+        <tbody>{visiveis.map((l) => <tr key={l.chave} onClick={() => setEmissao(l.training.id)} className={cn(tb.linha, tb.linhaClicavel)}>
           <td className={cn(tb.td, 'font-medium')}>{l.participante}</td>
           <td className={cn(tb.td, 'max-w-[180px] truncate')} title={l.training.title}>{l.training.nr} · {l.training.title}</td>
           <td className={cn(tb.td, 'max-w-[180px] truncate')}>{l.training.client_name}</td>
-          <td className={tb.td}><button type="button" onClick={() => setEmissao(l.training.id)} title="Ver a emissão desta turma e gerar de novo" className={cn(tb.codigo, 'underline decoration-ds-borda underline-offset-4 hover:decoration-ds-texto ds-foco')}>{l.training.code}</button></td>
+          <td className={tb.td}><button type="button" onClick={(e) => { e.stopPropagation(); setEmissao(l.training.id); }} title="Ver a emissão desta turma e gerar de novo" className={cn(tb.codigo, 'underline decoration-ds-borda underline-offset-4 hover:decoration-ds-texto ds-foco')}>{l.training.code}</button></td>
           <td className={cn(tb.td, 'whitespace-nowrap')}>{dataCurta(l.emissao)}</td>
           <td className={cn(tb.td, 'whitespace-nowrap', !l.validade && 'text-ds-texto-2')}>{l.validade ? dataCurta(l.validade) : '—'}</td>
           <td className={tb.td}><Tag tom={SITUACOES[l.situacao].tom}>{SITUACOES[l.situacao].texto}</Tag></td>
-          <td className={cn(tb.td, 'text-center')}>{l.arquivoId ? <a href={`/api/files/${l.arquivoId}?download=1`} aria-label={`Baixar o certificado de ${l.participante}`} className="inline-flex rounded p-1.5 hover:bg-ds-muted ds-foco"><Download className="size-[18px]" /></a> : <span className="ds-caption text-ds-texto-2" title="PDF não encontrado nos arquivos da turma">—</span>}</td>
+          <td className={cn(tb.td, 'text-center')}>{l.arquivoId ? <a href={`/api/files/${l.arquivoId}?download=1`} onClick={(e) => e.stopPropagation()} aria-label={`Baixar o certificado de ${l.participante}`} className="inline-flex rounded p-1.5 hover:bg-ds-muted ds-foco"><Download className="size-[18px]" /></a> : <span className="ds-caption text-ds-texto-2" title="PDF não encontrado nos arquivos da turma">—</span>}</td>
         </tr>)}</tbody>
       </table></div> : <Vazio icone={<Award />} titulo={linhas.length ? 'Nenhum certificado neste filtro' : 'Nenhum certificado emitido ainda'} texto={linhas.length ? 'Ajuste a busca ou os filtros.' : 'O certificado sai sozinho quando o último dia da turma é encerrado.'} />}
       {filtradas.length ? <div className="flex items-center justify-between border-t border-ds-borda px-5 py-3">
