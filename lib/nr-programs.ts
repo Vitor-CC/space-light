@@ -11,7 +11,14 @@
  */
 
 export type SecaoDePrograma = { titulo?: string; itens: string[] };
-export type ProgramaDeCurso = { cargaHoraria: string; secoes: SecaoDePrograma[] };
+export type ProgramaDeCurso = {
+  cargaHoraria: string;
+  secoes: SecaoDePrograma[];
+  /** Itens numerados (1., 2., ...) e espaçados, como no documento de origem. */
+  numerada?: boolean;
+  /** A responsável técnica assina a página do conteúdo. */
+  assinada?: boolean;
+};
 
 export const PROGRAMAS: Record<string, ProgramaDeCurso> = {
   'NR 05': {
@@ -33,6 +40,8 @@ export const PROGRAMAS: Record<string, ProgramaDeCurso> = {
   // NR 06 e DEA: certificados do certificador recebidos em 29/09/2026.
   'NR 06': {
     cargaHoraria: '2 horas',
+    numerada: true,
+    assinada: true,
     secoes: [{
       itens: [
         'Legislação;',

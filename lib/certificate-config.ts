@@ -156,6 +156,14 @@ export function registroValido(registry: string | null | undefined) {
   return limpo.length > 0 && !/^0+$/.test(limpo);
 }
 
+/**
+ * "MTE: <registro>", sem repetir o rótulo quando o cadastro já traz "MTE" na
+ * frente (ex.: "MTE SP 008828-5").
+ */
+export function mte(registry: string) {
+  return `MTE: ${registry.trim().replace(/^MTE[\s:.-]*/i, '')}`;
+}
+
 export function certificateSetup(nr: string) {
   return CERTIFICATE_SETUP[nr.trim()] ?? null;
 }

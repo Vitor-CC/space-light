@@ -8,6 +8,7 @@ import {
   TECHNICAL_LEAD,
   certificateSetup,
   formatCertificateDates,
+  mte,
 } from '@/lib/certificate-config';
 
 function SignatureBlock({ signature, lines }: { signature?: string | null; lines: string[] }) {
@@ -145,7 +146,7 @@ export function Certificate({
               />
               <SignatureBlock
                 signature={assinaturaInstrutor}
-                lines={['Técnico de Segurança', data.instructor.name, data.instructor.registry ? `MTE: ${data.instructor.registry}` : '']}
+                lines={['Técnico de Segurança', data.instructor.name, data.instructor.registry ? mte(data.instructor.registry) : '']}
               />
             </footer>
           </div>

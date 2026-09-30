@@ -11,6 +11,7 @@ import {
   certificateSetup,
   registroValido,
   formatCertificateDates,
+  mte,
 } from '@/lib/certificate-config';
 import { caixaAlta } from '@/lib/certificate-pdf';
 
@@ -280,7 +281,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
     ...(registroValido(data.instructor.registry)
       ? [{
           assinatura: assinaturaInstrutor,
-          linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), `MTE: ${data.instructor.registry}`],
+          linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), mte(data.instructor.registry)],
         }]
       : []),
   ];

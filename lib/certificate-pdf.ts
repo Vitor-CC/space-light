@@ -8,6 +8,7 @@ import type { CertificateData } from '@/db/company-repository';
 import {
   ISSUING_CITY,
   TECHNICAL_LEAD,
+  mte,
   certificateSetup,
   registroValido,
   formatCertificateDates,
@@ -15,7 +16,7 @@ import {
 import { nomeCertificadoAluno, PREFIXO_CERTIFICADO_ALUNO, semAcento } from '@/lib/nome-certificado';
 import { programForNr } from '@/lib/nr23-program';
 import { programaDoCurso } from '@/lib/nr-programs';
-import type { SecaoDePrograma } from '@/lib/nr-programs';
+import type { ProgramaDeCurso } from '@/lib/nr-programs';
 
 /** A4 paisagem em pontos, o mesmo do modelo impresso da Space. */
 const PAGE_W = 842;
@@ -152,7 +153,7 @@ function blocoDoInstrutor(
   if (!registroValido(data.instructor.registry)) return [];
   return [{
     assinatura,
-    linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), `MTE: ${data.instructor.registry}`],
+    linhas: ['Técnico de Segurança', caixaAlta(data.instructor.name), mte(data.instructor.registry)],
   }];
 }
 
@@ -224,14 +225,18 @@ type BlocoDeLista = { linhas: string[][]; altura: number; secao: boolean; espaco
  */
 function appendListaDePrograma(
   pdf: PDFDocument,
-  secoes: SecaoDePrograma[],
-  options: { duration: string; regular: PDFFont; bold: PDFFont },
+  programa: ProgramaDeCurso,
+  options: { duration: string; regular: PDFFont; bold: PDFFont; assinaturaResponsavel: PDFImage | null },
 ) {
+  const { secoes, numerada = false, assinada = false } = programa;
   const preto = rgb(0, 0, 0);
   const largura = LISTA_W - LISTA_MARGIN * 2;
   const vaoEntreColunas = 36;
-  const larguraColuna = (largura - vaoEntreColunas) / 2;
-  const recuo = 14;
+  // A lista numerada vai numa coluna só, na largura toda, como no documento de origem.
+  const larguraColuna = numerada ? largura : (largura - vaoEntreColunas) / 2;
+  const recuo = numerada ? 22 : 14;
+  /** Base da assinatura da responsável, quando o curso pede a página assinada. */
+  const baseAssinatura = LISTA_MARGIN + 40;
 
   const page = pdf.addPage([LISTA_W, LISTA_H]);
   let y = LISTA_H - LISTA_MARGIN;
@@ -250,7 +255,7 @@ function appendListaDePrograma(
   y -= 24;
 
   const topoDasColunas = y;
-  const alturaUtil = topoDasColunas - LISTA_MARGIN;
+  const alturaUtil = topoDasColunas - (assinada ? baseAssinatura + ASSINATURA_ALTURA_MAX + 12 : LISTA_MARGIN);
 
   function montar(tamanho: number, forcar: boolean) {
     const entreLinhas = tamanho * 1.34;
@@ -262,7 +267,7 @@ function appendListaDePrograma(
       }
       for (const item of secao.itens) {
         const linhas = wrap(item, options.regular, tamanho, larguraColuna - recuo);
-        blocos.push({ linhas, altura: linhas.length * entreLinhas, secao: false, espacoAntes: tamanho * 0.3 });
+        blocos.push({ linhas, altura: linhas.length * entreLinhas, secao: false, espacoAntes: tamanho * (numerada ? 1.3 : 0.3) });
       }
     }
 
@@ -277,8 +282,8 @@ function appendListaDePrograma(
       const necessario = bloco.espacoAntes + bloco.altura
         + (bloco.secao && proximo ? proximo.espacoAntes + proximo.altura : 0);
       if (usado > 0 && usado + necessario > alturaUtil) {
-        if (atual === 1 && !forcar) return null;
-        if (atual === 0) { atual = 1; usado = 0; }
+        if ((atual === 1 || numerada) && !forcar) return null;
+        if (atual === 0 && !numerada) { atual = 1; usado = 0; }
       }
       const consumo = (usado === 0 ? 0 : bloco.espacoAntes) + bloco.altura;
       if (consumo > alturaUtil && !forcar) return null;
@@ -297,18 +302,22 @@ function appendListaDePrograma(
   if (!montagem) return;
 
   const { colunas, entreLinhas, tamanho } = montagem;
+  let numero = 0;
   colunas.forEach((blocos, indice) => {
     const x = LISTA_MARGIN + indice * (larguraColuna + vaoEntreColunas);
     let cy = topoDasColunas;
     blocos.forEach((bloco, ordem) => {
       if (ordem > 0) cy -= bloco.espacoAntes;
+      if (!bloco.secao) numero += 1;
       bloco.linhas.forEach((palavras, linha) => {
         if (bloco.secao) {
           page.drawText(palavras.join(' '), {
             x, y: cy - tamanho, size: tamanho + 1, font: options.bold, color: preto,
           });
         } else {
-          if (linha === 0) {
+          if (linha === 0 && numerada) {
+            page.drawText(`${numero}.`, { x, y: cy - tamanho, size: tamanho, font: options.regular, color: preto });
+          } else if (linha === 0) {
             page.drawCircle({ x: x + 4, y: cy - tamanho * 0.66, size: tamanho * 0.13, color: preto });
           }
           page.drawText(palavras.join(' '), {
@@ -319,6 +328,21 @@ function appendListaDePrograma(
       });
     });
   });
+
+  if (assinada) {
+    // Como no documento de origem: responsável técnica assina à direita.
+    drawSignatureRow(page, {
+      baseY: baseAssinatura,
+      left: LISTA_MARGIN + largura * 0.4,
+      width: largura * 0.5,
+      font: options.regular,
+      color: preto,
+      blocks: [{
+        assinatura: options.assinaturaResponsavel,
+        linhas: [TECHNICAL_LEAD.role, caixaAlta(TECHNICAL_LEAD.name), `${TECHNICAL_LEAD.registryLabel}: ${TECHNICAL_LEAD.registry}`],
+      }],
+    });
+  }
 }
 
 /**
@@ -327,14 +351,14 @@ function appendListaDePrograma(
  */
 function appendProgramPages(
   pdf: PDFDocument,
-  options: { nr: string; duration: string; regular: PDFFont; bold: PDFFont },
+  options: { nr: string; duration: string; regular: PDFFont; bold: PDFFont; assinaturaResponsavel: PDFImage | null },
 ) {
   // A NR 23 tem grade de quatro colunas; os demais cursos vieram do
   // certificador como lista de tópicos, e têm página própria.
   const grade = programForNr(options.nr);
   if (!grade || grade.length === 0) {
     const programa = programaDoCurso(options.nr);
-    if (programa) appendListaDePrograma(pdf, programa.secoes, options);
+    if (programa) appendListaDePrograma(pdf, programa, options);
     return;
   }
 
@@ -574,7 +598,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
     });
   }
 
-  appendProgramPages(pdf, { nr: data.training.nr, duration: data.training.duration, regular, bold });
+  appendProgramPages(pdf, { nr: data.training.nr, duration: data.training.duration, regular, bold, assinaturaResponsavel });
 
   return pdf.save();
 }
@@ -715,7 +739,7 @@ export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Pr
     ],
   });
 
-  appendProgramPages(pdf, { nr: data.training.nr, duration: data.training.duration, regular, bold });
+  appendProgramPages(pdf, { nr: data.training.nr, duration: data.training.duration, regular, bold, assinaturaResponsavel });
 
   return pdf.save();
 }
