@@ -23,6 +23,11 @@ export async function prepararAssinatura(
     const recortada = await sharp(Buffer.from(bytes))
       // O limiar tolera o fundo levemente sujo de foto de papel, sem comer o traço.
       .trim({ threshold: 12 })
+      // Foto de celular vira PNG de 4000 px e ~20 MB, e o pdf-lib leva ~8 s
+      // para embutir cada um: uma turma de 26 alunos travava a emissão por
+      // minutos (NR 06, 30/09/2026). A caixa tem no máximo 96 pt de altura,
+      // então 400 px já dão ~300 dpi impressos.
+      .resize({ width: 1200, height: 400, fit: 'inside', withoutEnlargement: true })
       .png()
       .toBuffer();
     return { bytes: new Uint8Array(recortada), contentType: 'image/png' };
