@@ -15,7 +15,7 @@ export type CertificateSetup = {
   attestation?: AttestationSetup;
 };
 
-export type AttestationTurma = { duration: string; kind: string };
+export type AttestationTurma = { duration: string; kind: string; machine: string };
 
 /**
  * O atestado lista os participantes e a edificação do cliente. O parágrafo de
@@ -72,8 +72,8 @@ export const CERTIFICATE_SETUP: Record<string, CertificateSetup> = {
       'de acordo com a Portaria 3214/78 - NR 12 - Segurança no Trabalho em Máquinas e Equipamentos,',
     background: '/images/certificado/fundo-nr12.jpg',
     attestation: {
-      // O original diz "da bobcat": a máquina muda de cliente para cliente.
-      texto: ({ kind }) => `${ATESTO} do treinamento de "${kind === 'reciclagem' ? 'Reciclagem' : 'Formação'}", de acordo com a NR 12 - Segurança com Máquinas e Equipamentos, Portaria 3214/78, referente às máquinas alocadas na edificação localizada no endereço abaixo e estão aptas ao manuseio das máquinas da edificação:`,
+      // O original diz "da bobcat": a máquina vem do cadastro da turma.
+      texto: ({ kind, machine }) => `${ATESTO} do treinamento de "${kind === 'reciclagem' ? 'Reciclagem' : 'Formação'}", de acordo com a NR 12 - Segurança com Máquinas e Equipamentos, Portaria 3214/78, referente às máquinas alocadas na edificação localizada no endereço abaixo e estão aptas ao manuseio ${machine.trim() ? `da máquina ${machine.trim()}` : 'das máquinas'} da edificação:`,
       colunaExtra: 'treinamento',
     },
   },

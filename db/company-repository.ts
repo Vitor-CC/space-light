@@ -172,6 +172,13 @@ const COLUNAS_POR_MARCADOR = [
     coluna: 'kind',
     alter: "ALTER TABLE trainings ADD COLUMN kind TEXT NOT NULL DEFAULT ''",
   },
+  // Máquina da turma de NR 12: sai no atestado ("manuseio da máquina ...").
+  {
+    marcador: 'col_trainings_machine',
+    tabela: 'trainings',
+    coluna: 'machine',
+    alter: "ALTER TABLE trainings ADD COLUMN machine TEXT NOT NULL DEFAULT ''",
+  },
   // Foto de perfil do instrutor, do funcionário da Space e logo do cliente:
   // chave do arquivo em disco ('' = sem foto, o avatar mostra as iniciais).
   {
@@ -458,6 +465,7 @@ export function ensurePortalSchema(): Promise<void> {
         internal_label TEXT NOT NULL DEFAULT '',
         theme TEXT NOT NULL DEFAULT '',
         kind TEXT NOT NULL DEFAULT '',
+        machine TEXT NOT NULL DEFAULT '',
         validity_months INTEGER NOT NULL DEFAULT 0,
         content_program TEXT NOT NULL DEFAULT '',
         duration TEXT NOT NULL,
@@ -2107,6 +2115,8 @@ export async function updateTrainingByAdmin(input: {
   theme?: string;
   /** Tipo da turma; ausente = não mexe. */
   kind?: string;
+  /** Máquina (NR 12); ausente = não mexe. */
+  machine?: string;
   /** Meses de validade do certificado; ausente = não mexe. */
   validityMonths?: number;
 }) {
@@ -2142,6 +2152,7 @@ export async function updateTrainingByAdmin(input: {
     d1.prepare('UPDATE files SET client_id = ? WHERE training_id = ?').bind(campos.clientId, input.trainingId),
     ...(meses === null ? [] : [d1.prepare('UPDATE trainings SET validity_months = ? WHERE id = ?').bind(meses, input.trainingId)]),
     ...(input.kind === undefined ? [] : [d1.prepare('UPDATE trainings SET kind = ? WHERE id = ?').bind(tipoDaTurma(input.kind), input.trainingId)]),
+    ...(input.machine === undefined ? [] : [d1.prepare('UPDATE trainings SET machine = ? WHERE id = ?').bind(input.machine.trim(), input.trainingId)]),
   ]);
   await writeAudit(input.byUserId, 'training.updated', 'training', input.trainingId, {
     clienteTrocado: turma.client_id !== campos.clientId,
@@ -3068,6 +3079,8 @@ export type CertificateData = {
     duration: string;
     /** 'formacao', 'reciclagem' ou '' (turma sem tipo informado). */
     kind: string;
+    /** Máquina da turma de NR 12 ('' quando não informada). */
+    machine: string;
     dates: string[];
   };
   client: {
@@ -3101,7 +3114,7 @@ export async function getCertificateData(input: {
   await ensurePortalSchema();
   const d1 = getD1();
   const training = await d1
-    .prepare(`SELECT t.id, t.nr, t.title, t.duration, t.kind, t.training_date, t.training_dates,
+    .prepare(`SELECT t.id, t.nr, t.title, t.duration, t.kind, t.machine, t.training_date, t.training_dates,
       t.instructor_id, t.client_id, c.legal_name, c.document AS client_document,
       c.address, c.district, c.city, c.state,
       COALESCE(i.name, t.instructor) AS instructor_name,
@@ -3112,7 +3125,7 @@ export async function getCertificateData(input: {
       WHERE t.id = ? LIMIT 1`)
     .bind(input.trainingId)
     .first<{
-      id: string; nr: string; title: string; duration: string; kind: string | null;
+      id: string; nr: string; title: string; duration: string; kind: string | null; machine: string | null;
       training_date: string; training_dates: string; instructor_id: string | null;
       client_id: string; legal_name: string; client_document: string;
       address: string; district: string; city: string; state: string;
@@ -3160,6 +3173,7 @@ export async function getCertificateData(input: {
       title: training.title,
       duration: training.duration,
       kind: training.kind ?? '',
+      machine: training.machine ?? '',
       dates,
     },
     client: {
@@ -3448,7 +3462,7 @@ export async function getCompanyDashboardData(
       d1
         .prepare(
           `SELECT t.id, t.client_id, t.instructor_id, c.name AS client_name,
-           t.code, t.nr, t.title, t.internal_label, t.theme, t.kind, t.training_date, t.duration, t.location, t.content_program,
+           t.code, t.nr, t.title, t.internal_label, t.theme, t.kind, t.machine, t.training_date, t.duration, t.location, t.content_program,
            COALESCE(i.name, t.instructor) AS instructor,
            t.status, t.participant_limit, t.qr_token, t.qr_enabled,
            t.created_at, t.validity_months,
@@ -3595,6 +3609,8 @@ export async function createTraining(input: {
   theme?: string;
   /** 'formacao' ou 'reciclagem'; outro valor vira não informado. */
   kind?: string;
+  /** Máquina da turma de NR 12, citada no atestado. */
+  machine?: string;
   days: NovoDiaDeTreinamento[];
   contentProgram: string;
   duration: string;
@@ -3644,9 +3660,9 @@ export async function createTraining(input: {
   await d1.batch([
     d1
       .prepare(`INSERT INTO trainings (
-        id, client_id, instructor_id, code, nr, title, internal_label, theme, kind, training_date, training_dates,
+        id, client_id, instructor_id, code, nr, title, internal_label, theme, kind, machine, training_date, training_dates,
         content_program, duration, location, instructor, status, participant_limit, qr_token, qr_enabled
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, ?, 1)`)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, ?, 1)`)
       .bind(
         id,
         input.clientId,
@@ -3657,6 +3673,7 @@ export async function createTraining(input: {
         (input.internalLabel ?? '').trim(),
         (input.theme ?? '').trim(),
         tipoDaTurma(input.kind),
+        (input.machine ?? '').trim(),
         primaryDate,
         JSON.stringify(dias.map((dia) => dia.date)),
         (input.contentProgram ?? '').trim(),

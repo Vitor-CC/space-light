@@ -122,7 +122,7 @@ export async function buildAttestationPdf(input: AttestationPdfInput): Promise<U
   let y = 0;
 
   const corpo = 10.5;
-  const paragrafo = atestado.texto({ duration: data.training.duration ?? '', kind: data.training.kind });
+  const paragrafo = atestado.texto({ duration: data.training.duration ?? '', kind: data.training.kind, machine: data.training.machine });
   const campos: [string, string][] = [
     ['EMPRESA', caixaAlta(data.client.legalName)],
     ['CNPJ', data.client.document || '—'],

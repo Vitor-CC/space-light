@@ -162,7 +162,7 @@ function AddDay({ training, instructors, reload, notify }: { training: CompanyTr
   </form>;
 }
 
-type DadosTreinamento = { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string; kind: string; validityMonths: number };
+type DadosTreinamento = { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string; kind: string; machine: string; validityMonths: number };
 
 const ROTULO_DO_TIPO: Record<string, string> = { formacao: 'Formação', reciclagem: 'Reciclagem' };
 
@@ -248,7 +248,7 @@ function ChecklistDaTurma({ training, data, reload, notify }: { training: Compan
 /** O que sai no certificado e na lista: cliente, norma, título, carga horária, endereço e conteúdo. */
 function TrainingDetails({ training, data, reload, notify }: { training: CompanyTraining; data: CompanyDashboardData; reload: Reload; notify: Notify }) {
   const clients = data.clients;
-  const inicial = (): DadosTreinamento => ({ clientId: training.client_id, nr: training.nr, title: training.title, duration: training.duration, location: training.location, contentProgram: training.content_program ?? '', theme: training.theme ?? '', kind: training.kind ?? '', validityMonths: training.validity_months ?? 0 });
+  const inicial = (): DadosTreinamento => ({ clientId: training.client_id, nr: training.nr, title: training.title, duration: training.duration, location: training.location, contentProgram: training.content_program ?? '', theme: training.theme ?? '', kind: training.kind ?? '', machine: training.machine ?? '', validityMonths: training.validity_months ?? 0 });
   const [aberto, setAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [draft, setDraft] = useState<DadosTreinamento>(inicial);
@@ -274,6 +274,7 @@ function TrainingDetails({ training, data, reload, notify }: { training: Company
     <dt className="text-ds-texto-2">Carga horária</dt><dd>{training.duration || '—'}</dd>
     <dt className="text-ds-texto-2">Endereço</dt><dd>{training.location || '—'}</dd>
     <dt className="text-ds-texto-2">Validade</dt><dd>{rotuloValidade(training.validity_months ?? 0)}</dd>
+    {training.nr === 'NR 12' ? <><dt className="text-ds-texto-2">Máquina</dt><dd>{training.machine || 'Não informada'}</dd></> : null}
     {training.theme ? <><dt className="text-ds-texto-2">Tema</dt><dd>{training.theme}</dd></> : null}
     <dd className="sm:col-span-2"><button type="button" onClick={() => { setDraft(inicial()); setAberto(true); }} className={botaoClasses('fantasma', 'P', 'mt-1')}><Pencil />Editar dados do treinamento</button></dd>
   </dl>;
@@ -289,6 +290,7 @@ function TrainingDetails({ training, data, reload, notify }: { training: Company
       <Campo rotulo="Carga horária"><input required value={draft.duration} onChange={(e) => setDraft({ ...draft, duration: e.target.value })} className={campoClasses} /></Campo>
       <Campo rotulo="Validade do certificado" ajuda="Só no portal do cliente; o PDF não muda."><select value={draft.validityMonths} onChange={(e) => setDraft({ ...draft, validityMonths: Number(e.target.value) })} className={selectClasses}>{VALIDADES.map((m) => <option key={m} value={m}>{rotuloValidade(m)}</option>)}</select></Campo>
     </div>
+    {draft.nr === 'NR 12' ? <Campo rotulo="Máquina" ajuda="Sai no atestado: “aptas ao manuseio da máquina … da edificação”."><input value={draft.machine} onChange={(e) => setDraft({ ...draft, machine: e.target.value })} placeholder="Ex.: Bobcat" className={campoClasses} /></Campo> : null}
     <Campo rotulo="Endereço do treinamento"><input required value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} className={campoClasses} /></Campo>
     <Campo rotulo="Tema da turma" ajuda="Vai na mensagem de escala do instrutor. Não aparece em nenhum documento."><input value={draft.theme} onChange={(e) => setDraft({ ...draft, theme: e.target.value })} placeholder="Ex.: Reciclagem para a equipe de manutenção" className={campoClasses} /></Campo>
     <CampoConteudo data={data} nr={draft.nr} valor={draft.contentProgram} onChange={(contentProgram) => setDraft({ ...draft, contentProgram })} reload={reload} notify={notify} />
@@ -613,7 +615,7 @@ function Agenda({ data, reload, notify, abrirTurma }: { data: CompanyDashboardDa
 
 type Tipo = 'formacao' | 'reciclagem';
 type Modalidade = 'in_company' | 'centro';
-type Draft = { clientId: string; nr: string; kind: Tipo; duration: string; days: Omit<NovoDia, 'instructorId'>[]; modalidade: Modalidade; location: string; instructorId: string };
+type Draft = { clientId: string; nr: string; kind: Tipo; machine: string; duration: string; days: Omit<NovoDia, 'instructorId'>[]; modalidade: Modalidade; location: string; instructorId: string };
 
 /** Título do certificado sugerido pela norma; a equipe ajusta depois na ficha. */
 function tituloPadrao(nr: string) {
@@ -681,7 +683,7 @@ function NovaTurma({ data, reload, notify, aoCriar, onFechar, preset = null }: {
   // Vindo da ficha do cliente já chega com o cliente; "Agendar" uma reciclagem traz também a norma.
   const nrInicial = preset?.nr && NORMAS.includes(preset.nr) ? preset.nr : 'NR 23';
   const clienteInicial = data.clients.find((c) => c.id === preset?.clienteId);
-  const [draft, setDraft] = useState<Draft>({ clientId: clienteInicial?.id ?? '', nr: nrInicial, kind: preset?.nr ? 'reciclagem' : 'formacao', duration: cargaHorariaPadrao(nrInicial), days: [diaVazio()], modalidade: 'in_company', location: enderecoDoCliente(clienteInicial), instructorId: '' });
+  const [draft, setDraft] = useState<Draft>({ clientId: clienteInicial?.id ?? '', nr: nrInicial, kind: preset?.nr ? 'reciclagem' : 'formacao', machine: '', duration: cargaHorariaPadrao(nrInicial), days: [diaVazio()], modalidade: 'in_company', location: enderecoDoCliente(clienteInicial), instructorId: '' });
   const cliente = data.clients.find((c) => c.id === draft.clientId);
 
   function mudarCliente(id: string) {
@@ -738,6 +740,7 @@ function NovaTurma({ data, reload, notify, aoCriar, onFechar, preset = null }: {
         clientId: draft.clientId,
         nr: draft.nr,
         kind: draft.kind,
+        machine: draft.nr === 'NR 12' ? draft.machine : '',
         title: tituloPadrao(draft.nr),
         internalLabel: '',
         theme: '',
@@ -784,6 +787,7 @@ function NovaTurma({ data, reload, notify, aoCriar, onFechar, preset = null }: {
         <Campo rotulo="Tipo"><select value={draft.kind} onChange={(e) => { const valor = e.target.value as Tipo; setDraft((atual) => ({ ...atual, kind: valor })); }} className={selectClasses}><option value="formacao">Formação</option><option value="reciclagem">Reciclagem</option></select></Campo>
         <Campo rotulo="Carga horária"><input required value={draft.duration} onChange={(e) => { const valor = e.target.value; setDraft((atual) => ({ ...atual, duration: valor })); }} placeholder="Ex.: 16 horas" className={campoClasses} /></Campo>
       </div>
+      {draft.nr === 'NR 12' ? <Campo rotulo="Máquina" ajuda="Sai no atestado: “aptas ao manuseio da máquina … da edificação”."><input value={draft.machine} onChange={(e) => { const valor = e.target.value; setDraft((atual) => ({ ...atual, machine: valor })); }} placeholder="Ex.: Bobcat" className={campoClasses} /></Campo> : null}
 
       <Divisor>Data e local</Divisor>
       {draft.days.map((dia, index) => <div key={index} className="flex flex-col gap-2">

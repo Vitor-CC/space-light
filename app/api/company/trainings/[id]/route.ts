@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { renameTraining, updateTrainingByAdmin } from '@/db/company-repository';
 import { getCurrentUser } from '@/lib/app-auth';
 
-type Detalhes = { clientId?: string; nr?: string; title?: string; duration?: string; location?: string; contentProgram?: string; theme?: string; kind?: string; validityMonths?: number };
+type Detalhes = { clientId?: string; nr?: string; title?: string; duration?: string; location?: string; contentProgram?: string; theme?: string; kind?: string; machine?: string; validityMonths?: number };
 
 /**
  * `internalLabel` troca só a identificação interna da turma. `details` é a
@@ -30,6 +30,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         contentProgram: details.contentProgram ?? '',
         theme: details.theme ?? '',
         kind: details.kind,
+        machine: details.machine,
         validityMonths: details.validityMonths,
       }));
     }

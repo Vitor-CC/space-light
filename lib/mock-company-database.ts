@@ -46,7 +46,7 @@ export function approveInstructor(instructorId: string) {
 
 export type NovoDia = { date: string; startTime: string; endTime: string; instructorId: string | null };
 
-export function createMockTraining(input: { clientId: string; nr: string; title: string; internalLabel: string; theme: string; kind?: string; days: NovoDia[]; contentProgram: string; duration: string; location: string }) {
+export function createMockTraining(input: { clientId: string; nr: string; title: string; internalLabel: string; theme: string; kind?: string; machine?: string; days: NovoDia[]; contentProgram: string; duration: string; location: string }) {
   return requestJson<{ id: string; code: string; qrToken: string }>('/api/company/trainings', { method: 'POST', body: JSON.stringify(input) });
 }
 
@@ -227,7 +227,7 @@ export function updateInstructor(instructorId: string, input: { name: string; do
   return requestJson<{ ok: true }>(`/api/company/instructors/${encodeURIComponent(instructorId)}`, { method: 'PATCH', body: JSON.stringify(input) });
 }
 
-export function updateTrainingDetails(trainingId: string, details: { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string; kind?: string; validityMonths?: number }) {
+export function updateTrainingDetails(trainingId: string, details: { clientId: string; nr: string; title: string; duration: string; location: string; contentProgram: string; theme: string; kind?: string; machine?: string; validityMonths?: number }) {
   return requestJson<{ ok: true }>(`/api/company/trainings/${encodeURIComponent(trainingId)}`, { method: 'PATCH', body: JSON.stringify({ details }) });
 }
 

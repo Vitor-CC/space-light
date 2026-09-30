@@ -95,6 +95,8 @@ export type CompanyTraining = {
   theme?: string;
   /** 'formacao', 'reciclagem' ou '' (não informado); vem só na gestão. */
   kind?: string;
+  /** Máquina da turma de NR 12, citada no atestado; vem só na gestão. */
+  machine?: string;
   /** Conteúdo programático; vem só nos dados da gestão. */
   content_program?: string;
   training_date: string;
