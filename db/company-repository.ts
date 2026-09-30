@@ -2,6 +2,7 @@ import { getD1 } from '@/db';
 import { itensDoTexto, type ChecklistDaNorma, type MarcaDoChecklist } from '@/lib/checklist';
 import type { TipoDeFoto } from '@/lib/fotos';
 import { formatarCpf, formatarRg, problemaCpf, problemaRg } from '@/lib/documentos';
+import { validarEquipamentos } from '@/lib/equipamentos-instrutor';
 import { INSTRUCTOR_DOCUMENT_CATEGORIES } from '@/lib/instructor-documents';
 import { clientePedeLogin } from '@/lib/login-do-participante';
 import { nomeCertificadoAluno, PREFIXO_CERTIFICADO_ALUNO } from '@/lib/nome-certificado';
@@ -205,6 +206,13 @@ const COLUNAS_POR_MARCADOR = [
     tabela: 'participants',
     coluna: 'employee_login',
     alter: "ALTER TABLE participants ADD COLUMN employee_login TEXT NOT NULL DEFAULT ''",
+  },
+  // Carro, celular e notebook do instrutor, em JSON (lib/equipamentos-instrutor.ts).
+  {
+    marcador: 'col_instructors_equipment',
+    tabela: 'instructors',
+    coluna: 'equipment',
+    alter: "ALTER TABLE instructors ADD COLUMN equipment TEXT NOT NULL DEFAULT ''",
   },
 ];
 
@@ -418,6 +426,7 @@ export function ensurePortalSchema(): Promise<void> {
         professional_registry TEXT NOT NULL DEFAULT '',
         specialties TEXT NOT NULL DEFAULT '',
         base_city TEXT NOT NULL DEFAULT '',
+        equipment TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'pending',
         source TEXT NOT NULL DEFAULT 'self',
         photo_key TEXT NOT NULL DEFAULT '',
@@ -1417,7 +1426,7 @@ export async function getInstructorDashboardData(
   const d1 = getD1();
   const instructor = await d1
     .prepare(`SELECT id, name, document, email, phone, professional_registry,
-      specialties, base_city, status, source, photo_key, created_at
+      specialties, base_city, status, source, photo_key, equipment, created_at
       FROM instructors WHERE id = ? AND status != 'suspended' LIMIT 1`)
     .bind(currentUser.instructor_id)
     .first<CompanyInstructor>();
@@ -2872,6 +2881,22 @@ export async function updateInstructorProfile(input: {
   await writeAudit(input.userId, 'instructor.profile_updated', 'instructor', input.instructorId, {});
 }
 
+/** Carro, celular e notebook: o instrutor preenche em "Meus documentos". */
+export async function updateInstructorEquipment(input: {
+  instructorId: string;
+  userId: string;
+  equipment: unknown;
+}) {
+  await ensurePortalSchema();
+  const equipamentos = validarEquipamentos(input.equipment);
+  await getD1()
+    .prepare(`UPDATE instructors SET equipment = ?, updated_at = datetime('now') WHERE id = ?`)
+    .bind(JSON.stringify(equipamentos), input.instructorId)
+    .run();
+  await writeAudit(input.userId, 'instructor.equipment_updated', 'instructor', input.instructorId, {});
+  return equipamentos;
+}
+
 /**
  * O cliente edita só o que é dele no dia a dia. Razão social, CNPJ e nome de
  * exibição ficam de fora porque saem impressos na lista de presença; e-mail
@@ -3443,7 +3468,7 @@ export async function getCompanyDashboardData(
       d1
         .prepare(
           `SELECT id, name, document, email, phone, professional_registry,
-           specialties, base_city, status, source, photo_key, created_at
+           specialties, base_city, status, source, photo_key, equipment, created_at
            FROM instructors ORDER BY name COLLATE NOCASE ASC`,
         )
         .all<CompanyInstructor>(),

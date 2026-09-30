@@ -17,6 +17,7 @@ import { Abas, PainelLateral } from '@/components/ds/interativo';
 import { Calendar } from '@/components/ui/calendar';
 import { registroValido } from '@/lib/certificate-config';
 import type { CompanyDashboardData, CompanyInstructor } from '@/lib/company-types';
+import { GRUPOS_DE_EQUIPAMENTO, lerEquipamentos, temEquipamento } from '@/lib/equipamentos-instrutor';
 import { REQUIRED_INSTRUCTOR_DOCUMENTS } from '@/lib/instructor-documents';
 import { approveInstructor, createInstructor, deleteInstructor, readInstructorDocuments, resetUserPassword, reviewInstructorDocument, updateInstructor } from '@/lib/mock-company-database';
 import { urlDaFoto } from '@/lib/fotos';
@@ -103,6 +104,23 @@ function DocumentosDoInstrutor({ docs, onDecidir }: { docs: Documento[]; onDecid
         </div>
       </> : <Vazio icone={<FileText />} titulo="Nenhum documento enviado" texto="O instrutor envia CNH, assinatura e registro pelo portal dele. Aparecem aqui para você avaliar." />}
     </div>
+  </div>;
+}
+
+/** Carro, celular e notebook que o instrutor informou no portal dele. Só leitura. */
+function EquipamentosDoInstrutor({ instructor }: { instructor: CompanyInstructor }) {
+  const equipamentos = lerEquipamentos(instructor.equipment);
+  return <div className="flex flex-col gap-4 rounded-lg bg-ds-superficie p-5">
+    <div><h3 className="ds-h4">Carro, celular e notebook</h3><p className="ds-body-s text-ds-texto-2">Preenchido pelo instrutor em &ldquo;Meus documentos&rdquo;.</p></div>
+    {temEquipamento(equipamentos) ? <div className="grid gap-5 md:grid-cols-3">
+      {GRUPOS_DE_EQUIPAMENTO.map(({ grupo, titulo, campos }) => <dl key={grupo} className="flex flex-col gap-1.5">
+        <dt className="ds-caps text-ds-texto-2">{titulo}</dt>
+        {campos.map((campo) => {
+          const valor = (equipamentos[grupo] as Record<string, string>)[campo.chave];
+          return <dd key={campo.chave} className="flex justify-between gap-3 border-b border-ds-borda pb-1.5 ds-body-s"><span className="text-ds-texto-2">{campo.rotulo}</span><span className={cn('text-right font-medium', ['placa', 'imei', 'serie'].includes(campo.chave) && 'ds-mono', !valor && 'font-normal text-ds-texto-2')}>{valor || '—'}</span></dd>;
+        })}
+      </dl>)}
+    </div> : <p className="rounded-md border border-dashed border-ds-borda p-4 ds-body-s text-ds-texto-2">O instrutor ainda não preencheu.</p>}
   </div>;
 }
 
@@ -302,7 +320,7 @@ export function CompanyInstructors({ data, reload, notify, navegar }: { data: Co
         { id: 'turmas', rotulo: 'Turmas', contador: turmas.length },
         { id: 'dados', rotulo: 'Dados' },
       ]} />
-      {abaFicha === 'documentos' ? <DocumentosDoInstrutor key={instrutor.id} docs={docs} onDecidir={decidir} /> : null}
+      {abaFicha === 'documentos' ? <><DocumentosDoInstrutor key={instrutor.id} docs={docs} onDecidir={decidir} /><EquipamentosDoInstrutor instructor={instrutor} /></> : null}
       {abaFicha === 'disponibilidade' ? <DisponibilidadeDoInstrutor instructor={instrutor} data={data} hoje={hoje} /> : null}
       {abaFicha === 'turmas' ? (turmas.length ? <div className={tb.moldura}><div className={tb.rolagem}><table className={cn(tb.tabela, 'min-w-[720px]')}>
         <thead className={tb.cabeca}><tr><th className={tb.th}>Turma</th><th className={tb.th}>Cliente</th><th className={tb.th}>Treinamento</th><th className={tb.th}>Dias dele</th><th className={tb.th}>Status</th></tr></thead>

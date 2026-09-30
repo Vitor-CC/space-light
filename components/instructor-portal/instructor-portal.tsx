@@ -13,6 +13,7 @@ import { urlDaFoto } from '@/lib/fotos';
 import { Aviso, PortalShell, useAviso } from '@/components/ds/interativo';
 import { Calendar } from '@/components/ui/calendar';
 import type { CompanyTraining } from '@/lib/company-types';
+import { GRUPOS_DE_EQUIPAMENTO, lerEquipamentos, type EquipamentosDoInstrutor } from '@/lib/equipamentos-instrutor';
 import { INSTRUCTOR_DOCUMENT_STATUS, REQUIRED_INSTRUCTOR_DOCUMENTS } from '@/lib/instructor-documents';
 import type { InstructorDashboardData } from '@/lib/instructor-types';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ export function InstructorPortal({ initialData }: { initialData: InstructorDashb
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-8 sm:px-6">
         <TopoDePagina titulo={`Falta pouco, ${data.instructor.name.split(' ')[0]}`} subtitulo="Envie os três documentos abaixo. A Space Light analisa e libera o seu acesso às turmas; o aviso chega pelo WhatsApp cadastrado." />
         <MeusDocumentos notify={setAviso} />
+        <MeusEquipamentos salvo={data.instructor.equipment} reload={reload} notify={setAviso} />
       </div>
       <Aviso texto={aviso} onFechar={() => setAviso('')} />
     </main>;
@@ -52,7 +54,7 @@ export function InstructorPortal({ initialData }: { initialData: InstructorDashb
   else if (section === 'calendar') conteudo = <Calendario data={data} reload={reload} notify={setAviso} openTraining={openTraining} />;
   else if (section === 'trainings') conteudo = <div className="flex flex-col gap-6"><TopoDePagina titulo="Turmas" subtitulo="As turmas atribuídas a você pela Space Light." />{data.trainings.length ? <div className="grid gap-4 xl:grid-cols-2">{data.trainings.map((training) => <CartaoTurma key={training.id} training={training} onStart={openTraining} instructorId={data.instructor.id} />)}</div> : <Vazio icone={<GraduationCap />} titulo="Nenhuma turma atribuída" texto="A gestão da Space Light vincula seus próximos treinamentos aqui." />}</div>;
   else if (section === 'active') conteudo = <div className="flex flex-col gap-5"><TopoDePagina className="hidden lg:flex" titulo="Sala da turma" subtitulo="Inicie o dia, mostre o QR, faça a chamada e finalize a turma." acoes={<BotaoIcone rotulo="Atualizar dados" onClick={() => void reload()}><RefreshCw /></BotaoIcone>} /><Sala data={data} selectedId={selectedTrainingId} selectTraining={setSelectedTrainingId} reload={reload} notify={setAviso} /></div>;
-  else if (section === 'documents') conteudo = <div className="flex flex-col gap-6"><TopoDePagina titulo="Meus documentos" subtitulo="CNH, assinatura e registro MTE/RE exigidos pela Space Light para liberar as turmas." /><MeusDocumentos notify={setAviso} /></div>;
+  else if (section === 'documents') conteudo = <div className="flex flex-col gap-6"><TopoDePagina titulo="Meus documentos" subtitulo="CNH, assinatura e registro MTE/RE exigidos pela Space Light para liberar as turmas." /><MeusDocumentos notify={setAviso} /><MeusEquipamentos salvo={data.instructor.equipment} reload={reload} notify={setAviso} /></div>;
   else conteudo = <MeuCadastro data={data} reload={reload} notify={setAviso} />;
 
   return <PortalShell area="Área do instrutor" itens={itens} ativo={section === 'profile' ? null : section} onNavegar={setSection} usuario={{ nome: data.instructor.name, detalhe: 'Meu cadastro', foto: urlDaFoto('instrutor', data.instructor.id, data.instructor.photo_key) }} onUsuario={() => setSection('profile')}>
@@ -265,6 +267,42 @@ function MeusDocumentos({ notify }: { notify: (message: string) => void }) {
       </div>
     </Cartao>;
   })}</div>;
+}
+
+/* ─── Carro, celular e notebook ─────────────────────────────────────────── */
+
+function MeusEquipamentos({ salvo, reload, notify }: { salvo?: string; reload: () => Promise<void>; notify: (message: string) => void }) {
+  const [form, setForm] = useState<EquipamentosDoInstrutor>(() => lerEquipamentos(salvo));
+  const [saving, setSaving] = useState(false);
+  function mudar(grupo: keyof EquipamentosDoInstrutor, chave: string, valor: string) {
+    setForm((atual) => ({ ...atual, [grupo]: { ...atual[grupo], [chave]: valor } }));
+  }
+  async function save(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const resultado = await requestJson<{ equipment: EquipamentosDoInstrutor }>('/api/instructor/equipment', { method: 'POST', body: JSON.stringify({ equipment: form }) });
+      setForm(resultado.equipment);
+      notify('Dados do carro, celular e notebook salvos.');
+      await reload();
+    } catch (error) { notify(error instanceof Error ? error.message : 'Erro ao salvar os dados.'); }
+    finally { setSaving(false); }
+  }
+  return <Cartao className="p-5 sm:p-7">
+    <h3 className="ds-h4">Carro, celular e notebook</h3>
+    <p className="mt-1 max-w-lg ds-body-s text-ds-texto-2">O que você usa nos treinamentos da Space Light. Preencha o que tiver.</p>
+    <form onSubmit={save} className="mt-5 flex flex-col gap-6">
+      {GRUPOS_DE_EQUIPAMENTO.map(({ grupo, titulo, campos }) => <fieldset key={grupo} className="flex flex-col gap-3 border-t border-ds-borda pt-4">
+        <legend className="ds-caps pr-2 text-ds-texto-2">{titulo}</legend>
+        <div className={cn('grid gap-4 sm:grid-cols-2', campos.length === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}>
+          {campos.map((campo) => <Campo key={campo.chave} rotulo={campo.rotulo} ajuda={campo.ajuda}>
+            <input value={(form[grupo] as Record<string, string>)[campo.chave]} onChange={(e) => mudar(grupo, campo.chave, e.target.value)} placeholder={campo.exemplo ? `Ex.: ${campo.exemplo}` : undefined} inputMode={campo.chave === 'imei' ? 'numeric' : undefined} autoCapitalize={campo.chave === 'placa' ? 'characters' : undefined} className={campoClasses} />
+          </Campo>)}
+        </div>
+      </fieldset>)}
+      <div><Botao type="submit" disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : <Check />}Salvar</Botao></div>
+    </form>
+  </Cartao>;
 }
 
 /* ─── Meu cadastro ──────────────────────────────────────────────────────── */

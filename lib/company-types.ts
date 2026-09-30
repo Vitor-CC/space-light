@@ -39,6 +39,8 @@ export type CompanyInstructor = {
   document_count: number;
   /** Chave da foto em disco; '' = sem foto. */
   photo_key?: string;
+  /** Carro, celular e notebook em JSON; ler com lerEquipamentos(). */
+  equipment?: string;
   pending_document_count: number;
 };
 
