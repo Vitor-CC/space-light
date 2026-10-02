@@ -16,6 +16,7 @@ import {
 import { nomeCertificadoAluno, PREFIXO_CERTIFICADO_ALUNO, semAcento } from '@/lib/nome-certificado';
 import { programForNr } from '@/lib/nr23-program';
 import { programaDoCurso } from '@/lib/nr-programs';
+import { textosParaPdf } from '@/lib/texto-pdf';
 import type { ProgramaDeCurso } from '@/lib/nr-programs';
 
 /** A4 paisagem em pontos, o mesmo do modelo impresso da Space. */
@@ -461,7 +462,7 @@ export type CertificatePdfInput = {
  * embutidas uma única vez e reaproveitadas em todas as páginas.
  */
 export async function buildCertificatePdf(input: CertificatePdfInput): Promise<Uint8Array> {
-  const { data } = input;
+  const data = textosParaPdf(input.data);
   const setup = certificateSetup(data.training.nr);
   if (!setup) {
     throw new Error(`A base legal da ${data.training.nr} ainda não foi cadastrada.`);
@@ -608,7 +609,7 @@ export async function buildCertificatePdf(input: CertificatePdfInput): Promise<U
  * participante. Só duas assinaturas — não há aluno para assinar.
  */
 export async function buildCompanyCertificatePdf(input: CertificatePdfInput): Promise<Uint8Array> {
-  const { data } = input;
+  const data = textosParaPdf(input.data);
   const setup = certificateSetup(data.training.nr);
   if (!setup) {
     throw new Error(`A base legal da ${data.training.nr} ainda não foi cadastrada.`);

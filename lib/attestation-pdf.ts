@@ -14,6 +14,7 @@ import {
   mte,
 } from '@/lib/certificate-config';
 import { caixaAlta } from '@/lib/certificate-pdf';
+import { textosParaPdf } from '@/lib/texto-pdf';
 
 /** O atestado é A4 retrato: é um documento de texto com tabela. */
 const PAGE_W = 595.28;
@@ -93,7 +94,7 @@ export type AttestationPdfInput = {
  * e a edificação onde o treinamento foi aplicado.
  */
 export async function buildAttestationPdf(input: AttestationPdfInput): Promise<Uint8Array> {
-  const { data } = input;
+  const data = textosParaPdf(input.data);
   const setup = certificateSetup(data.training.nr);
   if (!setup) {
     throw new Error(`A base legal da ${data.training.nr} ainda não foi cadastrada.`);
